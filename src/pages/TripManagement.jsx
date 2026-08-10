@@ -95,7 +95,7 @@ const TripManagement = () => {
         </Section>
 
         <ActionArea>
-          <Button as={Link} to="/">
+          <Button as={Link} to="/trip-management/edit">
             구간 상세·편집
           </Button>
         </ActionArea>

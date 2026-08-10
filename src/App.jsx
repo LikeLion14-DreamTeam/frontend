@@ -5,6 +5,7 @@ import Recommendation from "./pages/Recommendation"
 import Archive from "./pages/Archive"
 import Trip from "./pages/Trip"
 import TripManagement from "./pages/TripManagement"
+import TripSegmentEdit from "./pages/TripSegmentEdit"
 
 
 function App() {
@@ -16,6 +17,7 @@ function App() {
       <Route path="/archive" element={<Archive />} />
       <Route path="/trip" element={<Trip />} />
       <Route path="/trip-management" element={<TripManagement />} />
+      <Route path="/trip-management/edit" element={<TripSegmentEdit />} />
     </Routes>
   )
 }
