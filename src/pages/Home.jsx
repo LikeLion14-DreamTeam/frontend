@@ -33,7 +33,7 @@ const Home = () => {
             <JourneyTitle>여정타이틀</JourneyTitle>
             <JourneyMeta>여정정보</JourneyMeta>
             <JourneyFooter>
-              <TextLink to="/trip">여행 구간 관리</TextLink>
+              <TextLink to="/trip-management">여행 구간 관리</TextLink>
             </JourneyFooter>
           </Card>
         </Section>
