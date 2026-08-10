@@ -68,7 +68,7 @@ const Home = () => {
         </Section>
 
         <Section>
-          <Button $variant="secondary">수동 여행 기록 시작</Button>
+          <Button>수동 여행 기록 시작</Button>
         </Section>
 
       </HomeWrapper>
