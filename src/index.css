@@ -1,5 +1,115 @@
+@font-face {
+  font-family: "Noto Sans KR";
+  src: url("./assets/fonts/NotoSansKR-VariableFont_wght.woff2")
+    format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Noto Sans";
+  src: url("./assets/fonts/NotoSans-VariableFont_wdth,wght.woff2")
+    format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Noto Sans";
+  src: url("./assets/fonts/NotoSans-Italic-VariableFont_wdth,wght.woff2")
+    format("woff2");
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Cormorant Garamond";
+  src: url("./assets/fonts/CormorantGaramond-VariableFont_wght.woff2")
+    format("woff2");
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Cormorant Garamond";
+  src: url("./assets/fonts/CormorantGaramond-Italic-VariableFont_wght.woff2")
+    format("woff2");
+  font-weight: 300 700;
+  font-style: italic;
+  font-display: swap;
+}
+
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
 }
+
+:root {
+  /* 01. Layout */
+  --layout-mobile-width: 402px;
+  --layout-mobile-height: 874px;
+  --layout-safe-area: 58px;
+  --layout-bottom-navigation: 75px;
+  --layout-margin: 24px;
+  --layout-grid-columns: 4;
+  --layout-grid-gutter: 20px;
+
+  /* 02. Color System */
+  --color-background-base: #f7f1e8;
+  --color-surface-base: #fffdf9;
+  --color-primary-cognac: #b5763b;
+  --color-primary-pressed: #945a2c;
+  --color-text-primary: #30251d;
+  --color-text-secondary: #817468;
+  --color-border-default: #ded3c6;
+  --color-accent-gold: #c5a15b;
+  --color-secondary-taupe: #b5a18c;
+  --color-border-strong: #c8b8a6;
+  --color-disabled-fill: #e8e0d7;
+  --color-disabled-text: #b6aca2;
+
+  /* Map palette */
+  --color-map-base: #f4eee5;
+  --color-map-land: #eee6db;
+  --color-map-road: #d9d0c5;
+  --color-map-water: #d9e0dc;
+  --color-map-park: #e2e6d7;
+  --color-map-route: #b5763b;
+  --color-map-pin-active: #b5763b;
+  --color-map-pin-inactive: #b9aa99;
+
+  /* 03. Typography */
+  --font-sans: "Noto Sans KR", "Noto Sans", "Apple SD Gothic Neo",
+    "Malgun Gothic", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  --font-serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+
+  /* 04. Spacing & Radius */
+  --space-4: 4px;
+  --space-8: 8px;
+  --space-16: 16px;
+  --space-20: 20px;
+  --space-24: 24px;
+  --space-32: 32px;
+  --space-48: 48px;
+
+  --spacing-section: 32px;
+  --spacing-card-padding: 16px;
+  --spacing-large-card-padding-min: 20px;
+  --spacing-large-card-padding-max: 24px;
+  --spacing-info-group: 8px;
+
+  --radius-control: 8px;
+  --radius-button: 10px;
+  --radius-image: 10px;
+  --radius-card: 12px;
+  --radius-journal: 16px;
+  --radius-passport: 18px;
+  --radius-bottom-sheet: 24px;
+}
+
