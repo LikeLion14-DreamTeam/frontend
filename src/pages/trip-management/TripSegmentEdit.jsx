@@ -1,8 +1,8 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
-import Button from '../components/common/Button'
-import Card from '../components/common/Card'
+import Button from '../../components/common/Button'
+import Card from '../../components/common/Card'
 
 const dateOptions = [
   '2024.11.01',

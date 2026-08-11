@@ -1,7 +1,7 @@
 import React from 'react'
 import styled from 'styled-components'
-import Header from '../components/layout/Header'
-import NavBar from '../components/layout/NavBar'
+import Header from '../../components/layout/Header'
+import NavBar from '../../components/layout/NavBar'
 import { Link } from 'react-router-dom'
 
 const Archive = () => {
