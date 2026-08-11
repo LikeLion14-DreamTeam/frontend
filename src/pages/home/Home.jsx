@@ -25,7 +25,12 @@ const Home = () => {
 
       <HomeWrapper>
 
-        <Title>나의 여행 기록</Title>
+        <TitleRow>
+          <Title>나의 여행 기록</Title>
+          <ContinueTripButton as={Link} to="/record/camera">
+            여행 계속하기
+          </ContinueTripButton>
+        </TitleRow>
 
         <Section>
           <Card>
@@ -89,8 +94,29 @@ const HomeWrapper = styled.main`
 `
 
 const Title = styled.h2`
-  margin-bottom: 16px;
   font-size: 22px;
+`
+
+const TitleRow = styled.div`
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+`
+
+const ContinueTripButton = styled(Button)`
+  width: auto;
+  min-width: 92px;
+  min-height: 27px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: #111827;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
 `
 
 const Section = styled.section`
