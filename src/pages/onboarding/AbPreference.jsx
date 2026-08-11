@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import ImagePlaceholder from '../../components/common/ImagePlaceholder'
 import Header from '../../components/layout/Header'
@@ -6,6 +7,7 @@ import Header from '../../components/layout/Header'
 const TOTAL_ROUND = 5
 
 const AbPreference = () => {
+  const navigate = useNavigate()
   const [round, setRound] = useState(1)
 
   const handleSelect = () => {
@@ -14,7 +16,7 @@ const AbPreference = () => {
       setRound(round + 1)
       return
     }
-    // TODO: 무드보드 취향 온보딩 화면으로 이동
+    navigate('/onboarding/moodboard')
   }
 
   const handlePrev = () => {
