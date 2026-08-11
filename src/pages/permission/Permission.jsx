@@ -40,7 +40,7 @@ const Permission = () => {
 
         <Section>
           <ActionArea>
-            <Button onClick={() => navigate('/', { replace: true })}>
+            <Button onClick={() => navigate('/onboarding/basic-question', { replace: true })}>
               권한 허용하고 시작하기
             </Button>
             <TextButton onClick={() => navigate('/permission/denied-guide')}>
