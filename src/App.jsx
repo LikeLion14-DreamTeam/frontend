@@ -10,6 +10,9 @@ import TripSegmentEdit from "./pages/trip-management/TripSegmentEdit"
 import LogIn from "./pages/login/LogIn"
 import Permission from "./pages/permission/Permission"
 import PermissionDeniedGuide from "./pages/permission/PermissionDeniedGuide"
+import BasicQuestion from "./pages/onboarding/BasicQuestion"
+import AbPreference from "./pages/onboarding/AbPreference"
+import MoodBoard from "./pages/onboarding/MoodBoard"
 import PhotoCapture from "./pages/record/PhotoCapture"
 import PinSaveComplete from "./pages/record/PinSaveComplete"
 
@@ -20,6 +23,9 @@ function App() {
       <Route path="/login" element={<LogIn />} />
       <Route path="/permission" element={<Permission />} />
       <Route path="/permission/denied-guide" element={<PermissionDeniedGuide />} />
+      <Route path="/onboarding/basic-question" element={<BasicQuestion />} />
+      <Route path="/onboarding/ab-preference" element={<AbPreference />} />
+      <Route path="/onboarding/moodboard" element={<MoodBoard />} />
       <Route path="/" element={<Home />} />
       <Route path="/record/camera" element={<PhotoCapture />} />
       <Route path="/record/pin-saved" element={<PinSaveComplete />} />
