@@ -10,6 +10,8 @@ import TripSegmentEdit from "./pages/trip-management/TripSegmentEdit"
 import LogIn from "./pages/login/LogIn"
 import Permission from "./pages/permission/Permission"
 import PermissionDeniedGuide from "./pages/permission/PermissionDeniedGuide"
+import PhotoCapture from "./pages/record/PhotoCapture"
+import PinSaveComplete from "./pages/record/PinSaveComplete"
 
 
 function App() {
@@ -19,6 +21,8 @@ function App() {
       <Route path="/permission" element={<Permission />} />
       <Route path="/permission/denied-guide" element={<PermissionDeniedGuide />} />
       <Route path="/" element={<Home />} />
+      <Route path="/record/camera" element={<PhotoCapture />} />
+      <Route path="/record/pin-saved" element={<PinSaveComplete />} />
       <Route path="/map" element={<Map />} />
       <Route path="/archive" element={<Archive />} />
       <Route path="/archive/trip/:tripID" element={<TripArchive />} />
