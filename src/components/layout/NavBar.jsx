@@ -1,15 +1,18 @@
 import React from 'react'
 import { NavLink } from 'react-router-dom'
 import styled from 'styled-components'
+import HomeIcon from '../../assets/icons/HomeIcon'
+import MapIcon from '../../assets/icons/MapIcon'
+import ArchiveIcon from '../../assets/icons/ArchiveIcon'
+import MyPageIcon from '../../assets/icons/MyPageIcon'
 
 const NavBar = () => {
   return (
     <NavWrapper>
-      <NavContent to="/">홈</NavContent>
-      <NavContent to="/record">기록</NavContent>
-      <NavContent to="/recommendation">추천</NavContent>
-      <NavContent to="/archive">아카이브</NavContent>
-      <NavContent to="/trip">여행</NavContent>
+      <NavContent to="/"><HomeIcon />홈</NavContent>
+      <NavContent to="/map"><MapIcon />지도</NavContent>
+      <NavContent to="/archive"><ArchiveIcon />아카이브</NavContent>
+      <NavContent to="/mypage"><MyPageIcon />마이페이지</NavContent>
     </NavWrapper>
   )
 }
@@ -18,7 +21,7 @@ export default NavBar
 
 const NavWrapper = styled.nav`
   width: 100%;
-  height: 50px;
+  height: 75px;
   display: flex;
   flex-direction: row;
   justify-content: space-around;
@@ -32,14 +35,17 @@ const NavWrapper = styled.nav`
 `
 
 const NavContent = styled(NavLink)`
-  width: 20%;
+  width: 25%;
   height: 100%;
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
+  gap: 4px;
   text-align: center;
   text-decoration: none;
   color: #000;
+  font-size: 11px;
 
   &.active {
     font-weight: 700;
