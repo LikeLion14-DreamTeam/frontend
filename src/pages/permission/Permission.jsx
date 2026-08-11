@@ -1,9 +1,9 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
-import Button from '../components/common/Button'
-import Card from '../components/common/Card'
-import Header from '../components/layout/Header'
+import Button from '../../components/common/Button'
+import Card from '../../components/common/Card'
+import Header from '../../components/layout/Header'
 
 const permissions = [
   { key: 'camera', title: '카메라', description: 'NFC 태깅 후 사진을 촬영하는 데 사용됩니다.' },

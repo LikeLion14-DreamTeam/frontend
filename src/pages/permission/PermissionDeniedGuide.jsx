@@ -1,8 +1,8 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
-import Card from '../components/common/Card'
-import Header from '../components/layout/Header'
+import Card from '../../components/common/Card'
+import Header from '../../components/layout/Header'
 
 const deniedPermissions = [
   { key: 'camera', title: '카메라', description: '태깅 시 사진 촬영이 불가능합니다', action: '설정에서 허용' },

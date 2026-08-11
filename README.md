@@ -1,16 +1,49 @@
-# React + Vite
+# Issue 템플릿
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+## ✅ 기능 설명
 
-Currently, two official plugins are available:
+어떤 기능을 추가하려는지 간단히 설명해주세요.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## 🛠️ 작업 내용 (Todo)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- [ ]
+- [ ]
+- [ ]
 
-## Expanding the Oxlint configuration
+---
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+## 🔗 참고 자료 (선택)
+
+- 관련 문서:
+- 참고 Issue:
+
+
+
+
+# PR 템플릿
+
+## 🔗 관련 이슈 (Issue)
+
+해당 PR이 어떤 이슈를 해결하는지 연결해주세요.
+
+- Closes #이슈번호
+- Related to #이슈번호
+
+---
+
+## ✅ 작업 내용
+
+이번 PR에서 어떤 작업을 했는지 요약해주세요.
+
+---
+
+## 🖥️ 테스트 방법
+
+리뷰어가 직접 확인할 수 있도록 테스트 방법을 적어주세요.
+
+1. `/login` 페이지 접속
+2. 아이디/비밀번호 입력
+3. 로그인 버튼 클릭
+4. 메인 페이지 이동 확인

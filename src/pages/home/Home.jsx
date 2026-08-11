@@ -1,10 +1,10 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
-import Button from '../components/common/Button'
-import Card from '../components/common/Card'
-import Header from '../components/layout/Header'
-import NavBar from '../components/layout/NavBar'
+import Button from '../../components/common/Button'
+import Card from '../../components/common/Card'
+import Header from '../../components/layout/Header'
+import NavBar from '../../components/layout/NavBar'
 
 const recentPins = [
   { id: 1, place: '장소1', date: '날짜1' },
