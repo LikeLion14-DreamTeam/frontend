@@ -7,11 +7,17 @@ import TripManagement from "./pages/TripManagement"
 import TripSegmentEdit from "./pages/TripSegmentEdit"
 import TripArchive from "./pages/TripArchive"
 import CityArchive from "./pages/CityArchive"
+import LogIn from "./pages/LogIn"
+import Permission from "./pages/Permission"
+import PermissionDeniedGuide from "./pages/PermissionDeniedGuide"
 
 
 function App() {
   return (
     <Routes>
+      <Route path="/login" element={<LogIn />} />
+      <Route path="/permission" element={<Permission />} />
+      <Route path="/permission/denied-guide" element={<PermissionDeniedGuide />} />
       <Route path="/" element={<Home />} />
       <Route path="/map" element={<Map />} />
       <Route path="/archive" element={<Archive />} />
