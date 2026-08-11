@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import Card from '../../components/common/Card'
 import Header from '../../components/layout/Header'
@@ -12,10 +13,12 @@ const question = {
 }
 
 const BasicQuestion = () => {
+  const navigate = useNavigate()
   const [selected, setSelected] = useState(null)
 
   const handleNext = () => {
-    // TODO: 응답 저장 후 A/B 취향 온보딩 화면으로 이동
+    // TODO: 응답 저장
+    navigate('/onboarding/ab-preference')
   }
 
   return (
