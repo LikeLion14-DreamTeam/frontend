@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import Card from '../../components/common/Card'
+import Option from '../../components/common/Option'
 import Header from '../../components/layout/Header'
 
 const question = {
@@ -48,7 +49,7 @@ const BasicQuestion = () => {
           {question.options.map((option) => (
             <Option
               key={option}
-              $selected={selected === option}
+              selected={selected === option}
               onClick={() => setSelected(option)}
             >
               {option}
@@ -140,19 +141,6 @@ const OptionList = styled.div`
   display: flex;
   flex-direction: column;
   gap: 12px;
-`
-
-const Option = styled.button`
-  width: 100%;
-  padding: 6px 12px;
-  border: 1px solid ${({ $selected }) => ($selected ? '#1f2937' : '#e5e7eb')};
-  border-radius: 999px;
-  background: #f3f4f6;
-  color: #1f2937;
-  font-size: 14px;
-  font-weight: ${({ $selected }) => ($selected ? 600 : 500)};
-  text-align: center;
-  cursor: pointer;
 `
 
 const NextButton = styled.button`
