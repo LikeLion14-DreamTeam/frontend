@@ -24,8 +24,8 @@ const Permission = () => {
           </Head>
 
           <PermissionList>
-            {permissionStatusCardItems.map((item) => (
-              <PermissionStatusCard key={item.key} {...item} />
+            {permissionStatusCardItems.map(({ key, ...item }) => (
+              <PermissionStatusCard key={key} {...item} />
             ))}
           </PermissionList>
 

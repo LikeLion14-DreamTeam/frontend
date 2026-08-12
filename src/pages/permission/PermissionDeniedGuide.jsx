@@ -1,112 +1,214 @@
-import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
+import Button from '../../components/common/Button'
 import Card from '../../components/common/Card'
+import PermissionStatusCard from '../../components/common/PermissionStatusCard'
+import { permissionStatusCardItems } from '../../components/common/PermissionStatusCard.constants'
 import Header from '../../components/layout/Header'
+import permissionBg from '../../assets/images/permission-bg.png'
 
-const deniedPermissions = [
-  { key: 'camera', title: '카메라', description: '태깅 시 사진 촬영이 불가능합니다', action: '설정에서 허용' },
-  { key: 'location', title: '위치', description: '여행 동선 지도 저장과 핀 기록이 불가능합니다', action: '설정에서 허용' },
-  { key: 'nfc', title: 'NFC', description: 'MCM 태그 인식이 불가능합니다', action: '기기 지원 확인' },
-]
-
-const PermissionDeniedGuide = () => {
+const Permission = () => {
   const navigate = useNavigate()
 
   return (
-    <>
-      <Header>권한 거부 안내 화면</Header>
+    <Page>
+      <Header to="/permission" />
 
-      <GuideWrapper>
+      <PermissionWrapper>
+        <Body>
+          <Head>
+            <Title>지금은 기록을 만들 수 없어요</Title>
+            <Description>
+              일부 기능을 사용하려면 다음 권한이 필요합니다.
+            </Description>
+          </Head>
 
-        <Section>
-          <Title>권한 설정 필요</Title>
-          <Description>일부 기능을 사용하려면 다음 권한이 필요합니다</Description>
-        </Section>
-
-        <Section>
           <PermissionList>
-            {deniedPermissions.map((item) => (
-              <Card key={item.key} $padding="12px">
-                <PermissionTitle>{item.title}</PermissionTitle>
-                <PermissionDesc>{item.description}</PermissionDesc>
-                <OutlineButton>{item.action}</OutlineButton>
-              </Card>
+            {permissionStatusCardItems.map(({ key, ...item }) => (
+              <PermissionStatusCard key={key} {...item} disabled />
             ))}
           </PermissionList>
-        </Section>
 
-        <Section>
-          <Caption>
-            권한 거부 상태에서는 이전 화면으로 돌아가 다른 기능을 이용하실 수 있습니다
-          </Caption>
-          <OutlineButton onClick={() => navigate(-1)}>돌아가기</OutlineButton>
-        </Section>
+          <PermissionDeniedActionCard>
+            <PermissionDeniedActionTitle>
+              권한 없이도 할 수 있는 것
+            </PermissionDeniedActionTitle>
+            <PermissionDeniedAction>지난 여정과 포토북 열람</PermissionDeniedAction>
+            <PermissionDeniedAction>저장된 핀의 사진·메모 보기</PermissionDeniedAction>
+          </PermissionDeniedActionCard>
+        </Body>
 
-      </GuideWrapper>
-    </>
+        <Footer>
+          <ActionArea>
+            <StartButton
+              type="button"
+              onClick={() =>
+                navigate('/onboarding/basic-question', { replace: true })
+              }
+            >
+              시작하기
+            </StartButton>
+            <LaterButton
+              type="button"
+              $variant="ghost"
+              onClick={() =>
+                navigate('/onboarding/basic-question', { replace: true })
+              }
+            >
+              이대로 둘러보기
+            </LaterButton>
+          </ActionArea>
+        </Footer>
+      </PermissionWrapper>
+    </Page>
   )
 }
 
-export default PermissionDeniedGuide
+export default Permission
 
-const GuideWrapper = styled.main`
-  width: 100%;
-  max-width: 450px;
+const Page = styled.div`
   min-height: 100vh;
-  margin: 0 auto;
-  padding: 74px 24px 24px;
-`
+  background:
+    url(${permissionBg}) center top / cover no-repeat,
+    var(--Background-Base);
 
-const Section = styled.section`
-  margin-top: 24px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 12px;
-
-  &:first-child {
-    margin-top: 0;
+  > header {
+    background: transparent;
   }
 `
 
+const PermissionWrapper = styled.main`
+  width: 100%;
+  max-width: 450px;
+  min-height: calc(100vh - 116px);
+  margin: 0 auto;
+  padding: 26px 24px 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 44px;
+`
+
+const Body = styled.section`
+  display: flex;
+  flex-direction: column;
+  gap: 33px;
+`
+
+const Head = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`
+
 const Title = styled.h2`
-  font-size: 16px;
-  font-weight: 600;
+  color: var(--Text-Primary);
+  font: var(--text-ui-h2);
+  word-break: keep-all;
 `
 
 const Description = styled.p`
-  font-size: 12px;
+  color: var(--Text-Secondary);
+  font: var(--text-ui-body-m);
 `
 
 const PermissionList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+`
+
+const PermissionDeniedActionCard = styled(Card).attrs({ as: 'aside' })`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 13px 20px;
+  border: 1px solid var(--Border-Default);
+  border-radius: 12px;
+  background: var(--Surface-Base);
+  overflow: hidden;
+`
+
+const PermissionDeniedActionTitle = styled.p`
+  color: var(--Text-Primary);
+  font: var(--text-ui-label);
+  word-break: keep-all;
+`
+
+const PermissionDeniedAction = styled.p`
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--Text-Secondary);
+  font: var(--text-ui-caption);
+  word-break: keep-all;
+
+  &::before {
+    content: '';
+    width: 4px;
+    height: 4px;
+    flex: 0 0 4px;
+    border-radius: 50%;
+    background: var(--Secondary-Taupe);
+  }
+`
+
+const PrivacyCard = styled.aside`
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 12px 20px;
+  border-radius: 12px;
+  background: rgb(181 118 59 / 9%);
+`
+
+const PrivacyIcon = styled.img`
+  width: 13.5px;
+  height: 18.5px;
+  flex: 0 0 auto;
+  display: block;
+`
+
+const PrivacyText = styled.p`
+  min-width: 0;
+  flex: 1;
+  color: var(--Primary-Cognac);
+  font: var(--text-ui-caption);
+  word-break: keep-all;
+`
+
+const Footer = styled.section`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+`
+
+const GuideButton = styled.button`
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--State-Disabled-Text);
+  font: var(--text-ui-caption);
+  text-decoration: underline;
+  cursor: pointer;
+`
+
+const ActionArea = styled.div`
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  align-items: center;
+  gap: 10px;
 `
 
-const PermissionTitle = styled.p`
-  font-size: 12px;
+const StartButton = styled(Button)`
+  font: var(--text-ui-button);
 `
 
-const PermissionDesc = styled.p`
-  margin-top: 8px;
-  font-size: 11px;
-`
-
-const Caption = styled.p`
-  font-size: 11px;
-`
-
-const OutlineButton = styled.button`
-  margin-top: 8px;
-  padding: 8px 16px;
-  border: 1px solid #1f2937;
-  border-radius: 6px;
-  background: #fff;
-  color: #1f2937;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
+const LaterButton = styled(Button)`
+  font: var(--text-ui-button);
 `
