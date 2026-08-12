@@ -1,6 +1,19 @@
 import React from 'react'
 import styled from 'styled-components'
 
+/**
+ * A/B 취향 온보딩의 사진 카드 (피그마 `Choice`)
+ *
+ *   <Choice label="A" selected={picked === 'A'} onClick={() => setPicked('A')} />
+ *   <Choice label="B" selected={picked === 'B'} onClick={() => setPicked('B')} />
+ *
+ * - `label` — 카드 아래 태그 문구.
+ * - `selected` — 선택 여부. 사진 박스에 코냑 테두리·틴트가 깔리고 태그가 반전된다.
+ * - 폭은 부모가 정한다. 두 장을 나란히 놓을 때는 부모에
+ *   `grid-template-columns: 1fr 1fr; gap: 12px` 를 준다.
+ * - 사진은 아직 안 받는다. 넣게 되면 `Photo` 안에 `<img>` 를 두고
+ *   틴트를 그 위 레이어로 올려야 한다.
+ */
 const Choice = ({ label, selected = false, ...rest }) => {
   return (
     <ChoiceButton type="button" aria-pressed={selected} {...rest}>
