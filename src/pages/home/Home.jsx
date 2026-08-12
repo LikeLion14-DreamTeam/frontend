@@ -6,17 +6,6 @@ import Card from '../../components/common/Card'
 import Header from '../../components/layout/Header'
 import NavBar from '../../components/layout/NavBar'
 
-const recentPins = [
-  { id: 1, place: '장소1', date: '날짜1' },
-  { id: 2, place: '장소2', date: '날짜2' },
-  { id: 3, place: '장소3', date: '날짜3' },
-]
-
-const exploreItems = [
-  { title: '기록 탐색', subtitle: '여행 기록', path: '/record' },
-  { title: '포토북', subtitle: '아카이브', path: '/archive' },
-  { title: '가상 여권', subtitle: '가상 여권', path: '/' },
-]
 
 const Home = () => {
   return (

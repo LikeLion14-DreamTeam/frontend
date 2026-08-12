@@ -244,19 +244,6 @@ const SkeletonLine = styled.span`
   }
 `
 
-const JourneySummary = styled.p`
-  margin-top: 24px;
-  color: #4b5563;
-  font-size: 12px;
-  line-height: 1.6;
-`
-
-const RouteLabel = styled.p`
-  margin-top: 22px;
-  color: #4b5563;
-  font-size: 11px;
-`
-
 const PhotobookPlaceholder = styled.div`
   width: 100%;
   height: 520px;
