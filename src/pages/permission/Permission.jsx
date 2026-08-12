@@ -49,7 +49,7 @@ const Permission = () => {
             <StartButton
               type="button"
               onClick={() =>
-                navigate('/onboarding/basic-question', { replace: true })
+                navigate('/onboarding/preference-start', { replace: true })
               }
             >
               시작하기
@@ -58,7 +58,7 @@ const Permission = () => {
               type="button"
               $variant="ghost"
               onClick={() =>
-                navigate('/onboarding/basic-question', { replace: true })
+                navigate('/onboarding/preference-start', { replace: true })
               }
             >
               나중에 설정하기
