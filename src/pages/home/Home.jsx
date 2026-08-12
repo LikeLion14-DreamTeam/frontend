@@ -48,10 +48,10 @@ export default Home
 
 const HomeWrapper = styled.main`
   width: 100%;
-  max-width: 430px;
+  max-width: 450px;
   min-height: 100vh;
   margin: 0 auto;
-  padding: 74px 20px 74px;
+  padding: 74px 24px 74px;
 `
 
 const Title = styled.h2`

@@ -43,10 +43,10 @@ export default Login
 
 const LoginWrapper = styled.main`
   width: 100%;
-  max-width: 430px;
+  max-width: 450px;
   min-height: 100vh;
   margin: 0 auto;
-  padding: 74px 0 24px;
+  padding: 74px 24px 24px;
   display: flex;
   flex-direction: column;
 `
@@ -56,7 +56,6 @@ const TitleArea = styled.section`
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  padding: 0 24px;
 `
 
 const PassportArea = styled.div`

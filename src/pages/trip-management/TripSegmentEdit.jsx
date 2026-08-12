@@ -213,10 +213,10 @@ const HeaderTitle = styled.h1`
 
 const TripSegmentEditWrapper = styled.main`
   width: 100%;
-  max-width: 430px;
+  max-width: 450px;
   min-height: 100vh;
   margin: 0 auto;
-  padding: 74px 20px 32px;
+  padding: 74px 24px 32px;
 `
 
 const FormSection = styled.section`

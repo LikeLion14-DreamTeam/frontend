@@ -92,8 +92,7 @@ const disabledText = css`
 `
 
 const Card = styled.article`
-  width: 354px;
-  max-width: 100%;
+  width: 100%;
   display: flex;
   align-items: flex-start;
   gap: 20px;

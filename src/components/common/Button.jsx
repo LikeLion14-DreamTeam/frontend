@@ -36,7 +36,7 @@ secondary: css`
 
 const Button = styled.button`
   display: flex;
-  width: 354px;
+  width: 100%;
   height: 52px;
   justify-content: center;
   align-items: center;

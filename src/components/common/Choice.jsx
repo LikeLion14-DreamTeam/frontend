@@ -9,9 +9,10 @@ import styled from 'styled-components'
  *
  * - `label` — 카드 아래 태그 문구.
  * - `selected` — 선택 여부. 사진 박스에 코냑 테두리·틴트가 깔리고 태그가 반전된다.
- * - 폭은 부모가 정한다. 두 장을 나란히 놓을 때는 부모에
- *   `grid-template-columns: 1fr 1fr; gap: 12px` 를 준다.
- * - 사진은 아직 안 받는다. 넣게 되면 `Photo` 안에 `<img>` 를 두고
+ * - 폭은 부모가 정하고 사진 박스는 171:320 비율을 유지한다. 두 장을 나란히 놓을 때는
+ *   부모에 `grid-template-columns: 1fr 1fr; gap: 12px` 를 준다.
+ *   (피그마 402px 화면 기준 본문 354 = 171 + 12 + 171)
+ * - 사진은 아직 안 받는다. 넣게 되면 `Photo` 안에 `<img>` 를 `object-fit: cover` 로 채우고
  *   틴트를 그 위 레이어로 올려야 한다.
  */
 const Choice = ({ label, selected = false, ...rest }) => {
@@ -39,7 +40,8 @@ const ChoiceButton = styled.button`
 
 const Photo = styled.div`
   width: 100%;
-  height: 320px;
+  /* 피그마 402px 화면 기준 171 x 320. 폭이 변해도 비율을 유지한다. */
+  aspect-ratio: 171 / 320;
   border-radius: 16px;
   border: ${({ $selected }) =>
     $selected ? '1px solid var(--Primary-Pressed)' : 'none'};

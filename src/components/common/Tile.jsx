@@ -11,10 +11,10 @@ import checkIcon from '../../assets/icons/check-circle-24.svg'
  *   />
  *
  * - `selected` — 선택 여부. 코냑 테두리·틴트가 깔리고 우상단에 체크 아이콘이 붙는다.
- * - 폭은 부모가 정한다. 3열 그리드로 쓸 때는 부모에
- *   `grid-template-columns: repeat(3, 1fr); column-gap: 6px; row-gap: 12px` 를 준다.
- * - 높이 124px는 피그마 컴포넌트 정의값이다. 무드보드 화면의 타일은 116px이라
- *   8px 차이가 난다. 어느 쪽이 맞는지 확정 전이므로 적용 시 확인할 것.
+ * - 폭은 부모가 정하고 111.33:124 비율을 유지한다. 3열 그리드로 쓸 때는 부모에
+ *   `grid-template-columns: repeat(3, 1fr); column-gap: 10px` 를 준다.
+ *   (피그마 402px 화면 기준 본문 354 = 111.33 x 3 + 10 x 2)
+ * - 세로 간격은 402px 무드보드 화면이 아직 없어 미확정이다. 적용 시 피그마에서 확인할 것.
  */
 const Tile = ({ selected = false, ...rest }) => {
   return (
@@ -29,7 +29,8 @@ export default Tile
 const TileButton = styled.button`
   position: relative;
   width: 100%;
-  height: 124px;
+  /* 피그마 402px 화면 기준 111.33 x 124. 폭이 변해도 비율을 유지한다. */
+  aspect-ratio: 111.33 / 124;
   padding: 0;
   border-radius: 12px;
   cursor: pointer;

@@ -106,7 +106,7 @@ export default PinSaveComplete
 
 const PageShell = styled.main`
   width: 100%;
-  max-width: 390px;
+  max-width: 450px;
   min-height: 100svh;
   margin: 0 auto;
   background: #fff;
