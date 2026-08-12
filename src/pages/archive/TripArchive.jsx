@@ -1,62 +1,20 @@
 import React from 'react'
 import { Link, useParams } from 'react-router-dom'
 import styled from 'styled-components'
+import Card from '../../components/common/Card'
 
 const tripArchives = {
   1: {
     title: '파리 - 프라하',
-    period: '2024.09.12 - 2024.09.22',
+    period: '2024년 9월 3일 - 9월 18일',
+    duration: '16일',
     tags: ['파리', '프라하', '체스키크룸로프'],
-    summary: '저녁먹어야하는데배가안고픔사건발생',
-    sections: [
-      {
-        id: 1,
-        city: '파리',
-        records: [
-          {
-            id: 1,
-            text: '메모메모아암ㄴㅇㄻㅇㄴㄻㄴㅇㄹㄹ',
-            audioTime: '1:08',
-          },
-          {
-            id: 2,
-            text: '메모입니다메모메모메모',
-            audioTime: '0:58',
-            reversed: true,
-          },
-        ],
-      },
-      {
-        id: 2,
-        city: '프라하',
-        records: [
-          {
-            id: 3,
-            text: '해커톤파이팅',
-            audioTime: '1:15',
-          },
-        ],
-      },
-    ],
   },
   2: {
     title: '도쿄 - 교토',
-    period: '2024.03.04 - 2024.03.14',
+    period: '2024년 3월 4일 - 3월 14일',
+    duration: '11일',
     tags: ['도쿄', '교토', '오사카'],
-    summary: '메모메모메모메모',
-    sections: [
-      {
-        id: 1,
-        city: '도쿄',
-        records: [
-          {
-            id: 1,
-            text: '시부야사변을일으켰습니다료이키텐카이',
-            audioTime: '0:45',
-          },
-        ],
-      },
-    ],
   },
 }
 
@@ -72,49 +30,54 @@ const TripArchive = () => {
         <BackLink to="/archive" aria-label="아카이브 화면으로 돌아가기">
           &lt;
         </BackLink>
-        <HeaderTitle>{archive.headerTitle}</HeaderTitle>
+        <HeaderTitle>포토북 상세 화면</HeaderTitle>
       </PageHeader>
 
       <TripArchiveWrapper>
-        <IntroSection>
-          <TripTitle>{archive.title}</TripTitle>
-          <TripMeta>{archive.period} · 7일</TripMeta>
+        <IntroCard>
+          <IntroHeader>
+            <TripTitle>{archive.title}</TripTitle>
+            <ManageLink to="/trip-management">여행 구간 관리</ManageLink>
+          </IntroHeader>
+          <TripMetaRow>
+            <TripMeta>{archive.period}</TripMeta>
+            <DurationBadge>{archive.duration}</DurationBadge>
+          </TripMetaRow>
           <TagList aria-label="여행 도시 목록">
             {archive.tags.map((tag) => (
               <Tag key={tag}>{tag}</Tag>
             ))}
           </TagList>
-        </IntroSection>
+        </IntroCard>
 
-        <HeroImage>Image</HeroImage>
+        <MapPlaceholder>지도 Placeholder</MapPlaceholder>
 
-        <Section>
+        <JourneyCard>
           <SectionTitle>이번 여정</SectionTitle>
-          <SummaryBox>{archive.summary}</SummaryBox>
-        </Section>
+          <SkeletonLine $width="66%" />
+          <SkeletonLine $width="28%" />
+        </JourneyCard>
 
-        {archive.sections.map((section) => (
-          <Section key={section.id}>
-            <SectionTitle>{section.city}</SectionTitle>
-            <RecordList>
-              {section.records.map((record) => (
-                <RecordItem key={record.id} $reversed={record.reversed}>
-                  <RecordImage>Image</RecordImage>
-                  <RecordContent>
-                    <RecordText>{record.text}</RecordText>
-                    <AudioBar aria-label={`${section.city} 음성 기록`}>
-                      <PlayIcon>▶</PlayIcon>
-                      <ProgressTrack>
-                        <Progress />
-                      </ProgressTrack>
-                      <AudioTime>{record.audioTime}</AudioTime>
-                    </AudioBar>
-                  </RecordContent>
-                </RecordItem>
-              ))}
-            </RecordList>
-          </Section>
-        ))}
+
+        <PhotobookPlaceholder>포토북 Placeholder</PhotobookPlaceholder>
+        
+        <PhotobookMetaCard>
+          <MetaWrapper>
+            <MetaTitle>저장된 핀</MetaTitle>
+            <MetaInfo>12곳</MetaInfo>
+          </MetaWrapper>
+          <MetaWrapper>
+            <MetaTitle>포토북 사진</MetaTitle>
+            <MetaInfo>38장</MetaInfo>
+          </MetaWrapper>
+          <MetaWrapper>
+            <MetaTitle>방문 도시</MetaTitle>
+            <MetaInfo>3개</MetaInfo>
+          </MetaWrapper>
+        </PhotobookMetaCard>
+
+        <LinkText to="/archive">포토북 목록으로 돌아가기</LinkText>
+
       </TripArchiveWrapper>
     </>
   )
@@ -125,7 +88,7 @@ export default TripArchive
 const PageHeader = styled.header`
   width: 100%;
   height: 50px;
-  border: 1px solid #ddd;
+  border-bottom: 1px solid #e5e7eb;
   background: #fff;
   display: flex;
   align-items: center;
@@ -152,7 +115,7 @@ const BackLink = styled(Link)`
 
 const HeaderTitle = styled.h1`
   color: #111827;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 700;
 `
 
@@ -161,14 +124,26 @@ const TripArchiveWrapper = styled.main`
   max-width: 430px;
   min-height: 100vh;
   margin: 0 auto;
-  padding: 74px 20px 34px;
+  padding: 72px 20px 34px;
   background: #fff;
+  font-family: var(--font-sans);
 `
 
-const IntroSection = styled.section`
+const IntroCard = styled.section`
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  padding: 14px 14px 12px;
+  background: #fbfcfd;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
+`
+
+const IntroHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 `
 
 const TripTitle = styled.h2`
@@ -177,15 +152,42 @@ const TripTitle = styled.h2`
   font-weight: 700;
 `
 
+const ManageLink = styled(Link)`
+  flex: 0 0 auto;
+  color: #6b7280;
+  font-size: 11px;
+  text-decoration: underline;
+`
+
+const TripMetaRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+`
+
 const TripMeta = styled.p`
   color: #4b5563;
   font-size: 12px;
 `
 
+const DurationBadge = styled.span`
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #d9dde3;
+  border-radius: 999px;
+  padding: 0 12px;
+  color: #111827;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 600;
+`
+
 const TagList = styled.div`
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 `
 
 const Tag = styled.span`
@@ -200,10 +202,10 @@ const Tag = styled.span`
   font-size: 12px;
 `
 
-const HeroImage = styled.div`
+const MapPlaceholder = styled.div`
   width: 100%;
-  height: 178px;
-  margin-top: 20px;
+  height: 470px;
+  margin-top: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -214,117 +216,69 @@ const HeroImage = styled.div`
   font-size: 12px;
 `
 
-const Section = styled.section`
-  margin-top: 22px;
+const JourneyCard = styled.section`
+  min-height: 78px;
+  margin-top: 20px;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  padding: 14px;
+  background: #fbfcfd;
 `
 
 const SectionTitle = styled.h3`
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   color: #111827;
   font-size: 14px;
   font-weight: 700;
 `
 
-const SummaryBox = styled.p`
-  min-height: 62px;
-  border: 1px solid #edf0f3;
-  border-radius: 4px;
-  padding: 12px;
-  color: #4b5563;
-  background: #fbfcfd;
-  font-size: 12px;
-  line-height: 1.6;
+const SkeletonLine = styled.span`
+  width: ${({ $width }) => $width};
+  height: 8px;
+  display: block;
+  border-radius: 999px;
+  background: #e5e7eb;
+
+  & + & {
+    margin-top: 8px;
+  }
 `
 
-const RecordList = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-`
-
-const RecordItem = styled.article`
-  display: grid;
-  grid-template-columns: 112px minmax(0, 1fr);
-  gap: 12px;
-  align-items: start;
-
-  ${({ $reversed }) =>
-    $reversed &&
-    `
-      grid-template-columns: minmax(0, 1fr) 112px;
-
-      ${RecordImage} {
-        order: 2;
-      }
-    `}
-`
-
-const RecordImage = styled.div`
+const PhotobookPlaceholder = styled.div`
   width: 100%;
-  height: 112px;
+  height: 520px;
+  margin-top: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px dashed #d8dde3;
-  border-radius: 4px;
-  background: #fbfcfd;
-  color: #c3c8cf;
-  font-size: 11px;
+  background-color: #111827;
+  color: #fff;
+  font-size: 13px;
 `
 
-const RecordContent = styled.div`
-  min-width: 0;
+const PhotobookMetaCard = styled(Card)`
+  margin-top: 16px;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+`
+
+const MetaWrapper = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 10px;
 `
 
-const RecordText = styled.p`
-  border: 1px solid #edf0f3;
-  border-radius: 4px;
-  padding: 10px;
-  color: #374151;
-  background: #fff;
-  font-size: 11px;
-  line-height: 1.5;
+const MetaTitle = styled.p`
+  font-size: 12px;
 `
 
-const AudioBar = styled.div`
-  height: 28px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid #d9dde3;
-  border-radius: 999px;
-  padding: 0 10px;
-  color: #111827;
-  background: #fff;
+const MetaInfo = styled.p`
+  font-weight: bold;
 `
 
-const PlayIcon = styled.span`
-  flex: 0 0 auto;
-  color: #4b5563;
-  font-size: 9px;
-  line-height: 1;
-`
-
-const ProgressTrack = styled.span`
-  height: 4px;
-  flex: 1;
-  border-radius: 999px;
-  background: #e5e7eb;
-`
-
-const Progress = styled.span`
-  width: 38%;
-  height: 100%;
-  display: block;
-  border-radius: inherit;
-  background: #c7ccd3;
-`
-
-const AudioTime = styled.span`
-  flex: 0 0 auto;
-  color: #4b5563;
-  font-size: 10px;
+const LinkText = styled(Link)`
+  display: inline-block;
+  margin-top: 24px;
+  font-size: 12px;
+  color: #555;
 `

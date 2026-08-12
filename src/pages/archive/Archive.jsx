@@ -28,22 +28,6 @@ const Archive = () => {
           </JourneyList>
         </Section>
 
-        <Section>
-          <SectionTitle>도시별 포토북</SectionTitle>
-          <CityList>
-            {cityPhotobooks.map((city) => (
-              <CityItem as={Link} to={`/archive/city/${city.id}`} key={city.id}>
-                <CityThumb>AA</CityThumb>
-                <CityText>
-                  <CityName>{city.name}</CityName>
-                  <CityMeta>
-                    사진 {city.photoCount}장 · {city.date}
-                  </CityMeta>
-                </CityText>
-              </CityItem>
-            ))}
-          </CityList>
-        </Section>
       </ArchiveWrapper>
 
       <NavBar />
@@ -74,13 +58,6 @@ const journeyPhotobooks = [
   },
 ]
 
-const cityPhotobooks = [
-  { id: 1, name: '파리', photoCount: 8, date: '2024.09' },
-  { id: 2, name: '암스테르담', photoCount: 13, date: '2024.09' },
-  { id: 3, name: '도쿄', photoCount: 6, date: '2024.03' },
-  { id: 4, name: '교토', photoCount: 33, date: '2024.03' },
-  { id: 5, name: '바르셀로나', photoCount: 72, date: '2023.11' },
-]
 
 const ArchiveWrapper = styled.main`
   width: 100%;
@@ -158,52 +135,3 @@ const BookMeta = styled.p`
   line-height: 1.5;
 `
 
-const CityList = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-`
-
-const CityItem = styled.article`
-  min-height: 52px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 4px;
-  padding: 10px 12px;
-  background: #fbfcfd;
-  text-decoration: none;
-`
-
-const CityThumb = styled.div`
-  width: 34px;
-  height: 34px;
-  flex: 0 0 34px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: #e5e7eb;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 600;
-`
-
-const CityText = styled.div`
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-`
-
-const CityName = styled.p`
-  color: #111827;
-  font-size: 13px;
-  font-weight: 600;
-`
-
-const CityMeta = styled.p`
-  color: #4b5563;
-  font-size: 11px;
-`
