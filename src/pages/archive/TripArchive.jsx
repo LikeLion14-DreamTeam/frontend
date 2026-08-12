@@ -2,19 +2,31 @@ import React from 'react'
 import { Link, useParams } from 'react-router-dom'
 import styled from 'styled-components'
 import Card from '../../components/common/Card'
+import GoogleMap from '../../components/common/GoogleMap'
 
+// 지도 확인용 임시 좌표. 실제 핀 데이터가 붙으면 API 응답으로 교체한다.
 const tripArchives = {
   1: {
     title: '파리 - 프라하',
     period: '2024년 9월 3일 - 9월 18일',
     duration: '16일',
     tags: ['파리', '프라하', '체스키크룸로프'],
+    points: [
+      { name: '개선문', lat: 48.8738, lng: 2.295 },
+      { name: '루브르', lat: 48.8606, lng: 2.3376 },
+      { name: '카를교', lat: 50.0865, lng: 14.4114 },
+    ],
   },
   2: {
     title: '도쿄 - 교토',
     period: '2024년 3월 4일 - 3월 14일',
     duration: '11일',
     tags: ['도쿄', '교토', '오사카'],
+    points: [
+      { name: '시부야', lat: 35.6595, lng: 139.7004 },
+      { name: '기요미즈데라', lat: 34.9949, lng: 135.785 },
+      { name: '도톤보리', lat: 34.6687, lng: 135.5013 },
+    ],
   },
 }
 
@@ -50,7 +62,9 @@ const TripArchive = () => {
           </TagList>
         </IntroCard>
 
-        <MapPlaceholder>지도 Placeholder</MapPlaceholder>
+        <MapSection>
+          <GoogleMap markers={archive.points} height="470px" />
+        </MapSection>
 
         <JourneyCard>
           <SectionTitle>이번 여정</SectionTitle>
@@ -202,18 +216,8 @@ const Tag = styled.span`
   font-size: 12px;
 `
 
-const MapPlaceholder = styled.div`
-  width: 100%;
-  height: 470px;
+const MapSection = styled.section`
   margin-top: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px dashed #d8dde3;
-  border-radius: 4px;
-  background: #fbfcfd;
-  color: #c3c8cf;
-  font-size: 12px;
 `
 
 const JourneyCard = styled.section`
