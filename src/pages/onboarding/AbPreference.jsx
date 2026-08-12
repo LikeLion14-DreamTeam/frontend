@@ -1,23 +1,38 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
-import ImagePlaceholder from '../../components/common/ImagePlaceholder'
+import Choice from '../../components/common/Choice'
 import Header from '../../components/layout/Header'
 
 const TOTAL_ROUND = 5
+// 선택 표시를 보여준 뒤 다음 쌍으로 넘어가기까지의 시간
+const ADVANCE_DELAY = 250
 
 const AbPreference = () => {
   const navigate = useNavigate()
   const [round, setRound] = useState(1)
+  const [picked, setPicked] = useState(null)
 
-  const handleSelect = () => {
+  const handleSelect = (choice) => {
     // TODO: 선택한 사진 저장
-    if (round < TOTAL_ROUND) {
-      setRound(round + 1)
-      return
-    }
-    navigate('/onboarding/moodboard')
+    if (picked) return
+    setPicked(choice)
   }
+
+  useEffect(() => {
+    if (!picked) return
+
+    const timer = setTimeout(() => {
+      setPicked(null)
+      if (round < TOTAL_ROUND) {
+        setRound(round + 1)
+        return
+      }
+      navigate('/onboarding/moodboard')
+    }, ADVANCE_DELAY)
+
+    return () => clearTimeout(timer)
+  }, [picked, round, navigate])
 
   const handlePrev = () => {
     setRound(round - 1)
@@ -37,8 +52,16 @@ const AbPreference = () => {
         <Description>더 끌리는 사진을 선택하세요</Description>
 
         <PhotoPair>
-          <PhotoChoice as="button" onClick={handleSelect}>Image</PhotoChoice>
-          <PhotoChoice as="button" onClick={handleSelect}>Image</PhotoChoice>
+          <Choice
+            label="A"
+            selected={picked === 'A'}
+            onClick={() => handleSelect('A')}
+          />
+          <Choice
+            label="B"
+            selected={picked === 'B'}
+            onClick={() => handleSelect('B')}
+          />
         </PhotoPair>
 
         <PrevButton onClick={handlePrev} disabled={round === 1}>
@@ -88,15 +111,9 @@ const Description = styled.p`
 
 const PhotoPair = styled.div`
   width: 100%;
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 12px;
-`
-
-const PhotoChoice = styled(ImagePlaceholder)`
-  flex: 1;
-  height: 320px;
-  font-family: inherit;
-  cursor: pointer;
 `
 
 const PrevButton = styled.button`

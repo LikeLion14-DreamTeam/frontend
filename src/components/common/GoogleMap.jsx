@@ -21,6 +21,20 @@ const getBounds = (markers) => {
   }
 }
 
+/**
+ * 공용 구글 지도. SDK 로더(`APIProvider`)는 `main.jsx` 에 이미 있으므로 여기서 감싸지 않는다.
+ *
+ *   // 마커가 전부 보이도록 영역 자동 계산
+ *   <GoogleMap markers={[{ name: '도쿄', lat: 35.6812, lng: 139.7671 }]} />
+ *
+ *   // 중심·배율을 직접 지정
+ *   <GoogleMap center={{ lat: 35.6812, lng: 139.7671 }} zoom={14} height="300px" />
+ *
+ * - `markers` — `{ name, lat, lng }` 배열. `name` 은 key와 마커 툴팁에 쓰인다.
+ * - `center` — 주면 `zoom` 과 함께 쓰이고, 안 주면 `markers` 로 영역을 계산한다.
+ * - `children` — `<Map>` 내부에 그대로 들어간다(폴리라인 등 추가할 때).
+ * - `.env` 에 API 키가 없으면 Placeholder 박스를 렌더한다.
+ */
 const GoogleMap = ({
   markers = [],
   center,
