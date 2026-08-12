@@ -9,6 +9,7 @@ import TripSegmentEdit from "./pages/trip-management/TripSegmentEdit"
 import LogIn from "./pages/login/LogIn"
 import Permission from "./pages/permission/Permission"
 import PermissionDeniedGuide from "./pages/permission/PermissionDeniedGuide"
+import PreferenceStart from "./pages/onboarding/PreferenceStart"
 import BasicQuestion from "./pages/onboarding/BasicQuestion"
 import AbPreference from "./pages/onboarding/AbPreference"
 import MoodBoard from "./pages/onboarding/MoodBoard"
@@ -22,6 +23,7 @@ function App() {
       <Route path="/login" element={<LogIn />} />
       <Route path="/permission" element={<Permission />} />
       <Route path="/permission/denied-guide" element={<PermissionDeniedGuide />} />
+      <Route path="/onboarding/preference-start" element={<PreferenceStart />} />
       <Route path="/onboarding/basic-question" element={<BasicQuestion />} />
       <Route path="/onboarding/ab-preference" element={<AbPreference />} />
       <Route path="/onboarding/moodboard" element={<MoodBoard />} />
