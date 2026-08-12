@@ -8,24 +8,6 @@
 }
 
 @font-face {
-  font-family: "Noto Sans";
-  src: url("./assets/fonts/NotoSans-VariableFont_wdth,wght.woff2")
-    format("woff2");
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Noto Sans";
-  src: url("./assets/fonts/NotoSans-Italic-VariableFont_wdth,wght.woff2")
-    format("woff2");
-  font-weight: 100 900;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
   font-family: "Cormorant Garamond";
   src: url("./assets/fonts/CormorantGaramond-VariableFont_wght.woff2")
     format("woff2");
@@ -44,34 +26,30 @@
 }
 
 * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 :root {
-  /* 01. Layout */
-  --layout-mobile-width: 402px;
-  --layout-mobile-height: 874px;
-  --layout-safe-area: 58px;
-  --layout-bottom-navigation: 75px;
-  --layout-margin: 24px;
-  --layout-grid-columns: 4;
-  --layout-grid-gutter: 20px;
-
-  /* 02. Color System */
+  /* Color */
   --color-background-base: #f7f1e8;
+  --color-background-paper: #f4ece1;
+  --color-background-passport: #efe7da;
   --color-surface-base: #fffdf9;
   --color-primary-cognac: #b5763b;
   --color-primary-pressed: #945a2c;
-  --color-text-primary: #30251d;
-  --color-text-secondary: #817468;
-  --color-border-default: #ded3c6;
   --color-accent-gold: #c5a15b;
   --color-secondary-taupe: #b5a18c;
+  --color-text-primary: #30251d;
+  --color-text-secondary: #817468;
+  --color-text-inverse: #ffffff;
+  --color-border-default: #ded3c6;
   --color-border-strong: #c8b8a6;
   --color-disabled-fill: #e8e0d7;
   --color-disabled-text: #b6aca2;
+  --color-ink-film: #332a22;
+  --color-ink-overlay: #2a2522;
 
   /* Map palette */
   --color-map-base: #f4eee5;
@@ -79,37 +57,111 @@
   --color-map-road: #d9d0c5;
   --color-map-water: #d9e0dc;
   --color-map-park: #e2e6d7;
-  --color-map-route: #b5763b;
-  --color-map-pin-active: #b5763b;
   --color-map-pin-inactive: #b9aa99;
 
-  /* 03. Typography */
-  --font-sans: "Noto Sans KR", "Noto Sans", "Apple SD Gothic Neo",
-    "Malgun Gothic", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
+  /* Typography */
+  --font-sans: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic",
+    system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
 
-  /* 04. Spacing & Radius */
-  --space-4: 4px;
-  --space-8: 8px;
-  --space-16: 16px;
-  --space-20: 20px;
-  --space-24: 24px;
-  --space-32: 32px;
-  --space-48: 48px;
+  --text-editorial-display: 600 40px/44px var(--font-serif);
+  --text-editorial-h1: 600 32px/38px var(--font-serif);
+  --text-editorial-h2: 600 24px/30px var(--font-serif);
+  --text-editorial-brand: 600 24px/30px var(--font-serif);
+  --text-ui-h1: 700 26px/36px var(--font-sans);
+  --text-ui-h2: 700 22px/30px var(--font-sans);
+  --text-ui-h3: 500 18px/26px var(--font-sans);
+  --text-ui-body-l: 400 16px/24px var(--font-sans);
+  --text-ui-body-m: 400 14px/22px var(--font-sans);
+  --text-ui-label: 500 13px/18px var(--font-sans);
+  --text-ui-button: 500 15px/20px var(--font-sans);
+  --text-ui-caption: 400 12px/18px var(--font-sans);
+  --text-ui-nav: 500 11px/16px var(--font-sans);
 
-  --spacing-section: 32px;
-  --spacing-card-padding: 16px;
-  --spacing-large-card-padding-min: 20px;
-  --spacing-large-card-padding-max: 24px;
-  --spacing-info-group: 8px;
-
-  --radius-control: 8px;
-  --radius-button: 10px;
-  --radius-image: 10px;
-  --radius-card: 12px;
-  --radius-journal: 16px;
-  --radius-passport: 18px;
-  --radius-bottom-sheet: 24px;
+  /* Elevation */
+  --shadow-card: 0 4px 14px rgb(48 38 28 / 11%);
+  --shadow-chip: 0 2px 6px rgb(48 38 28 / 6%);
+  --shadow-marker: 0 2px 5px rgb(48 38 28 / 18%);
+  --shadow-marker-active: 0 4px 10px rgb(48 38 28 / 30%);
+  --shadow-bottom-sheet: 0 -5px 22px rgb(48 38 28 / 17%);
+  --shadow-cta: 0 6px 16px rgb(48 38 28 / 30%);
 }
 
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--color-text-primary);
+  background: var(--color-background-base);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.text-editorial-display {
+  font: var(--text-editorial-display);
+  letter-spacing: 0.8px;
+}
+
+.text-editorial-h1 {
+  font: var(--text-editorial-h1);
+  letter-spacing: 0.32px;
+}
+
+.text-editorial-h2 {
+  font: var(--text-editorial-h2);
+  letter-spacing: 0.24px;
+}
+
+.text-editorial-brand {
+  font: var(--text-editorial-brand);
+  letter-spacing: 1.44px;
+}
+
+.text-ui-h1 {
+  font: var(--text-ui-h1);
+  letter-spacing: -0.26px;
+}
+
+.text-ui-h2 {
+  font: var(--text-ui-h2);
+  letter-spacing: -0.22px;
+}
+
+.text-ui-h3 {
+  font: var(--text-ui-h3);
+}
+
+.text-ui-body-l {
+  font: var(--text-ui-body-l);
+}
+
+.text-ui-body-m {
+  font: var(--text-ui-body-m);
+}
+
+.text-ui-label {
+  font: var(--text-ui-label);
+}
+
+.text-ui-button {
+  font: var(--text-ui-button);
+}
+
+.text-ui-caption {
+  font: var(--text-ui-caption);
+}
+
+.text-ui-nav {
+  font: var(--text-ui-nav);
+}
