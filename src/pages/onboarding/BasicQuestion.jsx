@@ -5,7 +5,6 @@ import Button from '../../components/common/Button'
 import Option from '../../components/common/Option'
 import Progress from '../../components/common/Progress'
 import Header from '../../components/layout/Header'
-import paperBg from '../../assets/images/paper-bg.webp'
 
 // TODO: 2~5번 질문 문구·선택지는 아직 디자인에 없어 임시값이다. 나오면 교체할 것.
 const questions = [
@@ -76,7 +75,7 @@ const BasicQuestion = () => {
   }
 
   return (
-    <PageBackground>
+    <>
       <Header to="/permission" />
 
       <OnboardingWrapper>
@@ -112,22 +111,11 @@ const BasicQuestion = () => {
         </Footer>
 
       </OnboardingWrapper>
-    </PageBackground>
+    </>
   )
 }
 
 export default BasicQuestion
-
-const PageBackground = styled.div`
-  min-height: 100vh;
-  /* 402px = 피그마 프레임 폭. cover로 늘리면 종이 결이 확대돼 얼룩처럼 보인다. */
-  background: url(${paperBg}) top center / 402px auto repeat var(--Background-Base);
-
-  /* 헤더의 단색 배경이 종이 질감을 가리지 않도록 한다. */
-  & > header {
-    background: transparent;
-  }
-`
 
 const OnboardingWrapper = styled.main`
   width: 100%;
