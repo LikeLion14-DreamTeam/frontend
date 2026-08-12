@@ -97,7 +97,7 @@ export default PhotoCapture
 
 const CaptureShell = styled.main`
   width: 100%;
-  max-width: 402px;
+  max-width: 450px;
   min-height: 100svh;
   margin: 0 auto;
   background: #000;
