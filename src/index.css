@@ -33,31 +33,31 @@
 
 :root {
   /* Color */
-  --color-background-base: #f7f1e8;
-  --color-background-paper: #f4ece1;
-  --color-background-passport: #efe7da;
-  --color-surface-base: #fffdf9;
-  --color-primary-cognac: #b5763b;
-  --color-primary-pressed: #945a2c;
-  --color-accent-gold: #c5a15b;
-  --color-secondary-taupe: #b5a18c;
-  --color-text-primary: #30251d;
-  --color-text-secondary: #817468;
-  --color-text-inverse: #ffffff;
-  --color-border-default: #ded3c6;
-  --color-border-strong: #c8b8a6;
-  --color-disabled-fill: #e8e0d7;
-  --color-disabled-text: #b6aca2;
-  --color-ink-film: #332a22;
-  --color-ink-overlay: #2a2522;
+  --Background-Base: #f7f1e8;
+  --Background-Paper: #f4ece1;
+  --Background-Passport: #efe7da;
+  --Surface-Base: #fffdf9;
+  --Primary-Cognac: #b5763b;
+  --Primary-Pressed: #945a2c;
+  --Accent-Gold: #c5a15b;
+  --Secondary-Taupe: #b5a18c;
+  --Text-Primary: #30251d;
+  --Text-Secondary: #817468;
+  --Text-Inverse: #ffffff;
+  --Border-Default: #ded3c6;
+  --Border-Strong: #c8b8a6;
+  --State-Disabled-Fill: #e8e0d7;
+  --State-Disabled-Text: #b6aca2;
+  --Ink-Film: #332a22;
+  --Ink-Overlay: #2a2522;
 
   /* Map palette */
-  --color-map-base: #f4eee5;
-  --color-map-land: #eee6db;
-  --color-map-road: #d9d0c5;
-  --color-map-water: #d9e0dc;
-  --color-map-park: #e2e6d7;
-  --color-map-pin-inactive: #b9aa99;
+  --Map-Base: #f4eee5;
+  --Map-Land: #eee6db;
+  --Map-Road: #d9d0c5;
+  --Map-Water: #d9e0dc;
+  --Map-Park: #e2e6d7;
+  --Map-Pin-Inactive: #b9aa99;
 
   /* Typography */
   --font-sans: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic",
@@ -79,12 +79,12 @@
   --text-ui-nav: 500 11px/16px var(--font-sans);
 
   /* Elevation */
-  --shadow-card: 0 4px 14px rgb(48 38 28 / 11%);
-  --shadow-chip: 0 2px 6px rgb(48 38 28 / 6%);
-  --shadow-marker: 0 2px 5px rgb(48 38 28 / 18%);
-  --shadow-marker-active: 0 4px 10px rgb(48 38 28 / 30%);
-  --shadow-bottom-sheet: 0 -5px 22px rgb(48 38 28 / 17%);
-  --shadow-cta: 0 6px 16px rgb(48 38 28 / 30%);
+  --Effect-Card: 0 4px 14px rgb(48 38 28 / 11%);
+  --Effect-Chip: 0 2px 6px rgb(48 38 28 / 6%);
+  --Effect-Marker: 0 2px 5px rgb(48 38 28 / 18%);
+  --Effect-Marker-Active: 0 4px 10px rgb(48 38 28 / 30%);
+  --Effect-Bottom-Sheet: 0 -5px 22px rgb(48 38 28 / 17%);
+  --Effect-CTA: 0 6px 16px rgb(48 38 28 / 30%);
 }
 
 html,
@@ -95,8 +95,8 @@ body,
 
 body {
   font-family: var(--font-sans);
-  color: var(--color-text-primary);
-  background: var(--color-background-base);
+  color: var(--Text-Primary, #30251d);
+  background: var(--Background-Base, #f7f1e8);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
