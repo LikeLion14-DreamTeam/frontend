@@ -119,11 +119,9 @@ const BasicQuestion = () => {
 export default BasicQuestion
 
 const PageBackground = styled.div`
-  width: 100%;
-  max-width: 450px;
   min-height: 100vh;
-  margin: 0 auto;
-  background: url(${paperBg}) center / cover no-repeat var(--Background-Base);
+  /* 402px = 피그마 프레임 폭. cover로 늘리면 종이 결이 확대돼 얼룩처럼 보인다. */
+  background: url(${paperBg}) top center / 402px auto repeat var(--Background-Base);
 
   /* 헤더의 단색 배경이 종이 질감을 가리지 않도록 한다. */
   & > header {

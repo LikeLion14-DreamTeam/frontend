@@ -1,135 +1,152 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
+import Button from '../../components/common/Button'
 import Choice from '../../components/common/Choice'
+import Progress from '../../components/common/Progress'
 import Header from '../../components/layout/Header'
+import paperBg from '../../assets/images/paper-bg.webp'
 
 const TOTAL_ROUND = 5
-// 선택 표시를 보여준 뒤 다음 쌍으로 넘어가기까지의 시간
-const ADVANCE_DELAY = 250
+
+const question = {
+  text: 'A/B 취향 파악',
+  hint: '더 끌리는 사진을 선택하세요',
+}
 
 const AbPreference = () => {
   const navigate = useNavigate()
   const [round, setRound] = useState(1)
-  const [picked, setPicked] = useState(null)
+  const [selected, setSelected] = useState(null)
+
+  const isLastRound = round === TOTAL_ROUND
 
   const handleSelect = (choice) => {
-    // TODO: 선택한 사진 저장
-    if (picked) return
-    setPicked(choice)
+    setSelected(choice)
   }
 
-  useEffect(() => {
-    if (!picked) return
-
-    const timer = setTimeout(() => {
-      setPicked(null)
-      if (round < TOTAL_ROUND) {
-        setRound(round + 1)
-        return
-      }
-      navigate('/onboarding/moodboard')
-    }, ADVANCE_DELAY)
-
-    return () => clearTimeout(timer)
-  }, [picked, round, navigate])
+  const handleNext = () => {
+    // TODO: 선택한 사진 저장
+    if (!isLastRound) {
+      setRound(round + 1)
+      setSelected(null)
+      return
+    }
+    navigate('/onboarding/moodboard')
+  }
 
   const handlePrev = () => {
     setRound(round - 1)
+    setSelected(null)
   }
 
   return (
-    <>
-      <Header>A/B 취향 온보딩 화면</Header>
+    <PageBackground>
+      <Header to="/onboarding/basic-question" />
 
       <OnboardingWrapper>
 
-        <ProgressArea>
-          <Title>A/B 취향 파악</Title>
-          <RoundCount>{round} / {TOTAL_ROUND}</RoundCount>
-        </ProgressArea>
+        <Body>
+          <Progress current={round} total={TOTAL_ROUND} />
 
-        <Description>더 끌리는 사진을 선택하세요</Description>
+          <Content>
+            <QuestionArea>
+              <QuestionText>{question.text}</QuestionText>
+              <QuestionHint>{question.hint}</QuestionHint>
+            </QuestionArea>
 
-        <PhotoPair>
-          <Choice
-            label="A"
-            selected={picked === 'A'}
-            onClick={() => handleSelect('A')}
-          />
-          <Choice
-            label="B"
-            selected={picked === 'B'}
-            onClick={() => handleSelect('B')}
-          />
-        </PhotoPair>
+            <PhotoPair>
+              <Choice
+                label="A"
+                selected={selected === 'A'}
+                onClick={() => handleSelect('A')}
+              />
+              <Choice
+                label="B"
+                selected={selected === 'B'}
+                onClick={() => handleSelect('B')}
+              />
+            </PhotoPair>
+          </Content>
+        </Body>
 
-        <PrevButton onClick={handlePrev} disabled={round === 1}>
-          &lt; 이전 사진
-        </PrevButton>
-
-        <Caption>선택하면 다음 사진 쌍으로 넘어갑니다</Caption>
+        <Footer>
+          <Button onClick={handleNext} disabled={!selected}>
+            {isLastRound ? '완료' : '다음'}
+          </Button>
+          <Button $variant="ghost" onClick={handlePrev} disabled={round === 1}>
+            이전으로
+          </Button>
+        </Footer>
 
       </OnboardingWrapper>
-    </>
+    </PageBackground>
   )
 }
 
 export default AbPreference
 
+const PageBackground = styled.div`
+  min-height: 100vh;
+  /* 402px = 피그마 프레임 폭. cover로 늘리면 종이 결이 확대돼 얼룩처럼 보인다. */
+  background: url(${paperBg}) top center / 402px auto repeat var(--Background-Base);
+
+  /* 헤더의 단색 배경이 종이 질감을 가리지 않도록 한다. */
+  & > header {
+    background: transparent;
+  }
+`
+
 const OnboardingWrapper = styled.main`
   width: 100%;
   max-width: 450px;
-  min-height: 100vh;
+  /* 헤더(116px)를 뺀 나머지를 채워 푸터를 아래로 밀어낸다. */
+  min-height: calc(100vh - 116px);
   margin: 0 auto;
-  padding: 74px 24px 24px;
+  padding: 0 24px 34px;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 16px;
 `
 
-const ProgressArea = styled.section`
-  width: 100%;
+const Body = styled.div`
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 24px;
 `
 
-const Title = styled.h2`
-  font-size: 16px;
-  font-weight: 600;
+const Content = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
 `
 
-const RoundCount = styled.span`
-  font-size: 12px;
+const QuestionArea = styled.section`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 `
 
-const Description = styled.p`
-  font-size: 12px;
+const QuestionText = styled.h2`
+  font: var(--text-ui-h2);
+  letter-spacing: -0.22px;
+  color: var(--Text-Primary);
+`
+
+const QuestionHint = styled.p`
+  font: var(--text-ui-body-m);
+  color: var(--Text-Secondary);
 `
 
 const PhotoPair = styled.div`
-  width: 100%;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 `
 
-const PrevButton = styled.button`
-  padding: 0;
-  border: none;
-  background: none;
-  color: #000;
-  font-size: 12px;
-  cursor: pointer;
-
-  &:disabled {
-    color: #9ca3af;
-    cursor: default;
-  }
-`
-
-const Caption = styled.p`
-  font-size: 11px;
+const Footer = styled.footer`
+  margin-top: auto;
+  padding-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 `
