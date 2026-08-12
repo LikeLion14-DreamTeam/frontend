@@ -1,156 +1,180 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
-import Card from '../../components/common/Card'
+import Button from '../../components/common/Button'
 import Option from '../../components/common/Option'
+import Progress from '../../components/common/Progress'
 import Header from '../../components/layout/Header'
+import paperBg from '../../assets/images/paper-bg.webp'
 
-const question = {
-  step: 3,
-  totalStep: 7,
-  categories: ['chip1', 'chip2', 'chip3'],
-  text: '사진을 찍을 때 가장 자주 담는 대상은 무엇인가요?',
-  options: ['인물 중심', '풍경·자연', '도시·건축', '음식·정물', '순간·감성'],
-}
+// TODO: 2~5번 질문 문구·선택지는 아직 디자인에 없어 임시값이다. 나오면 교체할 것.
+const questions = [
+  {
+    text: '사진을 찍을 때 가장 자주 담는 대상은 무엇인가요?',
+    hint: '여러 개 골라도 괜찮아요',
+    options: [
+      '풍경과 도시 전경',
+      '사람과 표정',
+      '음식과 카페',
+      '건축과 디테일',
+      '길 위의 우연한 순간',
+    ],
+  },
+  {
+    text: '질문 2 (문구 미정)',
+    hint: '여러 개 골라도 괜찮아요',
+    options: ['선택지 1', '선택지 2', '선택지 3', '선택지 4', '선택지 5'],
+  },
+  {
+    text: '질문 3 (문구 미정)',
+    hint: '여러 개 골라도 괜찮아요',
+    options: ['선택지 1', '선택지 2', '선택지 3', '선택지 4', '선택지 5'],
+  },
+  {
+    text: '질문 4 (문구 미정)',
+    hint: '여러 개 골라도 괜찮아요',
+    options: ['선택지 1', '선택지 2', '선택지 3', '선택지 4', '선택지 5'],
+  },
+  {
+    text: '질문 5 (문구 미정)',
+    hint: '여러 개 골라도 괜찮아요',
+    options: ['선택지 1', '선택지 2', '선택지 3', '선택지 4', '선택지 5'],
+  },
+]
+
+const TOTAL_ROUND = questions.length
 
 const BasicQuestion = () => {
   const navigate = useNavigate()
-  const [selected, setSelected] = useState(null)
+  const [round, setRound] = useState(1)
+  const [selected, setSelected] = useState([])
+
+  const question = questions[round - 1]
+  const isLastRound = round === TOTAL_ROUND
+
+  const handleSelect = (option) => {
+    if (selected.includes(option)) {
+      setSelected(selected.filter((item) => item !== option))
+      return
+    }
+    setSelected([...selected, option])
+  }
 
   const handleNext = () => {
     // TODO: 응답 저장
+    if (!isLastRound) {
+      setRound(round + 1)
+      setSelected([])
+      return
+    }
     navigate('/onboarding/ab-preference')
   }
 
+  const handlePrev = () => {
+    setRound(round - 1)
+    setSelected([])
+  }
+
   return (
-    <>
-      <Header>기본 질문 온보딩 화면</Header>
+    <PageBackground>
+      <Header to="/permission" />
 
       <OnboardingWrapper>
 
-        <ProgressArea>
-          <Title>취향 설정</Title>
-          <StepCount>{question.step} / {question.totalStep}</StepCount>
-        </ProgressArea>
+        <Body>
+          <Progress current={round} total={TOTAL_ROUND} />
 
-        <QuestionCard $padding="12px">
-          <CategoryArea>
-            <CategoryLabel />
-            <CategoryList>
-              {question.categories.map((category) => (
-                <Chip key={category}>{category}</Chip>
-              ))}
-            </CategoryList>
-          </CategoryArea>
-          <QuestionText>{question.text}</QuestionText>
-        </QuestionCard>
+          <QuestionArea>
+            <QuestionText>{question.text}</QuestionText>
+            <QuestionHint>{question.hint}</QuestionHint>
+          </QuestionArea>
 
-        <OptionList>
-          {question.options.map((option) => (
-            <Option
-              key={option}
-              selected={selected === option}
-              onClick={() => setSelected(option)}
-            >
-              {option}
-            </Option>
-          ))}
-        </OptionList>
+          <OptionList>
+            {question.options.map((option) => (
+              <Option
+                key={option}
+                selected={selected.includes(option)}
+                onClick={() => handleSelect(option)}
+              >
+                {option}
+              </Option>
+            ))}
+          </OptionList>
+        </Body>
 
-        <NextButton onClick={handleNext}>다음</NextButton>
+        <Footer>
+          <Button onClick={handleNext}>
+            {isLastRound ? '완료' : '다음'}
+          </Button>
+          <Button $variant="ghost" onClick={handlePrev} disabled={round === 1}>
+            이전으로
+          </Button>
+        </Footer>
 
       </OnboardingWrapper>
-    </>
+    </PageBackground>
   )
 }
 
 export default BasicQuestion
 
-const OnboardingWrapper = styled.main`
+const PageBackground = styled.div`
   width: 100%;
   max-width: 450px;
   min-height: 100vh;
   margin: 0 auto;
-  padding: 74px 24px 24px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 16px;
+  background: url(${paperBg}) center / cover no-repeat var(--Background-Base);
+
+  /* 헤더의 단색 배경이 종이 질감을 가리지 않도록 한다. */
+  & > header {
+    background: transparent;
+  }
 `
 
-const ProgressArea = styled.section`
+const OnboardingWrapper = styled.main`
   width: 100%;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-`
-
-const Title = styled.h2`
-  font-size: 16px;
-  font-weight: 600;
-`
-
-const StepCount = styled.span`
-  font-size: 12px;
-`
-
-const QuestionCard = styled(Card)`
+  max-width: 450px;
+  /* 헤더(116px)를 뺀 나머지를 채워 푸터를 아래로 밀어낸다. */
+  min-height: calc(100vh - 116px);
+  margin: 0 auto;
+  padding: 0 24px 34px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  background: #f9fafb;
 `
 
-const CategoryArea = styled.div`
+const Body = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 24px;
 `
 
-const CategoryLabel = styled.div`
-  width: 44px;
-  height: 10px;
-  border-radius: 4px;
-  background: #e5e7eb;
-`
-
-const CategoryList = styled.div`
+const QuestionArea = styled.section`
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+  flex-direction: column;
+  gap: 8px;
 `
 
-const Chip = styled.button`
-  min-width: 40px;
-  padding: 6px 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 999px;
-  background: #f3f4f6;
-  color: #1f2937;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
+const QuestionText = styled.h2`
+  font: var(--text-ui-h2);
+  letter-spacing: -0.22px;
+  color: var(--Text-Primary);
 `
 
-const QuestionText = styled.p`
-  font-size: 12px;
+const QuestionHint = styled.p`
+  font: var(--text-ui-body-m);
+  color: var(--Text-Secondary);
 `
 
 const OptionList = styled.div`
-  width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 `
 
-const NextButton = styled.button`
-  min-width: 60px;
-  padding: 8px 16px;
-  border: none;
-  border-radius: 6px;
-  background: #1f2937;
-  color: #fff;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
+const Footer = styled.footer`
+  margin-top: auto;
+  padding-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 `
