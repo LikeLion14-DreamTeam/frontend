@@ -3,7 +3,6 @@ import Home from "./pages/home/Home"
 import Map from "./pages/map/Map"
 import Archive from "./pages/archive/Archive"
 import TripArchive from "./pages/archive/TripArchive"
-import CityArchive from "./pages/archive/CityArchive"
 import MyPage from "./pages/mypage/MyPage"
 import TripManagement from "./pages/trip-management/TripManagement"
 import TripSegmentEdit from "./pages/trip-management/TripSegmentEdit"
@@ -32,7 +31,6 @@ function App() {
       <Route path="/map" element={<Map />} />
       <Route path="/archive" element={<Archive />} />
       <Route path="/archive/trip/:tripID" element={<TripArchive />} />
-      <Route path="/archive/city/:cityID" element={<CityArchive />} />
       <Route path="/mypage" element={<MyPage />} />
       <Route path="/trip-management" element={<TripManagement />} />
       <Route path="/trip-management/edit" element={<TripSegmentEdit />} />
