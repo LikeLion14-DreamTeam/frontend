@@ -1,13 +1,15 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
-import ImagePlaceholder from '../../components/common/ImagePlaceholder'
+import Button from '../../components/common/Button'
+import Progress from '../../components/common/Progress'
+import Tile from '../../components/common/Tile'
 import Header from '../../components/layout/Header'
+import paperBg from '../../assets/images/paper-bg.webp'
 
 const TOTAL_ROUND = 2
 const SELECT_LIMIT = 3
 
-const rounds = Array.from({ length: TOTAL_ROUND }, (_, index) => index + 1)
 const photos = Array.from({ length: 9 }, (_, index) => index)
 
 const MoodBoard = () => {
@@ -16,134 +18,157 @@ const MoodBoard = () => {
   const [selected, setSelected] = useState([])
 
   const isLastRound = round === TOTAL_ROUND
+  const isFilled = selected.length === SELECT_LIMIT
 
   const handleSelect = (photo) => {
     if (selected.includes(photo)) {
       setSelected(selected.filter((item) => item !== photo))
       return
     }
-    if (selected.length === SELECT_LIMIT) return
+    if (isFilled) return
+
     setSelected([...selected, photo])
   }
 
   const handleNext = () => {
     // TODO: 선택한 사진 저장
+    setSelected([])
+
     if (!isLastRound) {
       setRound(round + 1)
-      setSelected([])
       return
     }
     navigate('/', { replace: true })
   }
 
+  const handlePrev = () => {
+    setRound(round - 1)
+    setSelected([])
+  }
+
   return (
-    <>
-      <Header>무드보드 취향 온보딩 화면</Header>
+    <PageBackground>
+      <Header to="/onboarding/ab-preference" />
 
       <OnboardingWrapper>
 
-        <TitleArea>
-          <Title>나만의 사진 감각 찾기</Title>
-          <Description>마음에 드는 사진 {SELECT_LIMIT}장을 선택해 주세요</Description>
-        </TitleArea>
+        <Body>
+          <Progress current={round} total={TOTAL_ROUND} />
 
-        <RoundList>
-          {rounds.map((item) => (
-            <RoundChip key={item} $active={item === round}>{item}</RoundChip>
-          ))}
-        </RoundList>
+          <Head>
+            <Title>나만의 사진 감각 찾기</Title>
+            <Description>
+              마음에 드는 사진 {SELECT_LIMIT}장을 선택해 주세요
+            </Description>
+          </Head>
 
-        <PhotoGrid>
-          {photos.map((photo) => (
-            <Photo
-              key={photo}
-              as="button"
-              $selected={selected.includes(photo)}
-              onClick={() => handleSelect(photo)}
-            >
-              Image
-            </Photo>
-          ))}
-        </PhotoGrid>
+          <CounterRow>
+            <Counter>
+              {selected.length} / {SELECT_LIMIT} 선택됨
+            </Counter>
+          </CounterRow>
 
-        <NextButton onClick={handleNext}>
-          {isLastRound ? '선택완료' : '다음 라운드로'}
-        </NextButton>
+          <PhotoGrid>
+            {photos.map((photo) => (
+              <Tile
+                key={photo}
+                selected={selected.includes(photo)}
+                onClick={() => handleSelect(photo)}
+              />
+            ))}
+          </PhotoGrid>
+        </Body>
+
+        <Footer>
+          <Button onClick={handleNext} disabled={!isFilled}>
+            {!isFilled
+              ? `사진 ${SELECT_LIMIT}장을 모두 골라주세요`
+              : isLastRound
+                ? '완료'
+                : '다음'}
+          </Button>
+          <Button $variant="ghost" onClick={handlePrev} disabled={round === 1}>
+            이전으로
+          </Button>
+        </Footer>
 
       </OnboardingWrapper>
-    </>
+    </PageBackground>
   )
 }
 
 export default MoodBoard
 
+const PageBackground = styled.div`
+  min-height: 100vh;
+  /* 402px = 피그마 프레임 폭. cover로 늘리면 종이 결이 확대돼 얼룩처럼 보인다. */
+  background: url(${paperBg}) top center / 402px auto repeat var(--Background-Base);
+
+  /* 헤더의 단색 배경이 종이 질감을 가리지 않도록 한다. */
+  & > header {
+    background: transparent;
+  }
+`
+
 const OnboardingWrapper = styled.main`
   width: 100%;
   max-width: 450px;
-  min-height: 100vh;
+  /* 헤더(116px)를 뺀 나머지를 채워 푸터를 아래로 밀어낸다. */
+  min-height: calc(100vh - 116px);
   margin: 0 auto;
-  padding: 74px 24px 24px;
+  padding: 0 24px 34px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
 `
 
-const TitleArea = styled.section`
+const Body = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+`
+
+const Head = styled.section`
   display: flex;
   flex-direction: column;
   gap: 8px;
 `
 
 const Title = styled.h2`
-  font-size: 16px;
-  font-weight: 600;
+  font: var(--text-ui-h2);
+  letter-spacing: -0.22px;
+  color: var(--Text-Primary);
 `
 
 const Description = styled.p`
-  font-size: 12px;
+  font: var(--text-ui-body-m);
+  color: var(--Text-Secondary);
 `
 
-const RoundList = styled.div`
+const CounterRow = styled.div`
   display: flex;
-  justify-content: center;
-  gap: 6px;
+  justify-content: flex-end;
 `
 
-const RoundChip = styled.span`
-  min-width: 40px;
-  padding: 6px 12px;
-  border: 1px solid ${({ $active }) => ($active ? '#1f2937' : '#e5e7eb')};
-  border-radius: 999px;
-  background: ${({ $active }) => ($active ? '#1f2937' : '#f3f4f6')};
-  color: ${({ $active }) => ($active ? '#fff' : '#1f2937')};
-  font-size: 14px;
-  font-weight: 500;
-  text-align: center;
+const Counter = styled.span`
+  padding: 5px 12px;
+  border-radius: 12px;
+  background: rgb(197 161 91 / 16%);
+  font: var(--text-ui-caption);
+  color: var(--Primary-Cognac);
+  white-space: nowrap;
 `
 
 const PhotoGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  column-gap: 6px;
-  row-gap: 12px;
+  column-gap: 10px;
+  row-gap: 16px;
 `
 
-const Photo = styled(ImagePlaceholder)`
-  height: 116px;
-  border-style: ${({ $selected }) => ($selected ? 'solid' : 'dashed')};
-  border-color: ${({ $selected }) => ($selected ? '#1f2937' : '#d1d5db')};
-  font-family: inherit;
-  cursor: pointer;
-`
-
-const NextButton = styled.button`
-  width: 100%;
-  padding: 8px 16px;
-  border: none;
-  border-radius: 6px;
-  background: #1f2937;
-  color: #fff;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
+const Footer = styled.footer`
+  margin-top: auto;
+  padding-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 `

@@ -7,7 +7,7 @@ const variantStyles = {
     border: none;
 
     &:disabled {
-      color: var(--State-Disbaled-Text);
+      color: var(--State-Disabled-Text);
       background: var(--State-Disabled-Fill);
     }
   `,
