@@ -30,6 +30,7 @@ export default Option
 
 const OptionButton = styled.button`
   width: 100%;
+  height: 54px;
   display: flex;
   align-items: center;
   gap: 12px;

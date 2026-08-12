@@ -1,8 +1,9 @@
 import React from 'react'
+import Header from '../../components/layout/Header'
 
 const Map = () => {
   return (
-    <div>Map</div>
+    <Header />
   )
 }
 

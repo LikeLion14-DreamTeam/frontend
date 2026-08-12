@@ -1,24 +1,41 @@
 import React from 'react'
+import { Link } from 'react-router-dom'
 import styled from 'styled-components'
+import BackIcon from '../../assets/icons/Back.svg'
 
-const Header = ({ children }) => {
+// 사용법: <Header to="/돌아갈-경로" />
+const Header = ({ to = '/' }) => {
   return (
-    <HeaderTitle>{children}</HeaderTitle>
+    <HeaderWrapper>
+      <BackLink to={to} aria-label="뒤로가기">
+        <BackImage src={BackIcon} alt="" aria-hidden="true" />
+      </BackLink>
+    </HeaderWrapper>
   )
 }
 
 export default Header
 
-const HeaderTitle = styled.h1`
+const HeaderWrapper = styled.header`
   width: 100%;
-  height: 50px;
-  border: 1px solid #ddd;
-  background: #fff;
-  font-size: 16px;
-  line-height: 48px;
-  text-align: center;
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 10;
+  max-width: 450px;
+  height: 116px;
+  margin: 0 auto;
+  padding: 72px 24px 0;
+  background: var(--Background-Base);
+`
+
+const BackLink = styled(Link)`
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  text-decoration: none;
+`
+
+const BackImage = styled.img`
+  width: 9px;
+  height: 16px;
+  display: block;
 `
