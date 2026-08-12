@@ -111,5 +111,13 @@
   --radius-journal: 16px;
   --radius-passport: 18px;
   --radius-bottom-sheet: 24px;
-}
 
+  /* 05. Effects */
+  --color-card-background: var(--color-surface-base);
+  --color-bottom-sheet-background: var(--color-surface-base);
+  --color-passport-background: var(--color-surface-base);
+
+  --shadow-card: 0 4px 16px rgb(57 41 28 / 8%);
+  --shadow-bottom-sheet: 0 -8px 28px rgb(57 41 28 / 10%);
+  --shadow-passport: 0 10px 30px rgb(68 45 27 / 12%);
+}
