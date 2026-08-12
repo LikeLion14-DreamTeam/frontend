@@ -1,84 +1,121 @@
-import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import Button from '../../components/common/Button'
-import Card from '../../components/common/Card'
+import PermissionStatusCard from '../../components/common/PermissionStatusCard'
+import { permissionStatusCardItems } from '../../components/common/PermissionStatusCard.constants'
 import Header from '../../components/layout/Header'
-
-const permissions = [
-  { key: 'camera', title: '카메라', description: 'NFC 태깅 후 사진을 촬영하는 데 사용됩니다.' },
-  { key: 'location', title: '위치', description: '핀 저장 시 촬영 위치를 기록하는 데 사용됩니다.' },
-  { key: 'nfc', title: 'NFC', description: 'MCM 태그를 인식해 핀을 생성하는 데 사용됩니다.' },
-]
+import privacyLockIcon from '../../assets/icons/privacy-lock.svg'
+import permissionBg from '../../assets/images/permission-bg.png'
 
 const Permission = () => {
   const navigate = useNavigate()
 
   return (
-    <>
-      <Header>권한 안내 화면</Header>
+    <Page>
+      <Header />
 
       <PermissionWrapper>
+        <Body>
+          <Head>
+            <Title>기록을 시작하려면 3가지가 필요해요</Title>
+            <Description>
+              여행 기록을 시작하려면 아래 권한이 필요합니다.
+            </Description>
+          </Head>
 
-        <Title>앱 접근 권한 안내</Title>
-        <Description>여행 기록을 시작하려면 아래 권한이 필요합니다.</Description>
-
-        <Section>
           <PermissionList>
-            {permissions.map((item) => (
-              <Card key={item.key} $padding="12px">
-                <PermissionTitle>{item.title}</PermissionTitle>
-                <PermissionDesc>{item.description}</PermissionDesc>
-              </Card>
+            {permissionStatusCardItems.map((item) => (
+              <PermissionStatusCard key={item.key} {...item} />
             ))}
           </PermissionList>
-        </Section>
 
-        <Caption>
-          권한은 기능 사용 시점에만 요청되며, 태깅하지 않은 사진이나 위치는 수집하지 않습니다.
-        </Caption>
+          <PrivacyCard>
+            <PrivacyIcon src={privacyLockIcon} alt="" aria-hidden="true" />
+            <PrivacyText>
+              태깅하지 않은 사진과 위치는 어디에도 저장되지 않아요
+            </PrivacyText>
+          </PrivacyCard>
+        </Body>
 
-        <Section>
+        <Footer>
+          <GuideButton
+            type="button"
+            onClick={() => navigate('/permission/denied-guide')}
+          >
+            권한을 허용하지 않으면 어떻게 되나요?
+          </GuideButton>
+
           <ActionArea>
-            <Button onClick={() => navigate('/onboarding/basic-question', { replace: true })}>
-              권한 허용하고 시작하기
-            </Button>
-            <TextButton onClick={() => navigate('/permission/denied-guide')}>
-              권한을 허용하지 않으면 어떻게 되나요?
-            </TextButton>
+            <StartButton
+              type="button"
+              onClick={() =>
+                navigate('/onboarding/basic-question', { replace: true })
+              }
+            >
+              시작하기
+            </StartButton>
+            <LaterButton
+              type="button"
+              $variant="ghost"
+              onClick={() =>
+                navigate('/onboarding/basic-question', { replace: true })
+              }
+            >
+              나중에 설정하기
+            </LaterButton>
           </ActionArea>
-        </Section>
-
+        </Footer>
       </PermissionWrapper>
-    </>
+    </Page>
   )
 }
 
 export default Permission
 
+const Page = styled.div`
+  min-height: 100vh;
+  background:
+    url(${permissionBg}) center top / cover no-repeat,
+    var(--Background-Base);
+
+  > header {
+    background: transparent;
+  }
+`
+
 const PermissionWrapper = styled.main`
   width: 100%;
   max-width: 450px;
-  min-height: 100vh;
+  min-height: calc(100vh - 116px);
   margin: 0 auto;
-  padding: 74px 24px 24px;
+  padding: 26px 24px 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 44px;
+`
+
+const Body = styled.section`
+  display: flex;
+  flex-direction: column;
+  gap: 33px;
+`
+
+const Head = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 `
 
 const Title = styled.h2`
-  font-size: 16px;
-  font-weight: 600;
+  color: var(--Text-Primary);
+  font: var(--text-ui-h2);
+  word-break: keep-all;
 `
 
 const Description = styled.p`
-  margin-top: 16px;
-  font-size: 12px;
-`
-
-const Section = styled.section`
-  margin-top: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  color: var(--Text-Secondary);
+  font: var(--text-ui-body-m);
 `
 
 const PermissionList = styled.div`
@@ -87,33 +124,60 @@ const PermissionList = styled.div`
   gap: 12px;
 `
 
-const PermissionTitle = styled.p`
-  font-size: 12px;
+const PrivacyCard = styled.aside`
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 12px 20px;
+  border-radius: 12px;
+  background: rgb(181 118 59 / 9%);
 `
 
-const PermissionDesc = styled.p`
-  margin-top: 12px;
-  font-size: 11px;
+const PrivacyIcon = styled.img`
+  width: 13.5px;
+  height: 18.5px;
+  flex: 0 0 auto;
+  display: block;
 `
 
-const Caption = styled.p`
-  margin-top: 16px;
-  font-size: 11px;
+const PrivacyText = styled.p`
+  min-width: 0;
+  flex: 1;
+  color: var(--Primary-Cognac);
+  font: var(--text-ui-caption);
+  word-break: keep-all;
+`
+
+const Footer = styled.section`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+`
+
+const GuideButton = styled.button`
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--State-Disabled-Text);
+  font: var(--text-ui-caption);
+  text-decoration: underline;
+  cursor: pointer;
 `
 
 const ActionArea = styled.div`
+  width: 100%;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
 `
 
-const TextButton = styled.button`
-  padding: 0;
-  background: none;
-  border: none;
-  color: #6b7280;
-  font-size: 14px;
-  text-decoration: underline;
-  cursor: pointer;
+const StartButton = styled(Button)`
+  font: var(--text-ui-button);
+`
+
+const LaterButton = styled(Button)`
+  font: var(--text-ui-button);
 `
