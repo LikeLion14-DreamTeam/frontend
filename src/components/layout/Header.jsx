@@ -22,7 +22,6 @@ const HeaderWrapper = styled.header`
   height: 116px;
   margin: 0 auto;
   padding: 72px 24px 0;
-  background: var(--Background-Base);
 `
 
 const BackLink = styled(Link)`

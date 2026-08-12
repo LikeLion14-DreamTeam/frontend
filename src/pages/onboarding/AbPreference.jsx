@@ -5,7 +5,6 @@ import Button from '../../components/common/Button'
 import Choice from '../../components/common/Choice'
 import Progress from '../../components/common/Progress'
 import Header from '../../components/layout/Header'
-import paperBg from '../../assets/images/paper-bg.webp'
 
 const TOTAL_ROUND = 5
 
@@ -41,7 +40,7 @@ const AbPreference = () => {
   }
 
   return (
-    <PageBackground>
+    <>
       <Header to="/onboarding/basic-question" />
 
       <OnboardingWrapper>
@@ -80,22 +79,11 @@ const AbPreference = () => {
         </Footer>
 
       </OnboardingWrapper>
-    </PageBackground>
+    </>
   )
 }
 
 export default AbPreference
-
-const PageBackground = styled.div`
-  min-height: 100vh;
-  /* 402px = 피그마 프레임 폭. cover로 늘리면 종이 결이 확대돼 얼룩처럼 보인다. */
-  background: url(${paperBg}) top center / 402px auto repeat var(--Background-Base);
-
-  /* 헤더의 단색 배경이 종이 질감을 가리지 않도록 한다. */
-  & > header {
-    background: transparent;
-  }
-`
 
 const OnboardingWrapper = styled.main`
   width: 100%;

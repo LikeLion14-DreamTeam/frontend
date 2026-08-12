@@ -1,8 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import Button from '../../components/common/Button'
-import preferenceBg from '../../assets/images/onboarding-preference-bg.png'
-import preferencePhotos from '../../assets/images/onboarding-preference-photos.png'
+import preferencePhotos from '../../assets/images/onboarding-preference-photos.webp'
 
 const PreferenceStart = () => {
   const navigate = useNavigate()
@@ -48,7 +47,6 @@ export default PreferenceStart
 
 const Page = styled.div`
   min-height: 100vh;
-  background: var(--Background-Base);
 `
 
 const Frame = styled.main`
@@ -58,9 +56,6 @@ const Frame = styled.main`
   min-height: 875px;
   margin: 0 auto;
   overflow: hidden;
-  background:
-    url(${preferenceBg}) center top / cover no-repeat,
-    var(--Background-Base);
 `
 
 const Body = styled.section`
@@ -98,16 +93,12 @@ const PhotoStage = styled.div`
   left: -1px;
   width: calc(100% + 1px);
   height: 395px;
-  overflow: hidden;
   pointer-events: none;
 `
 
 const PhotoImage = styled.img`
-  position: absolute;
-  top: -44.96%;
-  left: 0;
   width: 100%;
-  height: 181.15%;
+  height: 100%;
   display: block;
   object-fit: fill;
 `

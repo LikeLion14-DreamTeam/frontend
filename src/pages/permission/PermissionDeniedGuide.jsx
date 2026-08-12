@@ -5,13 +5,12 @@ import Card from '../../components/common/Card'
 import PermissionStatusCard from '../../components/common/PermissionStatusCard'
 import { permissionStatusCardItems } from '../../components/common/PermissionStatusCard.constants'
 import Header from '../../components/layout/Header'
-import permissionBg from '../../assets/images/permission-bg.png'
 
 const Permission = () => {
   const navigate = useNavigate()
 
   return (
-    <Page>
+    <>
       <Header to="/permission" />
 
       <PermissionWrapper>
@@ -60,22 +59,11 @@ const Permission = () => {
           </ActionArea>
         </Footer>
       </PermissionWrapper>
-    </Page>
+    </>
   )
 }
 
 export default Permission
-
-const Page = styled.div`
-  min-height: 100vh;
-  background:
-    url(${permissionBg}) center top / cover no-repeat,
-    var(--Background-Base);
-
-  > header {
-    background: transparent;
-  }
-`
 
 const PermissionWrapper = styled.main`
   width: 100%;
