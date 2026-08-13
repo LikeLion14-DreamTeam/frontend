@@ -10,7 +10,7 @@ import photoAddIcon from '../../assets/map/photo-add.svg'
 import refreshIcon from '../../assets/map/refresh.svg'
 import voicePlayIcon from '../../assets/map/voice-play.svg'
 import { MAP_STYLES } from './mapStyles'
-import { getPin } from '../../features/pins/pinApi'
+import { getPin, updatePin } from '../../features/pins/pinApi'
 import { getTrip, getTripPins } from '../../features/trips/tripApi'
 
 // 지도에서 넘어오는 경로가 아직 없어 pinID 가 비면 이 값을 쓴다.
@@ -55,6 +55,11 @@ const PinDetail = () => {
   const [journey, setJourney] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
+
+  const [isEditingNote, setIsEditingNote] = useState(false)
+  const [noteDraft, setNoteDraft] = useState('')
+  const [isSavingNote, setIsSavingNote] = useState(false)
+  const [noteError, setNoteError] = useState('')
 
   useEffect(() => {
     let ignore = false
@@ -134,6 +139,32 @@ const PinDetail = () => {
     )
   }
 
+  const startEditingNote = () => {
+    setNoteDraft(pin.text_note ?? '')
+    setNoteError('')
+    setIsEditingNote(true)
+  }
+
+  const saveNote = async () => {
+    setIsSavingNote(true)
+    setNoteError('')
+
+    try {
+      // 5.2 는 장소명과 텍스트 기록을 함께 받는다. 장소명은 편집 UI 가 없어 그대로 보낸다.
+      const updated = await updatePin(pinID, {
+        placeName: pin.place_name,
+        textNote: noteDraft,
+      })
+
+      setPin((prev) => ({ ...prev, text_note: updated.text_note }))
+      setIsEditingNote(false)
+    } catch (error) {
+      setNoteError(error.message)
+    } finally {
+      setIsSavingNote(false)
+    }
+  }
+
   // 위치 권한을 거부한 상태로 저장된 핀은 좌표가 없다. 지도를 그리지 않는다.
   const hasCoordinates = pin.latitude !== null && pin.longitude !== null
   const position = hasCoordinates
@@ -141,7 +172,8 @@ const PinDetail = () => {
     : null
   const title = pin.place_name || pin.address || '이름 없는 장소'
   const representativePhotos = pin.representative_photos ?? []
-  const hasMemo = Boolean(pin.text_note) || Boolean(pin.voice_memo)
+  const hasMemo =
+    Boolean(pin.text_note) || Boolean(pin.voice_memo) || isEditingNote
 
   return (
     <Page>
@@ -200,7 +232,47 @@ const PinDetail = () => {
               <Memo>
                 <MemoRule />
                 <MemoBody>
-                  {pin.text_note && <MemoText>{pin.text_note}</MemoText>}
+                  {isEditingNote ? (
+                    <NoteEditor>
+                      <NoteInput
+                        value={noteDraft}
+                        onChange={(event) => setNoteDraft(event.target.value)}
+                        aria-label="텍스트 기록"
+                        placeholder="이 순간을 기록해보세요"
+                        rows={3}
+                      />
+                      {noteError && <NoteError role="alert">{noteError}</NoteError>}
+                      <NoteActions>
+                        <NoteCancel
+                          type="button"
+                          onClick={() => setIsEditingNote(false)}
+                          disabled={isSavingNote}
+                        >
+                          취소
+                        </NoteCancel>
+                        <NoteSave
+                          type="button"
+                          onClick={saveNote}
+                          disabled={isSavingNote}
+                        >
+                          {isSavingNote ? '저장 중...' : '저장'}
+                        </NoteSave>
+                      </NoteActions>
+                    </NoteEditor>
+                  ) : (
+                    pin.text_note && (
+                      <NoteRow>
+                        <MemoText>{pin.text_note}</MemoText>
+                        <EditIndicator
+                          type="button"
+                          aria-label="텍스트 기록 수정"
+                          onClick={startEditingNote}
+                        >
+                          수정
+                        </EditIndicator>
+                      </NoteRow>
+                    )
+                  )}
 
                   {pin.voice_memo && (
                     <VoiceBar>
@@ -479,6 +551,91 @@ const MemoBody = styled.div`
 const MemoText = styled.p`
   color: var(--Text-Primary);
   font: var(--text-ui-body-m);
+`
+
+const NoteRow = styled.div`
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+`
+
+/* TODO: 임시 UI. 시안에 텍스트 기록 수정 지시자가 없어 문구·모양을 임의로 정했다. */
+const EditIndicator = styled.button`
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--Primary-Cognac);
+  font: var(--text-ui-caption);
+  text-decoration: underline;
+  cursor: pointer;
+`
+
+const NoteEditor = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`
+
+const NoteInput = styled.textarea`
+  width: 100%;
+  border: 1px solid var(--Border-Default);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: var(--Text-Primary);
+  background: var(--Surface-Base);
+  font: var(--text-ui-body-m);
+  resize: none;
+  outline: none;
+
+  &:focus {
+    border-color: var(--Primary-Cognac);
+  }
+`
+
+const NoteError = styled.p`
+  color: var(--Primary-Cognac);
+  font: var(--text-ui-caption);
+  word-break: keep-all;
+`
+
+const NoteActions = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+`
+
+const NoteCancel = styled.button`
+  min-height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--Border-Default);
+  border-radius: 16px;
+  background: var(--Surface-Base);
+  color: var(--Text-Secondary);
+  font: var(--text-ui-caption);
+  cursor: pointer;
+
+  &:disabled {
+    color: var(--State-Disabled-Text);
+    cursor: not-allowed;
+  }
+`
+
+const NoteSave = styled.button`
+  min-height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--Primary-Cognac);
+  color: var(--Text-Inverse);
+  font: var(--text-ui-caption);
+  cursor: pointer;
+
+  &:disabled {
+    background: var(--State-Disabled-Fill);
+    color: var(--State-Disabled-Text);
+    cursor: not-allowed;
+  }
 `
 
 const VoiceBar = styled.div`

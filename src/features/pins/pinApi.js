@@ -47,3 +47,31 @@ export const getPin = async (pinId) => {
 
   return apiClient.get(`/pins/${pinId}`)
 }
+
+/**
+ * 5.2 핀 정보 수정
+ *
+ * 장소명(사용자 입력)과 텍스트 기록만 수정할 수 있다.
+ * 좌표·주소·음성메모는 생성 이후 수정 불가다.
+ * 텍스트 기록을 빈 문자열로 저장하면 기록을 지운 것으로 처리한다.
+ */
+export const updatePin = async (pinId, { placeName, textNote }) => {
+  if (USE_MOCK) {
+    const pin = mockPinStore.pins[pinId]
+    if (!pin) throw mockNotFound()
+
+    pin.place_name = placeName
+    pin.text_note = textNote
+
+    return {
+      pin_id: pin.pin_id,
+      place_name: pin.place_name,
+      text_note: pin.text_note,
+    }
+  }
+
+  return apiClient.patch(`/pins/${pinId}`, {
+    place_name: placeName,
+    text_note: textNote,
+  })
+}
