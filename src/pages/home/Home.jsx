@@ -23,7 +23,7 @@ const Home = () => {
 
         <Section>
           <Card>
-            <SectionTitle>진행 중인 여정</SectionTitle>
+            <SectionTitle>진행 중인 여</SectionTitle>
             <JourneyTitle>여정타이틀</JourneyTitle>
             <JourneyMeta>여정정보</JourneyMeta>
             <JourneyFooter>
