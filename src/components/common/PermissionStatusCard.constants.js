@@ -16,6 +16,7 @@ export const permissionStatusCardPresets = {
     title: 'NFC',
     description: 'MCM 태그를 읽어 핀을 만들어요',
     disabledDescription: '제품을 태그해도 반응하지 않아요',
+    enabledBadgeLabel: '확인',
     icon: nfcOnIcon,
     disabledIcon: nfcOffIcon,
     iconSize: 28,
@@ -24,6 +25,7 @@ export const permissionStatusCardPresets = {
     title: '카메라',
     description: '태깅한 자리에서 바로 사진을 남겨요',
     disabledDescription: '태깅 직후 사진 촬영이 안 돼요',
+    enabledBadgeLabel: '필수',
     icon: cameraOnIcon,
     disabledIcon: cameraOffIcon,
     iconSize: {
@@ -35,6 +37,7 @@ export const permissionStatusCardPresets = {
     title: '위치',
     description: '이 핀이 지도 위 어디인지 기록해요',
     disabledDescription: '지도 위에 기록이 안 돼요',
+    enabledBadgeLabel: '선택',
     icon: locationOnIcon,
     disabledIcon: locationOffIcon,
     iconSize: 26,
