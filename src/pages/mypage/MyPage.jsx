@@ -1,7 +1,15 @@
 import React from 'react'
+import { googleLogout } from '@react-oauth/google'
+import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import Button from '../../components/common/Button'
 import NavBar from '../../components/layout/NavBar'
+import {
+  clearSessionToken,
+  getSessionToken,
+} from '../../api/session'
+import { logout } from '../../features/auth/authApi'
+import useAuthStore from '../../features/auth/useAuthStore'
 import addIcon from '../../assets/icons/mypage/add.svg'
 import briefcaseIcon from '../../assets/icons/mypage/briefcase.svg'
 import chevronRightIcon from '../../assets/icons/mypage/chevron-right.svg'
@@ -37,12 +45,29 @@ const settings = [
 ]
 
 const MyPage = () => {
+  const navigate = useNavigate()
+  const clearUser = useAuthStore((state) => state.clearUser)
+
   const handlePreferenceInput = (event) => {
     const slider = event.currentTarget
     const value = Number(slider.value)
 
     slider.style.setProperty('--slider-progress', `${value}%`)
     slider.setAttribute('aria-valuetext', `${Math.round(value)}점`)
+  }
+
+  const handleLogout = () => {
+    const sessionToken = getSessionToken()
+    const logoutRequest = logout(sessionToken)
+
+    // 명세 1.2: 네트워크 결과와 무관하게 로컬 세션을 즉시 폐기한다.
+    clearSessionToken()
+    clearUser()
+    googleLogout()
+    navigate('/login', { replace: true })
+
+    // 서버 세션 해제 실패는 사용자 로그아웃을 되돌리지 않는다.
+    void logoutRequest.catch(() => {})
   }
 
   return (
@@ -138,7 +163,7 @@ const MyPage = () => {
               <ChevronIcon src={chevronRightIcon} alt="" aria-hidden="true" />
             </SettingRow>
           ))}
-          <SettingRow type="button">
+          <SettingRow type="button" onClick={handleLogout}>
             <LogoutLabel>로그아웃</LogoutLabel>
             <ChevronIcon src={chevronRightIcon} alt="" aria-hidden="true" />
           </SettingRow>
