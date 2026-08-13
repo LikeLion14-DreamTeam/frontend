@@ -189,7 +189,7 @@ const MapPage = () => {
         <RecordButton
           type="button"
           aria-label="현재 위치에 기록 추가"
-          onClick={() => navigate('/record/camera')}
+          onClick={() => navigate('/record/multi-capture')}
         >
           <img src={recordPlusIcon} alt="" />
         </RecordButton>

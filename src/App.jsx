@@ -15,7 +15,6 @@ import PreferenceStart from "./pages/onboarding/PreferenceStart"
 import BasicQuestion from "./pages/onboarding/BasicQuestion"
 import AbPreference from "./pages/onboarding/AbPreference"
 import MoodBoard from "./pages/onboarding/MoodBoard"
-import PhotoCapture from "./pages/record/PhotoCapture"
 import MultiCapture from "./pages/record/MultiCapture"
 import PinSaveComplete from "./pages/record/PinSaveComplete"
 
@@ -31,7 +30,6 @@ function App() {
       <Route path="/onboarding/ab-preference" element={<AbPreference />} />
       <Route path="/onboarding/moodboard" element={<MoodBoard />} />
       <Route path="/" element={<Home />} />
-      <Route path="/record/camera" element={<PhotoCapture />} />
       <Route path="/record/multi-capture" element={<MultiCapture />} />
       <Route path="/record/pin-saved" element={<PinSaveComplete />} />
       <Route path="/map" element={<Map />} />

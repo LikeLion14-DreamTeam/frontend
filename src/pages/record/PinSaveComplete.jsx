@@ -162,7 +162,7 @@ const PinSaveComplete = () => {
           <FooterButton
             type="button"
             $variant="ghost"
-            onClick={() => navigate('/record/camera')}
+            onClick={() => navigate('/record/multi-capture')}
           >
             계속 촬영하기
           </FooterButton>
