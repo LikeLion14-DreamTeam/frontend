@@ -109,7 +109,6 @@ const PageShell = styled.main`
   max-width: 450px;
   min-height: 100svh;
   margin: 0 auto;
-  background: #fff;
   color: #111827;
   border: 1px solid #e5e7eb;
   border-radius: 12px;

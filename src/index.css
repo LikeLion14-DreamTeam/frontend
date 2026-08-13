@@ -91,15 +91,12 @@ html,
 body,
 #root {
   min-height: 100%;
+  background-color: var(--Background-Base, #f7f1e8);
 }
 
 body {
   font-family: var(--font-sans);
   color: var(--Text-Primary, #30251d);
-  /* 402px = 피그마 프레임 폭. cover로 늘리면 종이 결이 확대돼 얼룩처럼 보인다.
-     body에 깔아야 iOS 상태바 아래 안전영역까지 질감이 채워진다. */
-  background: url("./assets/images/paper-bg.webp") top center / 402px auto repeat
-    var(--Background-Base, #f7f1e8);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }

@@ -65,7 +65,6 @@ const ArchiveWrapper = styled.main`
   min-height: 100vh;
   margin: 0 auto;
   padding: 74px 24px 92px;
-  background: #fff;
 `
 
 const Title = styled.h2`

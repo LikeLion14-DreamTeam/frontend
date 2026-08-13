@@ -123,7 +123,6 @@ const PageShell = styled.main`
   min-height: 100vh;
   margin: 0 auto;
   padding: 0 24px 104px;
-  background: #fff;
   color: #1f2937;
   font-family: var(--font-sans);
 `
