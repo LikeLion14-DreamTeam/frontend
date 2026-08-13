@@ -62,7 +62,9 @@ const journeyPhotobooks = [
 const ArchiveWrapper = styled.main`
   width: 100%;
   max-width: 450px;
-  min-height: 100vh;
+  min-height: calc(
+    var(--app-viewport-height) - 116px + var(--design-safe-top)
+  );
   margin: 0 auto;
   padding: 74px 24px 92px;
 `

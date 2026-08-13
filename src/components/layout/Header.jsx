@@ -57,9 +57,10 @@ const HeaderWrapper = styled.header`
   position: relative;
   width: 100%;
   max-width: 450px;
-  height: ${({ $height }) => $height};
+  height: calc(${({ $height }) => $height} - var(--design-safe-top));
   margin: 0 auto;
-  padding: ${({ $topPadding }) => $topPadding} 24px 0;
+  padding: calc(${({ $topPadding }) => $topPadding} - var(--design-safe-top))
+    24px 0;
   display: flex;
 
   &::after {
@@ -67,8 +68,10 @@ const HeaderWrapper = styled.header`
     position: absolute;
     left: 0;
     right: 0;
-    top: calc(${({ $topPadding }) => $topPadding} + ${({ $barHeight }) =>
-  $barHeight} - 1px);
+    top: calc(
+      ${({ $topPadding }) => $topPadding} - var(--design-safe-top) +
+        ${({ $barHeight }) => $barHeight} - 1px
+    );
     height: 1px;
     background: #d0d0d0;
   }
@@ -77,7 +80,7 @@ const HeaderWrapper = styled.header`
 const BackLink = styled(Link)`
   position: absolute;
   left: 24px;
-  top: ${({ $topPadding }) => $topPadding};
+  top: calc(${({ $topPadding }) => $topPadding} - var(--design-safe-top));
   width: 24px;
   height: ${({ $barHeight }) => $barHeight};
   display: inline-flex;
@@ -97,7 +100,7 @@ const TitleSlot = styled.div`
   position: absolute;
   left: 64px;
   right: 64px;
-  top: ${({ $topPadding }) => $topPadding};
+  top: calc(${({ $topPadding }) => $topPadding} - var(--design-safe-top));
   height: ${({ $barHeight }) => $barHeight};
   display: flex;
   align-items: center;
@@ -113,7 +116,7 @@ const HeaderTitle = styled.h1`
 const RightSlot = styled.div`
   position: absolute;
   right: 24px;
-  top: ${({ $topPadding }) => $topPadding};
+  top: calc(${({ $topPadding }) => $topPadding} - var(--design-safe-top));
   height: ${({ $barHeight }) => $barHeight};
   display: inline-flex;
   align-items: center;

@@ -68,7 +68,9 @@ export default Permission
 const PermissionWrapper = styled.main`
   width: 100%;
   max-width: 450px;
-  min-height: calc(100vh - 116px);
+  min-height: calc(
+    var(--app-viewport-height) - 116px + var(--design-safe-top)
+  );
   margin: 0 auto;
   padding: 26px 24px 40px;
   display: flex;

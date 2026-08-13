@@ -220,13 +220,15 @@ export default TripSegmentEdit
 
 const PageSurface = styled.div`
   width: 100%;
-  min-height: 100vh;
+  min-height: var(--app-viewport-height);
 `
 
 const TripSegmentEditWrapper = styled.main`
   width: 100%;
   max-width: 450px;
-  min-height: calc(100vh - 136px);
+  min-height: calc(
+    var(--app-viewport-height) - 136px + var(--design-safe-top)
+  );
   margin: 0 auto;
   padding: 0 24px 36px;
   display: flex;

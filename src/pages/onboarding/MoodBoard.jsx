@@ -101,8 +101,10 @@ export default MoodBoard
 const OnboardingWrapper = styled.main`
   width: 100%;
   max-width: 450px;
-  /* 헤더(116px)를 뺀 나머지를 채워 푸터를 아래로 밀어낸다. */
-  min-height: calc(100vh - 116px);
+  /* 브라우저가 이미 제외한 58px을 헤더 높이에 중복 반영하지 않는다. */
+  min-height: calc(
+    var(--app-viewport-height) - 116px + var(--design-safe-top)
+  );
   margin: 0 auto;
   padding: 0 24px 34px;
   display: flex;
