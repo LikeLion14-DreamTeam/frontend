@@ -1,276 +1,307 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
+import Card from '../../components/common/Card'
 import Header from '../../components/layout/Header'
 import NavBar from '../../components/layout/NavBar'
 
-const currentSegment = {
-  city: '서울',
-  period: '2025.06.14 ~',
-  pins: 4,
-  photos: 21,
+const segment = {
+  name: '파리 · 베르사유',
+  period: '2024.11.03 – 11.10',
+  duration: '8일간의 구간',
+  pinRange: '핀 1 – 핀 7',
 }
 
-const pastSegments = [
+const settings = [
+  { label: '구간 이름', value: segment.name },
+  { label: '여행 기간', value: '11.03 – 11.10' },
+  { label: '포함 핀 범위', value: segment.pinRange },
+]
+
+const metrics = [
+  { label: '선택된 핀', value: '12' },
+  { label: '연결된 사진', value: '2' },
+]
+
+const includedPins = [
   {
     id: 1,
-    city: '파리 · 암스테르담',
-    meta: '2024.09.12 ~ 09.27 · 핀 12개',
+    label: '핀 1',
+    title: '파리 에펠탑 근처',
+    meta: '11.03 오전 10:24 · 사진 8장',
   },
   {
     id: 2,
-    city: '도쿄 · 교토',
-    meta: '2024.03.04 ~ 03.14 · 핀 9개',
+    label: '핀 2',
+    title: '루브르 박물관 앞',
+    meta: '11.04 오후 2:11 · 사진 6장',
   },
   {
     id: 3,
-    city: '바르셀로나',
-    meta: '2023.11.01 ~ 11.10 · 핀 7개',
+    label: '핀 3',
+    title: '몽마르트르 언덕',
+    meta: '11.05 오전 11:05 · 사진 11장',
+  },
+  {
+    id: 5,
+    label: '핀 5',
+    title: '베르사유 궁전 정원',
+    meta: '11.08 오전 9:30 · 사진 7장',
   },
 ]
 
 const TripManagement = () => {
   return (
-    <>
-      <Header to="/" />
+    <PageSurface>
+      <Header
+        to="/archive"
+        height="104px"
+        topPadding="58px"
+        barHeight="24px"
+        rightContent={<EditLink to="/trip-management/edit">구간 편집</EditLink>}
+      />
 
       <TripManagementWrapper>
-        <Head>
-          <Title>여행 구간</Title>
-          <Description>
-            핀의 위치와 날짜로 자동으로 묶었어요. 다르게 나누고 싶으면 직접 수정할 수 있어요.
-          </Description>
-        </Head>
+        <SegmentIdentity>
+          <SegmentText>
+            <SegmentTitle>{segment.name}</SegmentTitle>
+            <SegmentMeta>
+              {segment.period} · {segment.duration}
+            </SegmentMeta>
+          </SegmentText>
+        </SegmentIdentity>
 
-        <ActiveSegment>
-          <SegmentRow>
-            <SegmentThumbnail $size={56} aria-hidden="true" />
-            <SegmentText>
-              <ActiveTag>기록 중</ActiveTag>
-              <ActiveTitle>{currentSegment.city}</ActiveTitle>
-              <SegmentMeta>
-                {currentSegment.period} · 핀 {currentSegment.pins}개 · 사진 {currentSegment.photos}장
-              </SegmentMeta>
-            </SegmentText>
-          </SegmentRow>
-
-          <SecondaryButton as={Link} to="/trip-management/edit">
-            이 구간 마치고 포토북 만들기
-          </SecondaryButton>
-        </ActiveSegment>
-
-        <PastTitle>지난 구간 3개</PastTitle>
-        <PastSegments>
-          {pastSegments.map((segment) => (
-            <PastSegmentLink key={segment.id} to="/trip-management/edit">
-              <SegmentThumbnail $size={52} aria-hidden="true" />
-              <SegmentText>
-                <PastSegmentTitle>{segment.city}</PastSegmentTitle>
-                <PastSegmentMeta>{segment.meta}</PastSegmentMeta>
-              </SegmentText>
-              <Chevron aria-hidden="true" />
-            </PastSegmentLink>
+        <SettingsCard>
+          {settings.map((item, index) => (
+            <React.Fragment key={item.label}>
+              <SettingRow>
+                <SettingLabel>{item.label}</SettingLabel>
+                <SettingValue>{item.value}</SettingValue>
+              </SettingRow>
+              {index < settings.length - 1 ? <Divider /> : null}
+            </React.Fragment>
           ))}
-        </PastSegments>
+        </SettingsCard>
 
-        <AddButton as={Link} to="/trip-management/edit">
-          <Plus aria-hidden="true">+</Plus>
-          구간 직접 만들기
-        </AddButton>
+        <StatsGrid aria-label="구간 요약">
+          {metrics.map((metric) => (
+            <MetricCard key={metric.label}>
+              <MetricValue>{metric.value}</MetricValue>
+              <MetricLabel>{metric.label}</MetricLabel>
+            </MetricCard>
+          ))}
+        </StatsGrid>
+
+        <PinSection>
+          <SectionHeader>
+            <SectionTitle>포함된 핀 기록</SectionTitle>
+            <SectionMeta>시간순</SectionMeta>
+          </SectionHeader>
+
+          <PinList>
+            {includedPins.map((pin) => (
+              <PinCard key={pin.id}>
+                <PinNumber>{pin.label}</PinNumber>
+                <PinText>
+                  <PinTitle>{pin.title}</PinTitle>
+                  <PinMeta>{pin.meta}</PinMeta>
+                </PinText>
+              </PinCard>
+            ))}
+          </PinList>
+        </PinSection>
       </TripManagementWrapper>
 
-      <NavBar />
-    </>
+      <NavBar activeOverride="archive" />
+    </PageSurface>
   )
 }
 
 export default TripManagement
 
+const EditLink = styled(Link)`
+  color: var(--Primary-Cognac);
+  font: var(--text-ui-label);
+  text-decoration: none;
+  white-space: nowrap;
+`
+
+const PageSurface = styled.div`
+  width: 100%;
+  min-height: 100vh;
+  background: var(--Background-Base);
+`
+
 const TripManagementWrapper = styled.main`
   width: 100%;
   max-width: 450px;
-  min-height: calc(100vh - 116px);
+  min-height: calc(100vh - 104px);
   margin: 0 auto;
-  padding: 0 24px 92px;
+  padding: 0 24px 99px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
   background: var(--Background-Base);
   color: var(--Text-Primary);
 `
 
-const Head = styled.section`
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-`
-
-const Title = styled.h2`
-  color: var(--Text-Primary);
-  font: var(--text-ui-h2);
-  letter-spacing: 0;
-`
-
-const Description = styled.p`
-  color: var(--Text-Secondary);
-  font: var(--text-ui-body-m);
-  word-break: keep-all;
-`
-
-const ActiveSegment = styled.section`
+const SegmentIdentity = styled.section`
   width: 100%;
-  margin-top: 20px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  border: 1.5px solid var(--Primary-Cognac);
-  border-radius: 16px;
-  background: rgb(181 118 59 / 9%);
-`
-
-const SegmentRow = styled.div`
   display: flex;
   align-items: center;
-  gap: 14px;
-`
-
-const SegmentThumbnail = styled.div`
-  position: relative;
-  width: ${({ $size }) => $size}px;
-  height: ${({ $size }) => $size}px;
-  flex: 0 0 ${({ $size }) => $size}px;
-  overflow: hidden;
-  border-radius: 8px;
-  background: var(--Map-Land);
-
-  &::before {
-    content: '';
-    position: absolute;
-    left: 6px;
-    bottom: 5px;
-    width: 0;
-    height: 0;
-    border-left: ${({ $size }) => Math.round($size * 0.28)}px solid transparent;
-    border-right: ${({ $size }) => Math.round($size * 0.28)}px solid transparent;
-    border-bottom: ${({ $size }) => Math.round($size * 0.55)}px solid #d8cdbd;
-  }
-
-  &::after {
-    content: '';
-    position: absolute;
-    top: ${({ $size }) => Math.round($size * 0.18)}px;
-    right: ${({ $size }) => Math.round($size * 0.2)}px;
-    width: ${({ $size }) => Math.round($size * 0.15)}px;
-    height: ${({ $size }) => Math.round($size * 0.15)}px;
-    border-radius: 999px;
-    background: #dec48e;
-  }
 `
 
 const SegmentText = styled.div`
   min-width: 0;
-  flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
   gap: 4px;
 `
 
-const ActiveTag = styled.span`
-  padding: 2px 7px;
-  border-radius: 5px;
-  background: var(--Primary-Cognac);
-  color: var(--Text-Inverse);
-  font: 400 10px/18px var(--font-sans);
-`
-
-const ActiveTitle = styled.h3`
+const SegmentTitle = styled.h2`
   color: var(--Text-Primary);
-  font: var(--text-ui-h3);
+  font: var(--text-ui-h2);
+  letter-spacing: -0.22px;
 `
 
 const SegmentMeta = styled.p`
   color: var(--Text-Secondary);
   font: var(--text-ui-caption);
-  white-space: nowrap;
 `
 
-const SecondaryButton = styled(Link)`
+const SettingsCard = styled(Card)`
+  border: 0;
+  border-radius: 16px;
+  padding: 4px 16px;
+  background: var(--Surface-Base);
+`
+
+const SettingRow = styled.div`
   width: 100%;
-  min-height: 42px;
+  min-height: 46px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  border: 1px solid rgb(181 118 59 / 55%);
-  border-radius: 21px;
-  color: var(--Primary-Cognac);
-  background: transparent;
-  font: var(--text-ui-button);
-  text-decoration: none;
-`
-
-const PastTitle = styled.p`
-  margin-top: 20px;
-  color: var(--Text-Secondary);
-  font: var(--text-ui-label);
-`
-
-const PastSegments = styled.section`
-  margin-top: 20px;
-  display: flex;
-  flex-direction: column;
   gap: 10px;
 `
 
-const PastSegmentLink = styled(Link)`
-  width: 100%;
-  min-height: 80px;
-  padding: 14px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  border: 1px solid var(--Border-Default);
-  border-radius: 14px;
-  background: var(--Surface-Base);
-  color: inherit;
-  text-decoration: none;
-`
-
-const PastSegmentTitle = styled.p`
+const SettingLabel = styled.p`
+  flex: 1;
+  min-width: 0;
   color: var(--Text-Primary);
   font: var(--text-ui-label);
 `
 
-const PastSegmentMeta = styled.p`
+const SettingValue = styled.p`
+  flex: 0 0 auto;
   color: var(--Text-Secondary);
   font: var(--text-ui-caption);
   white-space: nowrap;
 `
 
-const Chevron = styled.span`
-  width: 8px;
-  height: 14px;
-  flex: 0 0 8px;
-  border-top: 1.5px solid var(--Secondary-Taupe);
-  border-right: 1.5px solid var(--Secondary-Taupe);
-  transform: rotate(45deg);
+const Divider = styled.div`
+  width: 100%;
+  height: 1px;
+  background: var(--Border-Default);
+  opacity: 0.7;
 `
 
-const AddButton = styled(Link)`
+const StatsGrid = styled.section`
   width: 100%;
-  min-height: 48px;
-  margin-top: 20px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+`
+
+const MetricCard = styled(Card)`
+  min-height: 65px;
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 8px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  border: 1px dashed var(--Border-Default);
-  border-radius: 24px;
-  color: var(--Text-Secondary);
-  background: transparent;
-  font: var(--text-ui-button);
-  text-decoration: none;
+  gap: 2px;
+  background: var(--Surface-Base);
+  box-shadow: var(--Effect-Chip);
+  text-align: center;
 `
 
-const Plus = styled.span`
-  font-size: 24px;
-  line-height: 1;
+const MetricValue = styled.p`
+  color: #1f2937;
+  font: var(--text-ui-h3);
+`
+
+const MetricLabel = styled.p`
+  color: #6b7280;
+  font: var(--text-ui-nav);
+`
+
+const PinSection = styled.section`
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+`
+
+const SectionHeader = styled.div`
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+`
+
+const SectionTitle = styled.h3`
+  flex: 1;
+  min-width: 0;
+  color: var(--Text-Primary);
+  font: var(--text-ui-label);
+`
+
+const SectionMeta = styled.p`
+  flex: 0 0 auto;
+  color: var(--Text-Secondary);
+  font: var(--text-ui-caption);
+`
+
+const PinList = styled.div`
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+`
+
+const PinCard = styled(Card)`
+  min-height: 70px;
+  border: 0;
+  border-radius: 12px;
+  padding: 11px 15px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--Surface-Base);
+`
+
+const PinNumber = styled.p`
+  width: 30px;
+  flex: 0 0 30px;
+  color: var(--Secondary-Taupe);
+  font: var(--text-ui-nav);
+`
+
+const PinText = styled.div`
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+`
+
+const PinTitle = styled.p`
+  color: var(--Text-Primary);
+  font: var(--text-ui-label);
+`
+
+const PinMeta = styled.p`
+  color: var(--Text-Secondary);
+  font: var(--text-ui-caption);
 `

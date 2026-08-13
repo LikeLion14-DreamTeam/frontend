@@ -12,6 +12,7 @@ import myInactiveIcon from '../../assets/icons/nav-my-inactive.svg'
 
 const navItems = [
   {
+    id: 'home',
     to: '/',
     label: '홈',
     activeIcon: homeActiveIcon,
@@ -19,18 +20,21 @@ const navItems = [
     end: true,
   },
   {
+    id: 'map',
     to: '/map',
     label: '지도',
     activeIcon: mapActiveIcon,
     inactiveIcon: mapInactiveIcon,
   },
   {
+    id: 'archive',
     to: '/archive',
     label: '아카이브',
     activeIcon: archiveActiveIcon,
     inactiveIcon: archiveInactiveIcon,
   },
   {
+    id: 'mypage',
     to: '/mypage',
     label: '마이페이지',
     activeIcon: myActiveIcon,
@@ -38,21 +42,27 @@ const navItems = [
   },
 ]
 
-const NavBar = () => {
+const NavBar = ({ activeOverride }) => {
   return (
     <NavWrapper>
       {navItems.map((item) => (
         <NavContent key={item.to} to={item.to} end={item.end}>
-          {({ isActive }) => (
-            <>
-              <NavIcon
-                src={isActive ? item.activeIcon : item.inactiveIcon}
-                alt=""
-                aria-hidden="true"
-              />
-              <NavLabel>{item.label}</NavLabel>
-            </>
-          )}
+          {({ isActive }) => {
+            const isCurrent = activeOverride
+              ? activeOverride === item.id
+              : isActive
+
+            return (
+              <>
+                <NavIcon
+                  src={isCurrent ? item.activeIcon : item.inactiveIcon}
+                  alt=""
+                  aria-hidden="true"
+                />
+                <NavLabel $active={isCurrent}>{item.label}</NavLabel>
+              </>
+            )
+          }}
         </NavContent>
       ))}
     </NavWrapper>
@@ -62,16 +72,18 @@ const NavBar = () => {
 export default NavBar
 
 const NavWrapper = styled.nav`
-  width: 100%;
-  height: 75px;
   position: fixed;
   bottom: 0;
-  left: 0;
+  left: 50%;
+  z-index: 10;
+  width: 100%;
+  max-width: 450px;
+  height: 75px;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   border-top: 1px solid var(--Border-Default);
   background: var(--Surface-Base);
-  z-index: 10;
+  transform: translateX(-50%);
 `
 
 const NavContent = styled(NavLink)`
@@ -81,13 +93,9 @@ const NavContent = styled(NavLink)`
   justify-content: center;
   align-items: center;
   gap: 4px;
+  color: var(--Text-Secondary);
   text-align: center;
   text-decoration: none;
-  color: var(--Text-Secondary);
-
-  &.active {
-    color: var(--Primary-Cognac);
-  }
 `
 
 const NavIcon = styled.img`
@@ -99,7 +107,8 @@ const NavIcon = styled.img`
 `
 
 const NavLabel = styled.span`
-  color: currentColor;
+  color: ${({ $active }) =>
+    $active ? 'var(--Primary-Cognac)' : 'var(--Secondary-Taupe)'};
   font: var(--text-ui-nav);
   white-space: nowrap;
   word-break: break-word;
