@@ -3,13 +3,50 @@ import { Link } from 'react-router-dom'
 import styled from 'styled-components'
 import BackIcon from '../../assets/icons/Back.svg'
 
-// 사용법: <Header to="/돌아갈-경로" />
-const Header = ({ to = '/' }) => {
+const Header = ({
+  to = '/',
+  title,
+  rightContent,
+  iconSrc = BackIcon,
+  iconWidth = '9px',
+  iconHeight = '16px',
+  ariaLabel = '뒤로가기',
+  height = '116px',
+  topPadding = '72px',
+  barHeight = '24px',
+  borderBottom = false,
+}) => {
   return (
-    <HeaderWrapper>
-      <BackLink to={to} aria-label="뒤로가기">
-        <BackImage src={BackIcon} alt="" aria-hidden="true" />
+    <HeaderWrapper
+      $barHeight={barHeight}
+      $borderBottom={borderBottom}
+      $height={height}
+      $topPadding={topPadding}
+    >
+      <BackLink
+        $barHeight={barHeight}
+        $topPadding={topPadding}
+        to={to}
+        aria-label={ariaLabel}
+      >
+        <BackImage
+          $height={iconHeight}
+          $width={iconWidth}
+          src={iconSrc}
+          alt=""
+          aria-hidden="true"
+        />
       </BackLink>
+      {title ? (
+        <TitleSlot $barHeight={barHeight} $topPadding={topPadding}>
+          <HeaderTitle>{title}</HeaderTitle>
+        </TitleSlot>
+      ) : null}
+      {rightContent ? (
+        <RightSlot $barHeight={barHeight} $topPadding={topPadding}>
+          {rightContent}
+        </RightSlot>
+      ) : null}
     </HeaderWrapper>
   )
 }
@@ -17,24 +54,67 @@ const Header = ({ to = '/' }) => {
 export default Header
 
 const HeaderWrapper = styled.header`
+  position: relative;
   width: 100%;
   max-width: 450px;
-  height: 116px;
+  height: ${({ $height }) => $height};
   margin: 0 auto;
-  padding: 72px 24px 0;
+  padding: ${({ $topPadding }) => $topPadding} 24px 0;
+  display: flex;
+
+  &::after {
+    content: ${({ $borderBottom }) => ($borderBottom ? "''" : 'none')};
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(${({ $topPadding }) => $topPadding} + ${({ $barHeight }) =>
+  $barHeight} - 1px);
+    height: 1px;
+    background: #d0d0d0;
+  }
 `
 
 const BackLink = styled(Link)`
+  position: absolute;
+  left: 24px;
+  top: ${({ $topPadding }) => $topPadding};
   width: 24px;
-  height: 24px;
+  height: ${({ $barHeight }) => $barHeight};
   display: inline-flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: flex-start;
   text-decoration: none;
 `
 
 const BackImage = styled.img`
-  width: 9px;
-  height: 16px;
+  width: ${({ $width }) => $width};
+  height: ${({ $height }) => $height};
   display: block;
+  object-fit: contain;
+`
+
+const TitleSlot = styled.div`
+  position: absolute;
+  left: 64px;
+  right: 64px;
+  top: ${({ $topPadding }) => $topPadding};
+  height: ${({ $barHeight }) => $barHeight};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`
+
+const HeaderTitle = styled.h1`
+  color: #1f2937;
+  font: var(--text-ui-h3);
+  text-align: center;
+`
+
+const RightSlot = styled.div`
+  position: absolute;
+  right: 24px;
+  top: ${({ $topPadding }) => $topPadding};
+  height: ${({ $barHeight }) => $barHeight};
+  display: inline-flex;
+  align-items: center;
 `
