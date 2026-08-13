@@ -46,24 +46,31 @@ const PreferenceStart = () => {
 export default PreferenceStart
 
 const Page = styled.div`
-  min-height: 100vh;
+  min-height: var(--app-viewport-height);
 `
 
 const Frame = styled.main`
   position: relative;
   width: 100%;
   max-width: 402px;
-  min-height: 875px;
+  height: var(--app-viewport-height);
   margin: 0 auto;
+  padding: clamp(14px, calc(15.7vh - var(--design-safe-top)), 79px) 0
+    max(20px, env(safe-area-inset-bottom));
+  padding-top: clamp(
+    14px,
+    calc(15.7dvh - var(--design-safe-top)),
+    79px
+  );
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
 `
 
 const Body = styled.section`
-  position: absolute;
-  top: 137px;
-  left: 50%;
   width: calc(100% - 48px);
-  transform: translateX(-50%);
+  margin: 0 auto;
+  flex: 0 0 auto;
 `
 
 const Head = styled.div`
@@ -88,11 +95,14 @@ const Description = styled.p`
 `
 
 const PhotoStage = styled.div`
-  position: absolute;
-  top: 275px;
-  left: -1px;
   width: calc(100% + 1px);
-  height: 395px;
+  height: clamp(220px, 45vh, 395px);
+  height: clamp(220px, 45dvh, 395px);
+  min-height: 180px;
+  margin-top: clamp(12px, 5vh, 44px);
+  margin-top: clamp(12px, 5dvh, 44px);
+  margin-left: -1px;
+  flex: 0 1 auto;
   pointer-events: none;
 `
 
@@ -104,15 +114,13 @@ const PhotoImage = styled.img`
 `
 
 const Footer = styled.section`
-  position: absolute;
-  left: 50%;
-  bottom: 35px;
   width: calc(100% - 48px);
+  margin: auto auto 0;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  transform: translateX(-50%);
 `
 
 const StartButton = styled(Button)`

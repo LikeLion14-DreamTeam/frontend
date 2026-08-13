@@ -157,7 +157,7 @@ export default MyPage
 const PageShell = styled.main`
   width: 100%;
   max-width: 402px;
-  height: 100vh;
+  height: var(--app-viewport-height);
   margin: 0 auto;
   overflow-y: auto;
   scrollbar-width: none;
@@ -172,9 +172,9 @@ const PageShell = styled.main`
 const Content = styled.div`
   width: 100%;
   max-width: 402px;
-  min-height: 100vh;
+  min-height: 100%;
   margin: 0 auto;
-  padding: 74px 24px 115px;
+  padding: calc(74px - var(--design-safe-top)) 24px 115px;
   display: flex;
   flex-direction: column;
   gap: 20px;

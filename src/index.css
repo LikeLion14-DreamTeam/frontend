@@ -32,6 +32,11 @@
 }
 
 :root {
+  /* Use the visible viewport on mobile while keeping a fallback for older browsers. */
+  --app-viewport-height: 100vh;
+  /* The mobile browser/webview already starts below the designed 58px top safe area. */
+  --design-safe-top: 58px;
+
   /* Color */
   --Background-Base: #f7f1e8;
   --Background-Paper: #f4ece1;
@@ -85,6 +90,12 @@
   --Effect-Marker-Active: 0 4px 10px rgb(48 38 28 / 30%);
   --Effect-Bottom-Sheet: 0 -5px 22px rgb(48 38 28 / 17%);
   --Effect-CTA: 0 6px 16px rgb(48 38 28 / 30%);
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --app-viewport-height: 100dvh;
+  }
 }
 
 html,
