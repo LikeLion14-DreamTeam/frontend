@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import Button from '../../components/common/Button'
 import Card from '../../components/common/Card'
@@ -9,13 +9,31 @@ import Header from '../../components/layout/Header'
 import { updateMyAccount } from '../../features/auth/authApi'
 import { getAuthenticatedEntryPath } from '../../features/auth/authRoutes'
 import useAuthStore from '../../features/auth/useAuthStore'
+import { DEVICE_PERMISSION_STATUS } from '../../features/permissions/devicePermissions'
+
+const getDeniedGuideBadgeLabel = (permissionType, status) => {
+  if (status === DEVICE_PERMISSION_STATUS.GRANTED) {
+    return permissionType === 'nfc' ? '안내됨' : '허용됨'
+  }
+
+  if (status === DEVICE_PERMISSION_STATUS.UNSUPPORTED) {
+    return '미지원'
+  }
+
+  return '꺼짐'
+}
 
 const Permission = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   const user = useAuthStore((state) => state.user)
   const setUser = useAuthStore((state) => state.setUser)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+  const visiblePermissionKeys =
+    location.state?.visiblePermissionKeys ??
+    permissionStatusCardItems.map(({ key }) => key)
+  const permissionStatuses = location.state?.permissionStatuses
 
   const handleContinue = async () => {
     setIsSubmitting(true)
@@ -54,9 +72,22 @@ const Permission = () => {
           </Head>
 
           <PermissionList>
-            {permissionStatusCardItems.map(({ key, ...item }) => (
-              <PermissionStatusCard key={key} {...item} disabled />
-            ))}
+            {permissionStatusCardItems
+              .filter(({ key }) => visiblePermissionKeys.includes(key))
+              .map(({ key, ...item }) => {
+                const status =
+                  permissionStatuses?.[key] ?? DEVICE_PERMISSION_STATUS.DENIED
+                const disabled = status !== DEVICE_PERMISSION_STATUS.GRANTED
+
+                return (
+                  <PermissionStatusCard
+                    key={key}
+                    {...item}
+                    badgeLabel={getDeniedGuideBadgeLabel(key, status)}
+                    disabled={disabled}
+                  />
+                )
+              })}
           </PermissionList>
 
           <PermissionDeniedActionCard>
