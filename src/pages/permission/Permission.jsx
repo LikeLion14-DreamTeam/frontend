@@ -1,13 +1,44 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import Button from '../../components/common/Button'
 import PermissionStatusCard from '../../components/common/PermissionStatusCard'
 import { permissionStatusCardItems } from '../../components/common/PermissionStatusCard.constants'
 import Header from '../../components/layout/Header'
+import { updateMyAccount } from '../../features/auth/authApi'
+import { getAuthenticatedEntryPath } from '../../features/auth/authRoutes'
+import useAuthStore from '../../features/auth/useAuthStore'
 import privacyLockIcon from '../../assets/icons/privacy-lock.svg'
 
 const Permission = () => {
   const navigate = useNavigate()
+  const user = useAuthStore((state) => state.user)
+  const setUser = useAuthStore((state) => state.setUser)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
+
+  const handleContinue = async () => {
+    setIsSubmitting(true)
+    setErrorMessage('')
+
+    try {
+      const updatedAccount = await updateMyAccount({
+        onboarding_completed: user?.onboarding_completed ?? false,
+        permission_intro_shown: true,
+      })
+      const updatedUser = { ...(user ?? {}), ...updatedAccount }
+
+      setUser(updatedUser)
+      navigate(getAuthenticatedEntryPath(updatedUser), { replace: true })
+    } catch (error) {
+      setErrorMessage(
+        error.message ??
+          '권한 안내 확인 상태를 저장하지 못했습니다. 다시 시도해 주세요.',
+      )
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   return (
     <>
@@ -39,26 +70,29 @@ const Permission = () => {
         <Footer>
           <GuideButton
             type="button"
+            disabled={isSubmitting}
             onClick={() => navigate('/permission/denied-guide')}
           >
             권한을 허용하지 않으면 어떻게 되나요?
           </GuideButton>
 
+          {errorMessage && (
+            <ErrorMessage role="alert">{errorMessage}</ErrorMessage>
+          )}
+
           <ActionArea>
             <StartButton
               type="button"
-              onClick={() =>
-                navigate('/onboarding/preference-start', { replace: true })
-              }
+              disabled={isSubmitting}
+              onClick={handleContinue}
             >
-              시작하기
+              {isSubmitting ? '저장 중...' : '시작하기'}
             </StartButton>
             <LaterButton
               type="button"
               $variant="ghost"
-              onClick={() =>
-                navigate('/onboarding/preference-start', { replace: true })
-              }
+              disabled={isSubmitting}
+              onClick={handleContinue}
             >
               나중에 설정하기
             </LaterButton>
@@ -154,6 +188,13 @@ const GuideButton = styled.button`
   font: var(--text-ui-caption);
   text-decoration: underline;
   cursor: pointer;
+`
+
+const ErrorMessage = styled.p`
+  color: #b42318;
+  font: var(--text-ui-caption);
+  text-align: center;
+  word-break: keep-all;
 `
 
 const ActionArea = styled.div`

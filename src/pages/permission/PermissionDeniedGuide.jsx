@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import Button from '../../components/common/Button'
@@ -5,9 +6,39 @@ import Card from '../../components/common/Card'
 import PermissionStatusCard from '../../components/common/PermissionStatusCard'
 import { permissionStatusCardItems } from '../../components/common/PermissionStatusCard.constants'
 import Header from '../../components/layout/Header'
+import { updateMyAccount } from '../../features/auth/authApi'
+import { getAuthenticatedEntryPath } from '../../features/auth/authRoutes'
+import useAuthStore from '../../features/auth/useAuthStore'
 
 const Permission = () => {
   const navigate = useNavigate()
+  const user = useAuthStore((state) => state.user)
+  const setUser = useAuthStore((state) => state.setUser)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
+
+  const handleContinue = async () => {
+    setIsSubmitting(true)
+    setErrorMessage('')
+
+    try {
+      const updatedAccount = await updateMyAccount({
+        onboarding_completed: user?.onboarding_completed ?? false,
+        permission_intro_shown: true,
+      })
+      const updatedUser = { ...(user ?? {}), ...updatedAccount }
+
+      setUser(updatedUser)
+      navigate(getAuthenticatedEntryPath(updatedUser), { replace: true })
+    } catch (error) {
+      setErrorMessage(
+        error.message ??
+          '권한 안내 확인 상태를 저장하지 못했습니다. 다시 시도해 주세요.',
+      )
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   return (
     <>
@@ -38,21 +69,23 @@ const Permission = () => {
         </Body>
 
         <Footer>
+          {errorMessage && (
+            <ErrorMessage role="alert">{errorMessage}</ErrorMessage>
+          )}
+
           <ActionArea>
             <StartButton
               type="button"
-              onClick={() =>
-                navigate('/onboarding/preference-start', { replace: true })
-              }
+              disabled={isSubmitting}
+              onClick={handleContinue}
             >
-              시작하기
+              {isSubmitting ? '저장 중...' : '시작하기'}
             </StartButton>
             <LaterButton
               type="button"
               $variant="ghost"
-              onClick={() =>
-                navigate('/onboarding/preference-start', { replace: true })
-              }
+              disabled={isSubmitting}
+              onClick={handleContinue}
             >
               이대로 둘러보기
             </LaterButton>
@@ -145,31 +178,6 @@ const PermissionDeniedAction = styled.p`
   }
 `
 
-const PrivacyCard = styled.aside`
-  min-height: 42px;
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  padding: 12px 20px;
-  border-radius: 12px;
-  background: rgb(181 118 59 / 9%);
-`
-
-const PrivacyIcon = styled.img`
-  width: 13.5px;
-  height: 18.5px;
-  flex: 0 0 auto;
-  display: block;
-`
-
-const PrivacyText = styled.p`
-  min-width: 0;
-  flex: 1;
-  color: var(--Primary-Cognac);
-  font: var(--text-ui-caption);
-  word-break: keep-all;
-`
-
 const Footer = styled.section`
   display: flex;
   flex-direction: column;
@@ -177,14 +185,11 @@ const Footer = styled.section`
   gap: 20px;
 `
 
-const GuideButton = styled.button`
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--State-Disabled-Text);
+const ErrorMessage = styled.p`
+  color: #b42318;
   font: var(--text-ui-caption);
-  text-decoration: underline;
-  cursor: pointer;
+  text-align: center;
+  word-break: keep-all;
 `
 
 const ActionArea = styled.div`

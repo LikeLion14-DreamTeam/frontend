@@ -2,6 +2,7 @@ import apiClient from '../../api/client'
 import {
   MOCK_CURRENT_USER_RESPONSE,
   MOCK_GOOGLE_LOGIN_RESPONSE,
+  updateMockAccount,
 } from './authMock'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK_API === 'true'
@@ -38,4 +39,21 @@ export const getMyAccount = async () => {
   }
 
   return apiClient.get('/users/me')
+}
+
+/** API 명세 1.4: 온보딩 및 권한 안내 완료 상태를 수정한다. */
+export const updateMyAccount = async ({
+  onboarding_completed,
+  permission_intro_shown,
+}) => {
+  const accountState = {
+    onboarding_completed,
+    permission_intro_shown,
+  }
+
+  if (USE_MOCK) {
+    return updateMockAccount(accountState)
+  }
+
+  return apiClient.patch('/users/me', accountState)
 }

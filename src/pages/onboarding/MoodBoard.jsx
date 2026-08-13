@@ -5,6 +5,9 @@ import Button from '../../components/common/Button'
 import Progress from '../../components/common/Progress'
 import Tile from '../../components/common/Tile'
 import Header from '../../components/layout/Header'
+import { updateMyAccount } from '../../features/auth/authApi'
+import { getAuthenticatedEntryPath } from '../../features/auth/authRoutes'
+import useAuthStore from '../../features/auth/useAuthStore'
 
 const TOTAL_ROUND = 2
 const SELECT_LIMIT = 3
@@ -13,8 +16,12 @@ const photos = Array.from({ length: 9 }, (_, index) => index)
 
 const MoodBoard = () => {
   const navigate = useNavigate()
+  const user = useAuthStore((state) => state.user)
+  const setUser = useAuthStore((state) => state.setUser)
   const [round, setRound] = useState(1)
   const [selected, setSelected] = useState([])
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
 
   const isLastRound = round === TOTAL_ROUND
   const isFilled = selected.length === SELECT_LIMIT
@@ -29,15 +36,34 @@ const MoodBoard = () => {
     setSelected([...selected, photo])
   }
 
-  const handleNext = () => {
+  const handleNext = async () => {
     // TODO: 선택한 사진 저장
-    setSelected([])
-
     if (!isLastRound) {
       setRound(round + 1)
+      setSelected([])
       return
     }
-    navigate('/', { replace: true })
+
+    setIsSubmitting(true)
+    setErrorMessage('')
+
+    try {
+      const updatedAccount = await updateMyAccount({
+        onboarding_completed: true,
+        permission_intro_shown: user?.permission_intro_shown ?? false,
+      })
+      const updatedUser = { ...(user ?? {}), ...updatedAccount }
+
+      setUser(updatedUser)
+      navigate(getAuthenticatedEntryPath(updatedUser), { replace: true })
+    } catch (error) {
+      setErrorMessage(
+        error.message ??
+          '온보딩 완료 상태를 저장하지 못했습니다. 다시 시도해 주세요.',
+      )
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handlePrev = () => {
@@ -79,8 +105,13 @@ const MoodBoard = () => {
         </Body>
 
         <Footer>
-          <Button onClick={handleNext} disabled={!isFilled}>
-            {!isFilled
+          {errorMessage && (
+            <ErrorMessage role="alert">{errorMessage}</ErrorMessage>
+          )}
+          <Button onClick={handleNext} disabled={!isFilled || isSubmitting}>
+            {isSubmitting
+              ? '저장 중...'
+              : !isFilled
               ? `사진 ${SELECT_LIMIT}장을 모두 골라주세요`
               : isLastRound
                 ? '완료'
@@ -161,4 +192,11 @@ const Footer = styled.footer`
   display: flex;
   flex-direction: column;
   gap: 10px;
+`
+
+const ErrorMessage = styled.p`
+  color: #b42318;
+  font: var(--text-ui-caption);
+  text-align: center;
+  word-break: keep-all;
 `
