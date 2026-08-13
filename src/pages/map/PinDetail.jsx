@@ -99,7 +99,12 @@ const PinDetail = () => {
             <SectionHeading>
               <EditorialTitle>PHOTOS</EditorialTitle>
               <HeadingLine />
-              <TextAction type="button">모두 보기</TextAction>
+              <TextAction
+                type="button"
+                onClick={() => navigate('./photos')}
+              >
+                모두 보기
+              </TextAction>
             </SectionHeading>
 
             <PhotoGrid>
