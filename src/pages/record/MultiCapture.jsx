@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled, { createGlobalStyle } from 'styled-components'
+import deleteIcon from '../../assets/icons/capture-delete.svg'
+import closeIcon from '../../assets/icons/capture-close.svg'
 
 /**
- * 연속 촬영 화면.
+ * 연속 촬영 화면 (피그마 `8 사진 촬영 화면`, `8.1 사진 촬영 세부`)
  *
  * `<input capture>` 로 OS 카메라 앱을 여는 방식은 구조상 한 번에 한 장만 돌아온다.
  * 이 화면은 getUserMedia 로 앱 안에 카메라를 직접 띄우고, 셔터를 누를 때마다
@@ -22,21 +24,18 @@ const VIDEO_CONSTRAINTS = {
 
 const JPEG_QUALITY = 0.92
 
-// 저장 비율 3:4 고정. 미리보기 프레임도 같은 비율이라 보이는 그대로 찍힌다.
+// 저장 비율 3:4 고정. 뷰파인더도 같은 비율이라 보이는 그대로 찍힌다.
 const CAPTURE_RATIO = 3 / 4
 
-/**
- * 상하단 안전영역(상태바 뒤, 홈 인디케이터 자리)을 검게 만든다.
- *
- * 그 영역은 페이지 요소가 아니라 브라우저가 칠하는 자리라 배경 이미지가 닿지 않고,
- * 페이지의 배경 "색상"만 따라간다. 카메라 화면에서만 검은색으로 바꾸고
- * 화면을 벗어나면 원래 색으로 돌아온다.
- */
-const BlackSafeArea = createGlobalStyle`
+// TODO: NFC 태그·위치 연동 전까지 쓰는 임시 문구.
+const TAG_CONTEXT = '경복궁 광화문 앞 · 태그 인식됨'
+
+/** 상하단 안전영역을 화면 배경색과 맞춘다. 그 영역은 배경 "색상"만 따라간다. */
+const DarkSafeArea = createGlobalStyle`
   html,
   body,
   #root {
-    background-color: #000;
+    background-color: var(--Text-Primary);
   }
 `
 
@@ -119,7 +118,7 @@ const MultiCapture = () => {
     if (!video || status !== 'ready') return
 
     // 원본 프레임에서 3:4 영역만 가운데 기준으로 잘라낸다.
-    // 미리보기가 object-fit: cover 라 화면에 보이던 영역과 동일하다.
+    // 뷰파인더가 object-fit: cover 라 화면에 보이던 영역과 동일하다.
     const sourceWidth = video.videoWidth
     const sourceHeight = video.videoHeight
     const isSourceWider = sourceWidth / sourceHeight > CAPTURE_RATIO
@@ -155,9 +154,6 @@ const MultiCapture = () => {
           {
             id: `${prev.length}-${blob.size}`,
             url: URL.createObjectURL(blob),
-            size: blob.size,
-            width: canvas.width,
-            height: canvas.height,
             capturedAt: new Date().toISOString(),
           },
         ])
@@ -186,58 +182,68 @@ const MultiCapture = () => {
 
   return (
     <CaptureShell>
-      <BlackSafeArea />
+      <DarkSafeArea />
 
-      <PreviewArea>
-        <PreviewFrame>
+      <ViewfinderArea>
+        <Viewfinder>
           <Preview ref={videoRef} playsInline muted autoPlay />
-        </PreviewFrame>
+          <ViewfinderTint aria-hidden="true" />
+          <GridLine $vertical style={{ left: '33.333%' }} aria-hidden="true" />
+          <GridLine $vertical style={{ left: '66.666%' }} aria-hidden="true" />
+          <GridLine style={{ top: '33.333%' }} aria-hidden="true" />
+          <GridLine style={{ top: '66.666%' }} aria-hidden="true" />
+        </Viewfinder>
+
+        <TagChip>{TAG_CONTEXT}</TagChip>
+        <CountChip>{shots.length} 장</CountChip>
 
         {status !== 'ready' && (
-          <Overlay>
+          <StatusOverlay>
             {status === 'starting' ? (
-              <OverlayText>카메라를 여는 중...</OverlayText>
+              <StatusText>카메라를 여는 중...</StatusText>
             ) : (
               <>
-                <OverlayText>{errorMessage}</OverlayText>
+                <StatusText>{errorMessage}</StatusText>
                 <RetryButton type="button" onClick={startCamera}>
                   다시 시도
                 </RetryButton>
               </>
             )}
-          </Overlay>
+          </StatusOverlay>
         )}
-
-        <ShotCount>{shots.length}장</ShotCount>
-      </PreviewArea>
+      </ViewfinderArea>
 
       <BottomPanel>
+        <StripHeader>
+          <StripTitle>방금 찍은 사진</StripTitle>
+          {shots.length > 0 && <StripHint>탭하여 크게 보기</StripHint>}
+        </StripHeader>
+
         <ThumbnailStrip aria-label="촬영한 사진">
-          {shots.length === 0 && <EmptyHint>셔터를 눌러 촬영하세요</EmptyHint>}
           {shots.map((shot, index) => (
             <Thumbnail key={shot.id}>
               <ThumbnailButton
                 type="button"
-                aria-label={`${index + 1}번째 사진 미리보기`}
+                aria-label={`${index + 1}번째 사진 크게 보기`}
                 onClick={() => setPreviewId(shot.id)}
               >
                 <ThumbnailImage src={shot.url} alt="" />
               </ThumbnailButton>
-              <RemoveButton
+              <DeleteButton
                 type="button"
                 aria-label="이 사진 삭제"
                 onClick={() => handleRemove(shot.id)}
               >
-                ×
-              </RemoveButton>
+                <img src={deleteIcon} alt="" aria-hidden="true" />
+              </DeleteButton>
             </Thumbnail>
           ))}
         </ThumbnailStrip>
 
         <ControlRow>
-          <SideButton type="button" onClick={handleDone}>
+          <TextButton type="button" onClick={handleDone}>
             닫기
-          </SideButton>
+          </TextButton>
 
           <Shutter
             type="button"
@@ -246,34 +252,30 @@ const MultiCapture = () => {
             disabled={status !== 'ready'}
           />
 
-          <SideButton type="button" onClick={handleDone} $primary>
+          <TextButton type="button" $accent onClick={handleDone}>
             완료
-          </SideButton>
+          </TextButton>
         </ControlRow>
-
-        {/* 높이가 흔들리면 미리보기 프레임 계산이 어긋나므로 항상 렌더한다. */}
-        <DebugInfo>
-          {shots.length > 0
-            ? `마지막 촬영 ${shots.at(-1).width}×${shots.at(-1).height} · ${Math.round(shots.at(-1).size / 1024)}KB`
-            : ''}
-        </DebugInfo>
       </BottomPanel>
 
       {previewShot && (
-        <PreviewOverlay
-          role="dialog"
-          aria-label="사진 미리보기"
-          onClick={() => setPreviewId(null)}
-        >
-          <PreviewImage src={previewShot.url} alt="" />
-          <PreviewClose type="button" aria-label="미리보기 닫기">
-            ×
+        <PreviewLayer role="dialog" aria-label="사진 크게 보기">
+          <PreviewClose
+            type="button"
+            aria-label="닫기"
+            onClick={() => setPreviewId(null)}
+          >
+            <img src={closeIcon} alt="" aria-hidden="true" />
           </PreviewClose>
-          <PreviewMeta>
-            {previewIndex + 1} / {shots.length} · {previewShot.width}×
-            {previewShot.height} · {Math.round(previewShot.size / 1024)}KB
-          </PreviewMeta>
-        </PreviewOverlay>
+
+          <PreviewPhoto src={previewShot.url} alt="" />
+
+          <PreviewIndex>
+            <IndexCurrent>{previewIndex + 1}</IndexCurrent>
+            <IndexSlash>/</IndexSlash>
+            <IndexTotal>{shots.length}</IndexTotal>
+          </PreviewIndex>
+        </PreviewLayer>
       )}
     </CaptureShell>
   )
@@ -281,10 +283,9 @@ const MultiCapture = () => {
 
 export default MultiCapture
 
-/* 하단 패널의 확정 높이. 미리보기 프레임 크기를 여기서 역산하므로,
-   패널 구성을 바꾸면 이 값도 함께 고쳐야 한다.
-   12(위 여백) + 64(썸네일) + 10 + 68(셔터) + 10 + 18(정보) + 12(아래 여백) */
-const BOTTOM_PANEL_HEIGHT = '194px'
+/* 하단 패널의 확정 높이. 뷰파인더가 남은 공간을 채우므로 구성을 바꾸면 함께 고친다.
+   13(라벨) + 11 + 66(썸네일) + 20 + 72(컨트롤) + 38(아래 여백) */
+const BOTTOM_PANEL_HEIGHT = '220px'
 
 const CaptureShell = styled.main`
   width: 100%;
@@ -295,25 +296,20 @@ const CaptureShell = styled.main`
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #000;
-  color: #fff;
-  font-family: var(--font-sans);
+  background: var(--Text-Primary);
 `
 
-const PreviewArea = styled.section`
+const ViewfinderArea = styled.section`
   position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  overflow: hidden;
-  background: #000;
 `
 
-/* 3:4 고정 프레임. 남는 위아래는 검은 여백이 되고, 기기 높이에 따라 여백 크기가 달라진다.
-   폭이 넘칠 때를 대비해 남은 세로 공간에서 역산한 값과 100% 중 작은 쪽을 쓴다. */
-const PreviewFrame = styled.div`
+/* 3:4 고정. 폭이 넘칠 때를 대비해 남은 세로 공간에서 역산한 값과 100% 중 작은 쪽을 쓴다. */
+const Viewfinder = styled.div`
   position: relative;
   width: min(
     100%,
@@ -326,7 +322,7 @@ const PreviewFrame = styled.div`
   );
   aspect-ratio: 3 / 4;
   overflow: hidden;
-  background: #111;
+  background: #9c9c9c;
 `
 
 const Preview = styled.video`
@@ -336,7 +332,48 @@ const Preview = styled.video`
   object-fit: cover;
 `
 
-const Overlay = styled.div`
+const ViewfinderTint = styled.div`
+  position: absolute;
+  inset: 0;
+  background: rgb(20 17 16 / 12%);
+`
+
+const GridLine = styled.span`
+  position: absolute;
+  background: rgb(255 255 255 / 14%);
+  ${({ $vertical }) =>
+    $vertical
+      ? 'top: 0; bottom: 0; width: 1px;'
+      : 'left: 0; right: 0; height: 1px;'}
+`
+
+const chipBase = `
+  position: absolute;
+  top: 20px;
+  display: inline-flex;
+  align-items: center;
+  background: rgb(36 28 22 / 60%);
+  font: var(--text-ui-label);
+  white-space: nowrap;
+`
+
+const TagChip = styled.span`
+  ${chipBase}
+  left: 24px;
+  padding: 7px 14px 7px 11px;
+  border-radius: 16px;
+  color: rgb(242 233 220 / 92%);
+`
+
+const CountChip = styled.span`
+  ${chipBase}
+  right: 24px;
+  padding: 6px 11px;
+  border-radius: 20px;
+  color: #f2e9dc;
+`
+
+const StatusOverlay = styled.div`
   position: absolute;
   inset: 0;
   display: flex;
@@ -345,11 +382,12 @@ const Overlay = styled.div`
   justify-content: center;
   gap: 16px;
   padding: 24px;
-  background: rgb(0 0 0 / 70%);
+  background: rgb(20 17 16 / 72%);
   text-align: center;
 `
 
-const OverlayText = styled.p`
+const StatusText = styled.p`
+  color: #f2e9dc;
   font: var(--text-ui-body-m);
   word-break: keep-all;
 `
@@ -357,53 +395,56 @@ const OverlayText = styled.p`
 const RetryButton = styled.button`
   min-height: 40px;
   padding: 0 20px;
-  border: 1px solid rgb(255 255 255 / 40%);
+  border: 1px solid rgb(242 233 220 / 40%);
   border-radius: 999px;
   background: transparent;
-  color: #fff;
+  color: #f2e9dc;
   font: var(--text-ui-button);
   cursor: pointer;
-`
-
-const ShotCount = styled.span`
-  position: absolute;
-  top: calc(16px + env(safe-area-inset-top));
-  right: 16px;
-  padding: 4px 12px;
-  border-radius: 999px;
-  background: rgb(0 0 0 / 55%);
-  font: var(--text-ui-caption);
 `
 
 const BottomPanel = styled.section`
   flex: 0 0 auto;
   height: calc(${BOTTOM_PANEL_HEIGHT} + env(safe-area-inset-bottom));
-  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  padding: 0 24px calc(38px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  background: #000;
+`
+
+const StripHeader = styled.div`
+  flex: 0 0 13px;
+  height: 13px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+`
+
+const StripTitle = styled.p`
+  color: rgb(242 233 220 / 60%);
+  font-size: 11px;
+`
+
+const StripHint = styled.p`
+  color: rgb(197 161 91 / 90%);
+  font-size: 10px;
 `
 
 const ThumbnailStrip = styled.div`
-  flex: 0 0 64px;
-  height: 64px;
+  flex: 0 0 66px;
+  height: 66px;
+  margin-top: 11px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   overflow-x: auto;
-`
-
-const EmptyHint = styled.p`
-  color: #8a8a8a;
-  font: var(--text-ui-caption);
+  overflow-y: visible;
 `
 
 const Thumbnail = styled.div`
   position: relative;
   flex: 0 0 auto;
-  width: 56px;
-  height: 56px;
+  width: 66px;
+  height: 66px;
 `
 
 const ThumbnailButton = styled.button`
@@ -411,8 +452,8 @@ const ThumbnailButton = styled.button`
   height: 100%;
   padding: 0;
   border: 0;
-  border-radius: 8px;
-  background: none;
+  border-radius: 10px;
+  background: #fff9f1;
   overflow: hidden;
   cursor: pointer;
 `
@@ -427,114 +468,138 @@ const ThumbnailImage = styled.img`
   pointer-events: none;
 `
 
-const PreviewOverlay = styled.div`
-  position: fixed;
-  inset: 0;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: rgb(0 0 0 / 92%);
-`
-
-const PreviewImage = styled.img`
-  max-width: 100%;
-  max-height: 100%;
-  display: block;
-  object-fit: contain;
-`
-
-const PreviewClose = styled.button`
+const DeleteButton = styled.button`
   position: absolute;
-  top: calc(12px + env(safe-area-inset-top));
-  right: 16px;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: 999px;
-  background: rgb(255 255 255 / 15%);
-  color: #fff;
-  font-size: 22px;
-  line-height: 1;
-  cursor: pointer;
-`
-
-const PreviewMeta = styled.p`
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: calc(16px + env(safe-area-inset-bottom));
-  color: #b9b9b9;
-  font: var(--text-ui-caption);
-  text-align: center;
-`
-
-const RemoveButton = styled.button`
-  position: absolute;
-  top: -6px;
+  top: -4px;
   right: -6px;
   width: 20px;
   height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  padding: 0;
   border: 0;
-  border-radius: 999px;
-  background: rgb(0 0 0 / 80%);
-  color: #fff;
-  font-size: 14px;
-  line-height: 1;
+  background: none;
   cursor: pointer;
+
+  img {
+    width: 20px;
+    height: 20px;
+    display: block;
+  }
 `
 
 const ControlRow = styled.div`
-  flex: 0 0 68px;
-  height: 68px;
+  flex: 0 0 72px;
+  height: 72px;
+  margin-top: 20px;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
 `
 
+const TextButton = styled.button`
+  justify-self: ${({ $accent }) => ($accent ? 'end' : 'start')};
+  padding: 8px;
+  border: 0;
+  background: none;
+  color: ${({ $accent }) => ($accent ? 'var(--Accent-Gold)' : 'rgb(242 233 220 / 80%)')};
+  font-size: 15px;
+  font-weight: ${({ $accent }) => ($accent ? 500 : 400)};
+  cursor: pointer;
+`
+
 const Shutter = styled.button`
-  width: 68px;
-  height: 68px;
-  border: 4px solid rgb(255 255 255 / 85%);
+  position: relative;
+  width: 72px;
+  height: 72px;
+  padding: 0;
+  border: 2.5px solid rgb(242 233 220 / 85%);
   border-radius: 999px;
-  background: #fff;
+  background: none;
   cursor: pointer;
 
-  &:active {
-    background: #d0d0d0;
+  /* 안쪽 원 58px */
+  &::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 58px;
+    height: 58px;
+    border-radius: 999px;
+    background: #f2e9dc;
+    transform: translate(-50%, -50%);
+  }
+
+  &:active::after {
+    background: #cdc4b6;
   }
 
   &:disabled {
-    border-color: rgb(255 255 255 / 30%);
-    background: #555;
+    border-color: rgb(242 233 220 / 30%);
     cursor: not-allowed;
+  }
+
+  &:disabled::after {
+    background: rgb(242 233 220 / 30%);
   }
 `
 
-const SideButton = styled.button`
-  justify-self: ${({ $primary }) => ($primary ? 'end' : 'start')};
-  min-height: 36px;
-  padding: 0 14px;
-  border: 0;
-  border-radius: 999px;
-  background: ${({ $primary }) => ($primary ? '#fff' : 'transparent')};
-  color: ${({ $primary }) => ($primary ? '#111' : '#fff')};
-  font: var(--text-ui-button);
-  cursor: pointer;
+const PreviewLayer = styled.div`
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--Text-Primary);
 `
 
-const DebugInfo = styled.p`
-  flex: 0 0 18px;
-  height: 18px;
-  color: #8a8a8a;
-  font: var(--text-ui-caption);
-  line-height: 18px;
-  text-align: center;
+const PreviewClose = styled.button`
+  position: absolute;
+  top: 0;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+
+  img {
+    width: 40px;
+    height: 40px;
+    display: block;
+  }
+`
+
+const PreviewPhoto = styled.img`
+  width: calc(100% - 2px);
+  margin-top: 65px;
+  aspect-ratio: 3 / 4;
+  display: block;
+  object-fit: cover;
+  background: #d5d5d5;
+`
+
+const PreviewIndex = styled.p`
+  margin-top: 25px;
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+`
+
+const IndexCurrent = styled.span`
+  color: #f2e9dc;
+  font: var(--text-ui-body-l);
+`
+
+const IndexSlash = styled.span`
+  color: rgb(242 233 220 / 35%);
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: 600;
+`
+
+const IndexTotal = styled.span`
+  color: rgb(242 233 220 / 60%);
+  font: var(--text-ui-body-l);
 `
