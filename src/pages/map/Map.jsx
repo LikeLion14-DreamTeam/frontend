@@ -17,36 +17,38 @@ import { MAP_STYLES } from './mapStyles'
 
 const PARIS_CENTER = { lat: 48.8569, lng: 2.3376 }
 
+// TODO: 지도 뷰 API 연동 대기. GET /trips/{segmentId}/pins(4.5)로 교체해야 한다.
+// 그때까지는 핀 상세로 이동만 되도록 id 를 mock 의 pin_id 와 맞춰둔다.
 const pins = [
   {
-    id: 'montmartre',
+    id: 101,
+    name: '파리 에펠탑 근처',
+    lat: 48.8584,
+    lng: 2.2945,
+  },
+  {
+    id: 102,
+    name: '루브르 박물관 앞',
+    lat: 48.8606,
+    lng: 2.3376,
+  },
+  {
+    id: 103,
     name: '몽마르트르 언덕',
     lat: 48.8867,
     lng: 2.3431,
   },
   {
-    id: 'opera',
-    name: '오페라 가르니에',
-    lat: 48.8719,
-    lng: 2.3316,
-  },
-  {
-    id: 'louvre',
-    name: '루브르 박물관',
-    lat: 48.8606,
-    lng: 2.3376,
-  },
-  {
-    id: 'gyeongbokgung',
-    name: '경복궁 광화문 앞',
+    id: 104,
+    name: '이름 없는 장소',
     lat: 48.853,
     lng: 2.3499,
   },
   {
-    id: 'luxembourg',
-    name: '뤽상부르 공원',
-    lat: 48.8462,
-    lng: 2.3372,
+    id: 105,
+    name: '베르사유 궁전 정원',
+    lat: 48.8049,
+    lng: 2.1204,
   },
 ]
 
@@ -227,7 +229,7 @@ const MapPage = () => {
 
           <DetailButton
             type="button"
-            onClick={() => navigate('/map/pin/gyeongbokgung')}
+            onClick={() => navigate(`/map/pin/${selectedPin?.id}`)}
           >
             이 핀 기록 자세히 보기
           </DetailButton>

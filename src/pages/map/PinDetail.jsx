@@ -134,7 +134,11 @@ const PinDetail = () => {
     )
   }
 
-  const position = { lat: pin.latitude, lng: pin.longitude }
+  // 위치 권한을 거부한 상태로 저장된 핀은 좌표가 없다. 지도를 그리지 않는다.
+  const hasCoordinates = pin.latitude !== null && pin.longitude !== null
+  const position = hasCoordinates
+    ? { lat: pin.latitude, lng: pin.longitude }
+    : null
   const title = pin.place_name || pin.address || '이름 없는 장소'
   const representativePhotos = pin.representative_photos ?? []
   const hasMemo = Boolean(pin.text_note) || Boolean(pin.voice_memo)
@@ -142,17 +146,21 @@ const PinDetail = () => {
   return (
     <Page>
       <MapHero>
-        <GoogleMap
-          center={position}
-          zoom={15.5}
-          height="100%"
-          styles={MAP_STYLES}
-          borderRadius="0"
-          bordered={false}
-          mapOptions={{ clickableIcons: false, keyboardShortcuts: false }}
-        >
-          <Marker position={position} icon={activePinIcon} title={title} />
-        </GoogleMap>
+        {hasCoordinates ? (
+          <GoogleMap
+            center={position}
+            zoom={15.5}
+            height="100%"
+            styles={MAP_STYLES}
+            borderRadius="0"
+            bordered={false}
+            mapOptions={{ clickableIcons: false, keyboardShortcuts: false }}
+          >
+            <Marker position={position} icon={activePinIcon} title={title} />
+          </GoogleMap>
+        ) : (
+          <NoLocation>위치 정보 없음</NoLocation>
+        )}
 
         <BackButton type="button" aria-label="뒤로 가기" onClick={() => navigate(-1)}>
           <img src={backIcon} alt="" />
@@ -164,10 +172,12 @@ const PinDetail = () => {
           </JourneyChip>
         )}
 
-        <OpenMapButton type="button" onClick={() => navigate('/map')}>
-          <img src={openMapIcon} alt="" />
-          지도에서 보기
-        </OpenMapButton>
+        {hasCoordinates && (
+          <OpenMapButton type="button" onClick={() => navigate('/map')}>
+            <img src={openMapIcon} alt="" />
+            지도에서 보기
+          </OpenMapButton>
+        )}
       </MapHero>
 
       <DetailSheet>
@@ -304,6 +314,17 @@ const Page = styled.main`
   &::-webkit-scrollbar {
     display: none;
   }
+`
+
+const NoLocation = styled.p`
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--Map-Base);
+  color: var(--Text-Secondary);
+  font: var(--text-ui-body-m);
 `
 
 const StateMessage = styled.p`
