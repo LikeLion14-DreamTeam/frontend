@@ -1,6 +1,8 @@
 import { Routes, Route } from "react-router-dom"
 import Home from "./pages/home/Home"
 import Map from "./pages/map/Map"
+import PinDetail from "./pages/map/PinDetail"
+import AllPhotos from "./pages/map/AllPhotos"
 import Archive from "./pages/archive/Archive"
 import TripArchive from "./pages/archive/TripArchive"
 import MyPage from "./pages/mypage/MyPage"
@@ -31,6 +33,8 @@ function App() {
       <Route path="/record/camera" element={<PhotoCapture />} />
       <Route path="/record/pin-saved" element={<PinSaveComplete />} />
       <Route path="/map" element={<Map />} />
+      <Route path="/map/pin/:pinID" element={<PinDetail />} />
+      <Route path="/map/pin/:pinID/photos" element={<AllPhotos />} />
       <Route path="/archive" element={<Archive />} />
       <Route path="/archive/trip/:tripID" element={<TripArchive />} />
       <Route path="/mypage" element={<MyPage />} />

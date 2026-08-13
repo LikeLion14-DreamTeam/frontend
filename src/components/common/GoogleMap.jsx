@@ -40,10 +40,22 @@ const GoogleMap = ({
   center,
   zoom = 12,
   height = '470px',
+  styles,
+  borderRadius = '4px',
+  bordered = true,
+  mapOptions = {},
   children,
 }) => {
   if (!HAS_API_KEY) {
-    return <MapFallback $height={height}>지도 Placeholder</MapFallback>
+    return (
+      <MapFallback
+        $height={height}
+        $borderRadius={borderRadius}
+        $bordered={bordered}
+      >
+        지도 Placeholder
+      </MapFallback>
+    )
   }
 
   // 중심을 지정하지 않으면 마커가 모두 보이도록 영역을 잡는다.
@@ -53,13 +65,19 @@ const GoogleMap = ({
       : { defaultCenter: center || DEFAULT_CENTER, defaultZoom: zoom }
 
   return (
-    <MapFrame $height={height}>
+    <MapFrame
+      $height={height}
+      $borderRadius={borderRadius}
+      $bordered={bordered}
+    >
       <Map
-        mapId={MAP_ID}
+        mapId={styles ? undefined : MAP_ID}
         gestureHandling="greedy"
         disableDefaultUI
+        styles={styles}
         style={{ width: '100%', height: '100%' }}
         {...viewProps}
+        {...mapOptions}
       >
         {markers.map(({ name, lat, lng }) => (
           <AdvancedMarker key={name} position={{ lat, lng }} title={name}>
@@ -77,8 +95,8 @@ export default GoogleMap
 const MapFrame = styled.div`
   width: 100%;
   height: ${({ $height }) => $height};
-  border: 1px solid #e5e7eb;
-  border-radius: 4px;
+  border: ${({ $bordered }) => ($bordered ? '1px solid #e5e7eb' : '0')};
+  border-radius: ${({ $borderRadius }) => $borderRadius};
   overflow: hidden;
 `
 
@@ -88,9 +106,10 @@ const MapFallback = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px dashed #d8dde3;
-  border-radius: 4px;
-  background: #fbfcfd;
-  color: #c3c8cf;
+  border: ${({ $bordered }) =>
+    $bordered ? '1px dashed var(--Border-Default)' : '0'};
+  border-radius: ${({ $borderRadius }) => $borderRadius};
+  background: var(--Map-Base);
+  color: var(--Text-Secondary);
   font-size: 12px;
 `

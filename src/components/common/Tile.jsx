@@ -16,9 +16,16 @@ import checkIcon from '../../assets/icons/check-circle-24.svg'
  *   (피그마 402px 화면 기준 본문 354 = 111.33 x 3 + 10 x 2)
  * - 세로 간격은 402px 무드보드 화면이 아직 없어 미확정이다. 적용 시 피그마에서 확인할 것.
  */
-const Tile = ({ selected = false, ...rest }) => {
+const Tile = ({ selected = false, interactive = true, ...rest }) => {
   return (
-    <TileButton type="button" $selected={selected} aria-pressed={selected} {...rest}>
+    <TileButton
+      as={interactive ? 'button' : 'div'}
+      type={interactive ? 'button' : undefined}
+      $interactive={interactive}
+      $selected={selected}
+      aria-pressed={interactive ? selected : undefined}
+      {...rest}
+    >
       {selected && <CheckIcon src={checkIcon} alt="" />}
     </TileButton>
   )
@@ -33,7 +40,7 @@ const TileButton = styled.button`
   aspect-ratio: 111.33 / 124;
   padding: 0;
   border-radius: 12px;
-  cursor: pointer;
+  cursor: ${({ $interactive }) => ($interactive ? 'pointer' : 'default')};
   border: ${({ $selected }) =>
     $selected
       ? '2px solid var(--Primary-Cognac)'
