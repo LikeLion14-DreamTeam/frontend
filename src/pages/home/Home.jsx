@@ -16,7 +16,7 @@ const Home = () => {
 
         <TitleRow>
           <Title>나의 여행 기록</Title>
-          <ContinueTripButton as={Link} to="/record/camera">
+          <ContinueTripButton as={Link} to="/record/multi-capture">
             여행 계속하기
           </ContinueTripButton>
         </TitleRow>
