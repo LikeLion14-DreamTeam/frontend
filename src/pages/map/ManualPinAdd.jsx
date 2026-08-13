@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import { useNavigate } from 'react-router-dom'
 import Button from '../../components/common/Button'
 import GoogleMap from '../../components/common/GoogleMap'
 import NavBar from '../../components/layout/NavBar'
@@ -10,6 +11,8 @@ import { MAP_STYLES } from './mapStyles'
 const BUKCHON_CENTER = { lat: 37.5796, lng: 126.9849 }
 
 const ManualPinAdd = () => {
+  const navigate = useNavigate()
+
   return (
     <Page>
       <MapLayer>
@@ -49,7 +52,12 @@ const ManualPinAdd = () => {
         <LocationLabel>선택한 위치</LocationLabel>
         <LocationTitle>북촌 한옥마을 입구</LocationTitle>
         <LocationMeta>서울 종로구 계동길 37&nbsp; · &nbsp;현재 지도 중심</LocationMeta>
-        <ContinueButton type="button">이 위치로 계속</ContinueButton>
+        <ContinueButton
+          type="button"
+          onClick={() => navigate('/map/pin/new/details')}
+        >
+          이 위치로 계속
+        </ContinueButton>
       </AddressSheet>
 
       <NavBar activeOverride="home" />
