@@ -8,13 +8,28 @@ const SESSION_TOKEN_KEY = 'orte_session_token'
  * 요청 헤더에 토큰을 붙이는 건 `client.js` 의 인터셉터가 알아서 한다.
  */
 export const getSessionToken = () => {
-  return sessionStorage.getItem(SESSION_TOKEN_KEY)
+  const token = localStorage.getItem(SESSION_TOKEN_KEY)
+
+  if (token) {
+    return token
+  }
+
+  // 기존 탭의 세션을 새 탭에서도 사용할 수 있도록 한 번만 이전한다.
+  const legacyToken = sessionStorage.getItem(SESSION_TOKEN_KEY)
+
+  if (legacyToken) {
+    localStorage.setItem(SESSION_TOKEN_KEY, legacyToken)
+    sessionStorage.removeItem(SESSION_TOKEN_KEY)
+  }
+
+  return legacyToken
 }
 
 export const setSessionToken = (token) => {
-  sessionStorage.setItem(SESSION_TOKEN_KEY, token)
+  localStorage.setItem(SESSION_TOKEN_KEY, token)
 }
 
 export const clearSessionToken = () => {
+  localStorage.removeItem(SESSION_TOKEN_KEY)
   sessionStorage.removeItem(SESSION_TOKEN_KEY)
 }
