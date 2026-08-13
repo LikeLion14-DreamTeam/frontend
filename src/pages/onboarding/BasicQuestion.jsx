@@ -5,39 +5,33 @@ import Button from '../../components/common/Button'
 import Option from '../../components/common/Option'
 import Progress from '../../components/common/Progress'
 import Header from '../../components/layout/Header'
+import { saveBasicQuestionResponse } from '../../features/onboarding/basicQuestionApi'
 
-// TODO: 2~5번 질문 문구·선택지는 아직 디자인에 없어 임시값이다. 나오면 교체할 것.
 const questions = [
   {
-    text: '사진을 찍을 때 가장 자주 담는 대상은 무엇인가요?',
-    hint: '여러 개 골라도 괜찮아요',
-    options: [
-      '풍경과 도시 전경',
-      '사람과 표정',
-      '음식과 카페',
-      '건축과 디테일',
-      '길 위의 우연한 순간',
-    ],
+    text: '여행 사진, 어떤 톤이 더 좋아요?',
+    hint: '더 끌리는 하나를 골라주세요',
+    options: ['환하고 밝은 느낌', '어둡고 무드있는 느낌'],
   },
   {
-    text: '질문 2 (문구 미정)',
-    hint: '여러 개 골라도 괜찮아요',
-    options: ['선택지 1', '선택지 2', '선택지 3', '선택지 4', '선택지 5'],
+    text: '색감은 어느 쪽이 끌리나요?',
+    hint: '더 끌리는 하나를 골라주세요',
+    options: ['선명하고 생생한 색', '차분하고 톤 다운된 색'],
   },
   {
-    text: '질문 3 (문구 미정)',
-    hint: '여러 개 골라도 괜찮아요',
-    options: ['선택지 1', '선택지 2', '선택지 3', '선택지 4', '선택지 5'],
+    text: '사진의 분위기는요?',
+    hint: '더 끌리는 하나를 골라주세요',
+    options: ['따뜻한 느낌', '차가운 느낌'],
   },
   {
-    text: '질문 4 (문구 미정)',
-    hint: '여러 개 골라도 괜찮아요',
-    options: ['선택지 1', '선택지 2', '선택지 3', '선택지 4', '선택지 5'],
+    text: '화면 구성은 어떤 게 좋아요?',
+    hint: '더 끌리는 하나를 골라주세요',
+    options: ['여백이 있는 여유로운 구도', '꽉 차고 밀도 있는 구도'],
   },
   {
-    text: '질문 5 (문구 미정)',
-    hint: '여러 개 골라도 괜찮아요',
-    options: ['선택지 1', '선택지 2', '선택지 3', '선택지 4', '선택지 5'],
+    text: '여행에서 더 남기고 싶은 건요?',
+    hint: '더 끌리는 하나를 골라주세요',
+    options: ['그 순간 함께 한 사람들', '그 순간의 풍경'],
   },
 ]
 
@@ -46,32 +40,73 @@ const TOTAL_ROUND = questions.length
 const BasicQuestion = () => {
   const navigate = useNavigate()
   const [round, setRound] = useState(1)
-  const [selected, setSelected] = useState([])
+  const [answers, setAnswers] = useState(() =>
+    Array(TOTAL_ROUND).fill(null),
+  )
+  const [savedResponses, setSavedResponses] = useState({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
 
   const question = questions[round - 1]
+  const selected = answers[round - 1]
   const isLastRound = round === TOTAL_ROUND
+  const isSaved = Boolean(savedResponses[round])
 
   const handleSelect = (option) => {
-    if (selected.includes(option)) {
-      setSelected(selected.filter((item) => item !== option))
-      return
-    }
-    setSelected([...selected, option])
+    if (isSubmitting || isSaved) return
+
+    setAnswers((currentAnswers) => {
+      const nextAnswers = [...currentAnswers]
+      nextAnswers[round - 1] = option
+      return nextAnswers
+    })
+    setErrorMessage('')
   }
 
-  const handleNext = () => {
-    // TODO: 응답 저장
+  const moveToNextRound = () => {
     if (!isLastRound) {
-      setRound(round + 1)
-      setSelected([])
+      setRound((currentRound) => currentRound + 1)
       return
     }
+
     navigate('/onboarding/ab-preference')
   }
 
+  const handleNext = async () => {
+    if (!selected || isSubmitting) return
+
+    if (isSaved) {
+      moveToNextRound()
+      return
+    }
+
+    setIsSubmitting(true)
+    setErrorMessage('')
+
+    try {
+      const savedResponse = await saveBasicQuestionResponse({
+        roundNo: round,
+        response: selected,
+      })
+
+      setSavedResponses((currentResponses) => ({
+        ...currentResponses,
+        [round]: savedResponse,
+      }))
+      moveToNextRound()
+    } catch (error) {
+      setErrorMessage(
+        error.message ??
+          '응답을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.',
+      )
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   const handlePrev = () => {
-    setRound(round - 1)
-    setSelected([])
+    setRound((currentRound) => currentRound - 1)
+    setErrorMessage('')
   }
 
   return (
@@ -92,8 +127,9 @@ const BasicQuestion = () => {
             {question.options.map((option) => (
               <Option
                 key={option}
-                selected={selected.includes(option)}
+                selected={selected === option}
                 onClick={() => handleSelect(option)}
+                disabled={isSubmitting || isSaved}
               >
                 {option}
               </Option>
@@ -102,10 +138,22 @@ const BasicQuestion = () => {
         </Body>
 
         <Footer>
-          <Button onClick={handleNext}>
-            {isLastRound ? '완료' : '다음'}
+          {errorMessage && (
+            <ErrorMessage role="alert">{errorMessage}</ErrorMessage>
+          )}
+          <Button
+            type="button"
+            onClick={handleNext}
+            disabled={!selected || isSubmitting}
+          >
+            {isSubmitting ? '저장 중...' : isLastRound ? '완료' : '다음'}
           </Button>
-          <Button $variant="ghost" onClick={handlePrev} disabled={round === 1}>
+          <Button
+            type="button"
+            $variant="ghost"
+            onClick={handlePrev}
+            disabled={round === 1 || isSubmitting}
+          >
             이전으로
           </Button>
         </Footer>
@@ -165,4 +213,11 @@ const Footer = styled.footer`
   display: flex;
   flex-direction: column;
   gap: 10px;
+`
+
+const ErrorMessage = styled.p`
+  color: #b42318;
+  font: var(--text-ui-caption);
+  text-align: center;
+  word-break: keep-all;
 `
