@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import styled from 'styled-components'
 import { Marker } from '@vis.gl/react-google-maps'
 import GoogleMap from '../../components/common/GoogleMap'
@@ -10,8 +10,34 @@ import photoAddIcon from '../../assets/map/photo-add.svg'
 import refreshIcon from '../../assets/map/refresh.svg'
 import voicePlayIcon from '../../assets/map/voice-play.svg'
 import { MAP_STYLES } from './mapStyles'
+import { getPin } from '../../features/pins/pinApi'
+import { getTrip, getTripPins } from '../../features/trips/tripApi'
 
-const PIN_POSITION = { lat: 37.576, lng: 126.9769 }
+// 지도에서 넘어오는 경로가 아직 없어 pinID 가 비면 이 값을 쓴다.
+const FALLBACK_PIN_ID = 101
+
+const detailDateFormatter = new Intl.DateTimeFormat('ko-KR', {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true,
+})
+
+const formatTaggedAt = (taggedAt) =>
+  taggedAt
+    ? detailDateFormatter.format(new Date(taggedAt)).replace(/\. /g, '.')
+    : ''
+
+const formatDuration = (seconds) => {
+  if (seconds == null) return ''
+
+  const minutes = Math.floor(seconds / 60)
+  const rest = seconds % 60
+
+  return `${String(minutes).padStart(2, '0')}:${String(rest).padStart(2, '0')}`
+}
 
 const waveHeights = [
   5, 9, 14, 7, 17, 11, 6, 15, 19, 9, 5, 12, 17, 8, 11, 5, 10, 15,
@@ -22,13 +48,102 @@ const waveHeights = [
 
 const PinDetail = () => {
   const navigate = useNavigate()
+  const { pinID = FALLBACK_PIN_ID } = useParams()
+
   const [isPlaying, setIsPlaying] = useState(false)
+  const [pin, setPin] = useState(null)
+  const [journey, setJourney] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [errorMessage, setErrorMessage] = useState('')
+
+  useEffect(() => {
+    let ignore = false
+
+    const load = async () => {
+      setIsLoading(true)
+      setErrorMessage('')
+
+      try {
+        const data = await getPin(pinID)
+        if (!ignore) setPin(data)
+      } catch (error) {
+        if (!ignore) setErrorMessage(error.message)
+      } finally {
+        if (!ignore) setIsLoading(false)
+      }
+    }
+
+    load()
+
+    return () => {
+      ignore = true
+    }
+  }, [pinID])
+
+  /**
+   * 여정 칩(`n개 핀 중 m번째`)에 필요한 값은 5.1 응답에 없어서 4번 API로 따로 받는다.
+   * segment_id 가 없으면(진행 중인 여정) 칩을 그리지 않는다.
+   */
+  useEffect(() => {
+    const segmentId = pin?.segment_id
+
+    if (!segmentId) {
+      setJourney(null)
+      return undefined
+    }
+
+    let ignore = false
+
+    const loadJourney = async () => {
+      try {
+        const [trip, pinList] = await Promise.all([
+          getTrip(segmentId),
+          getTripPins(segmentId),
+        ])
+
+        if (ignore) return
+
+        const order =
+          pinList.pins.findIndex((item) => item.pin_id === pin.pin_id) + 1
+
+        setJourney(
+          order > 0
+            ? { name: trip.name, total: pinList.pins.length, order }
+            : null,
+        )
+      } catch {
+        // 칩은 부가 정보라 실패해도 화면을 막지 않는다.
+        if (!ignore) setJourney(null)
+      }
+    }
+
+    loadJourney()
+
+    return () => {
+      ignore = true
+    }
+  }, [pin])
+
+  if (isLoading || !pin) {
+    return (
+      <Page>
+        <StateMessage role={errorMessage ? 'alert' : undefined}>
+          {errorMessage || '불러오는 중...'}
+        </StateMessage>
+      </Page>
+    )
+  }
+
+  const position = { lat: pin.latitude, lng: pin.longitude }
+  const title = pin.place_name || pin.address || '이름 없는 장소'
+  const representativePhotos = pin.representative_photos ?? []
+  const hasMemo = Boolean(pin.text_note) || Boolean(pin.voice_memo)
 
   return (
     <Page>
       <MapHero>
         <GoogleMap
-          center={PIN_POSITION}
+          center={position}
           zoom={15.5}
           height="100%"
           styles={MAP_STYLES}
@@ -36,18 +151,19 @@ const PinDetail = () => {
           bordered={false}
           mapOptions={{ clickableIcons: false, keyboardShortcuts: false }}
         >
-          <Marker
-            position={PIN_POSITION}
-            icon={activePinIcon}
-            title="경복궁 광화문 앞"
-          />
+          <Marker position={position} icon={activePinIcon} title={title} />
         </GoogleMap>
 
         <BackButton type="button" aria-label="뒤로 가기" onClick={() => navigate(-1)}>
           <img src={backIcon} alt="" />
         </BackButton>
 
-        <JourneyChip>서울 여정 · 12개 핀 중 3번째</JourneyChip>
+        {journey && (
+          <JourneyChip>
+            {journey.name} · {journey.total}개 핀 중 {journey.order}번째
+          </JourneyChip>
+        )}
+
         <OpenMapButton type="button" onClick={() => navigate('/map')}>
           <img src={openMapIcon} alt="" />
           지도에서 보기
@@ -60,39 +176,49 @@ const PinDetail = () => {
         <DetailContent>
           <PinIntro>
             <HeadingGroup>
-              <PinTitle>경복궁 광화문 앞</PinTitle>
-              <PinMeta>서울 종로구 세종로&nbsp;&nbsp;·&nbsp;&nbsp;2025.06.14 오전 10:32</PinMeta>
+              <PinTitle>{title}</PinTitle>
+              <PinMeta>
+                {pin.address}
+                {pin.address && pin.tagged_at && (
+                  <>&nbsp;&nbsp;·&nbsp;&nbsp;</>
+                )}
+                {formatTaggedAt(pin.tagged_at)}
+              </PinMeta>
             </HeadingGroup>
 
-            <Memo>
-              <MemoRule />
-              <MemoBody>
-                <MemoText>
-                  오래된 돌담을 따라 걷다가, 해가 드는 순간에 멈춰 섰다.
-                  다음엔 이른 아침에 다시 오기로.
-                </MemoText>
-                <VoiceBar>
-                  <PlayButton
-                    type="button"
-                    aria-label={isPlaying ? '음성 일시정지' : '음성 재생'}
-                    aria-pressed={isPlaying}
-                    onClick={() => setIsPlaying((playing) => !playing)}
-                  >
-                    <img src={voicePlayIcon} alt="" />
-                  </PlayButton>
-                  <Waveform aria-hidden="true">
-                    {waveHeights.map((height, index) => (
-                      <Wave
-                        key={`${height}-${index}`}
-                        $height={height}
-                        $played={index < (isPlaying ? 32 : 18)}
-                      />
-                    ))}
-                  </Waveform>
-                  <Duration>00:18</Duration>
-                </VoiceBar>
-              </MemoBody>
-            </Memo>
+            {hasMemo && (
+              <Memo>
+                <MemoRule />
+                <MemoBody>
+                  {pin.text_note && <MemoText>{pin.text_note}</MemoText>}
+
+                  {pin.voice_memo && (
+                    <VoiceBar>
+                      <PlayButton
+                        type="button"
+                        aria-label={isPlaying ? '음성 일시정지' : '음성 재생'}
+                        aria-pressed={isPlaying}
+                        onClick={() => setIsPlaying((playing) => !playing)}
+                      >
+                        <img src={voicePlayIcon} alt="" />
+                      </PlayButton>
+                      <Waveform aria-hidden="true">
+                        {waveHeights.map((height, index) => (
+                          <Wave
+                            key={`${height}-${index}`}
+                            $height={height}
+                            $played={index < (isPlaying ? 32 : 18)}
+                          />
+                        ))}
+                      </Waveform>
+                      <Duration>
+                        {formatDuration(pin.voice_memo.duration_sec)}
+                      </Duration>
+                    </VoiceBar>
+                  )}
+                </MemoBody>
+              </Memo>
+            )}
           </PinIntro>
 
           <PhotosSection>
@@ -107,13 +233,25 @@ const PinDetail = () => {
               </TextAction>
             </SectionHeading>
 
+            {/* TODO: 세 번째 사진 위의 `+5` 배지 복구 대기.
+                5.1 응답에 핀의 전체 사진 수가 없어 계산할 수 없다.
+                5.4 사진 목록을 붙이면 그 개수로 표시한다. */}
             <PhotoGrid>
-              <Photo $tone="main" />
+              <Photo $tone="main">
+                {representativePhotos[0] && (
+                  <PhotoImage src={representativePhotos[0].url} alt="" />
+                )}
+              </Photo>
               <PhotoStack>
-                <Photo $tone="light" />
+                <Photo $tone="light">
+                  {representativePhotos[1] && (
+                    <PhotoImage src={representativePhotos[1].url} alt="" />
+                  )}
+                </Photo>
                 <Photo $tone="dark">
-                  <PhotoOverlay />
-                  <PhotoCount>+5</PhotoCount>
+                  {representativePhotos[2] && (
+                    <PhotoImage src={representativePhotos[2].url} alt="" />
+                  )}
                 </Photo>
               </PhotoStack>
             </PhotoGrid>
@@ -166,6 +304,14 @@ const Page = styled.main`
   &::-webkit-scrollbar {
     display: none;
   }
+`
+
+const StateMessage = styled.p`
+  padding: 120px 24px;
+  color: var(--Text-Secondary);
+  font: var(--text-ui-body-m);
+  text-align: center;
+  word-break: keep-all;
 `
 
 const MapHero = styled.section`
@@ -408,6 +554,8 @@ const PhotoGrid = styled.div`
   height: 164px;
   display: grid;
   grid-template-columns: minmax(0, 1.85fr) minmax(0, 1fr);
+  /* 행 높이를 고정하지 않으면 사진 원본 크기가 그리드를 밀어낸다. */
+  grid-template-rows: minmax(0, 1fr);
   gap: 6px;
 `
 
@@ -423,13 +571,23 @@ const Photo = styled.div`
   position: relative;
   width: 100%;
   height: 100%;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
   border-radius: 12px;
   background: ${({ $tone }) => toneBackgrounds[$tone]};
 `
 
+const PhotoImage = styled.img`
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+`
+
 const PhotoStack = styled.div`
   min-width: 0;
+  min-height: 0;
   display: grid;
   grid-template-rows: repeat(2, minmax(0, 1fr));
   gap: 6px;
