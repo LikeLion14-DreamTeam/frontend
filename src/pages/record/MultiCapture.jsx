@@ -284,11 +284,11 @@ const MultiCapture = () => {
 export default MultiCapture
 
 /* 하단 패널의 확정 높이. 뷰파인더가 남은 공간을 채우므로 구성을 바꾸면 함께 고친다.
-   13(라벨) + 11 + 66(썸네일) + 35 + 72(컨트롤) + 24(아래 여백)
+   13(라벨) + 11 + 66(썸네일) + 24 + 72(컨트롤) + 4(아래 여백)
 
-   시안의 아래 여백은 58이지만 사파리 하단 주소창이 약 95px을 가져가, 그대로 두면
-   뷰파인더가 폭을 못 채우고 좌우에 여백이 생긴다. 그만큼을 여기서 덜어낸다. */
-const BOTTOM_PANEL_HEIGHT = '220px'
+   시안은 간격 35 · 아래 여백 58이지만 사파리 하단 주소창이 약 95px을 가져가,
+   그대로 두면 뷰파인더가 폭을 못 채우고 좌우에 여백이 생긴다. 그만큼을 덜어낸다. */
+const BOTTOM_PANEL_HEIGHT = '190px'
 
 const CaptureShell = styled.main`
   width: 100%;
@@ -410,7 +410,7 @@ const RetryButton = styled.button`
 const BottomPanel = styled.section`
   flex: 0 0 auto;
   height: calc(${BOTTOM_PANEL_HEIGHT} + env(safe-area-inset-bottom));
-  padding: 0 24px calc(24px + env(safe-area-inset-bottom));
+  padding: 0 24px calc(4px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
 `
@@ -493,7 +493,7 @@ const DeleteButton = styled.button`
 const ControlRow = styled.div`
   flex: 0 0 72px;
   height: 72px;
-  margin-top: 35px;
+  margin-top: 24px;
   /* 패널 좌우 여백 24 + 30 = 시안의 54px */
   padding: 0 30px;
   display: grid;
