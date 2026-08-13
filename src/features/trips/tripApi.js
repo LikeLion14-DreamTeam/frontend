@@ -1,5 +1,6 @@
 import apiClient from '../../api/client'
-import { MOCK_TRIPS, MOCK_TRIP_DETAIL, MOCK_TRIP_PINS } from './tripMock'
+import { ApiError } from '../../api/errors'
+import { getMockPhotoCount, mockTripStore } from './tripMock'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK_API === 'true'
 
@@ -10,10 +11,46 @@ const USE_MOCK = import.meta.env.VITE_USE_MOCK_API === 'true'
  * 진행 중인 여정은 대상 세그먼트 자체가 없어 호출할 수 없다.
  */
 
+const mockNotFound = () =>
+  new ApiError({
+    status: 404,
+    code: 'NOT_FOUND',
+    message: '여행 구간을 찾을 수 없습니다.',
+  })
+
+/** mock 전용. 수록된 핀을 기준으로 구간 요약을 계산한다. */
+const buildMockTripSummary = (segmentId) => {
+  const trip = mockTripStore.trips[segmentId]
+  if (!trip) throw mockNotFound()
+
+  const includedPins = (mockTripStore.pins[segmentId] ?? []).filter(
+    (pin) => pin.included_in_segment,
+  )
+
+  return {
+    ...trip,
+    pin_count: includedPins.length,
+    photo_count: includedPins.reduce(
+      (total, pin) => total + getMockPhotoCount(pin.pin_id),
+      0,
+    ),
+  }
+}
+
 /** 4.1 여행 구간 목록 조회 */
 export const getTrips = async ({ cursor = null, limit = 20 } = {}) => {
   if (USE_MOCK) {
-    return MOCK_TRIPS
+    return {
+      trips: Object.values(mockTripStore.trips).map(
+        ({ segment_id, name, start_at, end_at }) => ({
+          segment_id,
+          name,
+          start_at,
+          end_at,
+        }),
+      ),
+      next_cursor: null,
+    }
   }
 
   return apiClient.get('/trips', { params: { cursor, limit } })
@@ -22,7 +59,7 @@ export const getTrips = async ({ cursor = null, limit = 20 } = {}) => {
 /** 4.2 여행 구간 상세(요약) 조회 */
 export const getTrip = async (segmentId) => {
   if (USE_MOCK) {
-    return MOCK_TRIP_DETAIL
+    return buildMockTripSummary(segmentId)
   }
 
   return apiClient.get(`/trips/${segmentId}`)
@@ -39,16 +76,18 @@ export const getTrip = async (segmentId) => {
  */
 export const updateTrip = async (segmentId, { name, pinInclusions }) => {
   if (USE_MOCK) {
-    const includedCount = pinInclusions.filter(
-      (pin) => pin.included_in_segment,
-    ).length
+    const trip = mockTripStore.trips[segmentId]
+    if (!trip) throw mockNotFound()
 
-    return {
-      ...MOCK_TRIP_DETAIL,
-      name,
-      pin_count: includedCount,
-      photo_count: MOCK_TRIP_DETAIL.photo_count,
-    }
+    trip.name = name
+
+    const pins = mockTripStore.pins[segmentId] ?? []
+    pinInclusions.forEach(({ pin_id, included_in_segment }) => {
+      const target = pins.find((pin) => pin.pin_id === pin_id)
+      if (target) target.included_in_segment = included_in_segment
+    })
+
+    return buildMockTripSummary(segmentId)
   }
 
   return apiClient.patch(`/trips/${segmentId}`, {
@@ -66,6 +105,11 @@ export const updateTrip = async (segmentId, { name, pinInclusions }) => {
  */
 export const deleteTrip = async (segmentId) => {
   if (USE_MOCK) {
+    if (!mockTripStore.trips[segmentId]) throw mockNotFound()
+
+    delete mockTripStore.trips[segmentId]
+    delete mockTripStore.pins[segmentId]
+
     return null
   }
 
@@ -78,7 +122,12 @@ export const getTripPins = async (
   { cursor = null, limit = 20 } = {},
 ) => {
   if (USE_MOCK) {
-    return MOCK_TRIP_PINS
+    if (!mockTripStore.trips[segmentId]) throw mockNotFound()
+
+    return {
+      pins: mockTripStore.pins[segmentId] ?? [],
+      next_cursor: null,
+    }
   }
 
   return apiClient.get(`/trips/${segmentId}/pins`, {
