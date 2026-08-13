@@ -28,8 +28,12 @@ const MultiCaptureTest = () => {
   const shotsRef = useRef([])
 
   const [shots, setShots] = useState([])
+  const [previewId, setPreviewId] = useState(null)
   const [status, setStatus] = useState('starting')
   const [errorMessage, setErrorMessage] = useState('')
+
+  const previewIndex = shots.findIndex((shot) => shot.id === previewId)
+  const previewShot = previewIndex === -1 ? null : shots[previewIndex]
 
   // 미리보기에 쓰는 objectURL 은 해제 시점을 놓치면 메모리에 남는다.
   shotsRef.current = shots
@@ -127,6 +131,10 @@ const MultiCaptureTest = () => {
       if (target) URL.revokeObjectURL(target.url)
       return prev.filter((shot) => shot.id !== id)
     })
+
+    if (previewId === id) {
+      setPreviewId(null)
+    }
   }
 
   const handleDone = () => {
@@ -160,9 +168,15 @@ const MultiCaptureTest = () => {
       <BottomPanel>
         <ThumbnailStrip aria-label="촬영한 사진">
           {shots.length === 0 && <EmptyHint>셔터를 눌러 촬영하세요</EmptyHint>}
-          {shots.map((shot) => (
+          {shots.map((shot, index) => (
             <Thumbnail key={shot.id}>
-              <ThumbnailImage src={shot.url} alt="" />
+              <ThumbnailButton
+                type="button"
+                aria-label={`${index + 1}번째 사진 미리보기`}
+                onClick={() => setPreviewId(shot.id)}
+              >
+                <ThumbnailImage src={shot.url} alt="" />
+              </ThumbnailButton>
               <RemoveButton
                 type="button"
                 aria-label="이 사진 삭제"
@@ -198,6 +212,23 @@ const MultiCaptureTest = () => {
           </DebugInfo>
         )}
       </BottomPanel>
+
+      {previewShot && (
+        <PreviewOverlay
+          role="dialog"
+          aria-label="사진 미리보기"
+          onClick={() => setPreviewId(null)}
+        >
+          <PreviewImage src={previewShot.url} alt="" />
+          <PreviewClose type="button" aria-label="미리보기 닫기">
+            ×
+          </PreviewClose>
+          <PreviewMeta>
+            {previewIndex + 1} / {shots.length} · {previewShot.width}×
+            {previewShot.height} · {Math.round(previewShot.size / 1024)}KB
+          </PreviewMeta>
+        </PreviewOverlay>
+      )}
     </CaptureShell>
   )
 }
@@ -299,12 +330,71 @@ const Thumbnail = styled.div`
   height: 56px;
 `
 
+const ThumbnailButton = styled.button`
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  overflow: hidden;
+  cursor: pointer;
+`
+
 const ThumbnailImage = styled.img`
   width: 100%;
   height: 100%;
   display: block;
-  border-radius: 8px;
   object-fit: cover;
+  /* iOS에서 길게 눌렀을 때 시스템 메뉴가 뜨지 않도록 한다. */
+  -webkit-touch-callout: none;
+  pointer-events: none;
+`
+
+const PreviewOverlay = styled.div`
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgb(0 0 0 / 92%);
+`
+
+const PreviewImage = styled.img`
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
+  object-fit: contain;
+`
+
+const PreviewClose = styled.button`
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top));
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 15%);
+  color: #fff;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+`
+
+const PreviewMeta = styled.p`
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  color: #b9b9b9;
+  font: var(--text-ui-caption);
+  text-align: center;
 `
 
 const RemoveButton = styled.button`
