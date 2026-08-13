@@ -3,13 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import styled, { createGlobalStyle } from 'styled-components'
 
 /**
- * 연속 촬영 테스트 화면.
+ * 연속 촬영 화면.
  *
- * 기존 `/record/camera` 는 <input capture> 로 OS 카메라 앱을 여는 방식이라
- * 구조상 한 번에 한 장만 돌아온다. 이 화면은 getUserMedia 로 앱 안에 카메라를
- * 직접 띄우고, 셔터를 누를 때마다 현재 프레임을 canvas 로 캡처해 쌓는다.
+ * `<input capture>` 로 OS 카메라 앱을 여는 방식은 구조상 한 번에 한 장만 돌아온다.
+ * 이 화면은 getUserMedia 로 앱 안에 카메라를 직접 띄우고, 셔터를 누를 때마다
+ * 현재 프레임을 canvas 로 캡처해 쌓는다.
  *
- * 확인 후 실제 촬영 플로우에 반영할지 결정한다.
+ * 제약: HTTPS 환경에서만 동작하고(로컬은 localhost 만), canvas 캡처라 EXIF 가 없다.
+ * 촬영 위치·시각은 나중에 Geolocation API 와 촬영 시각으로 직접 채워야 한다.
  */
 
 // 촬영 해상도 요청값. 기기가 지원하지 않으면 근접한 값으로 대체된다.
@@ -39,7 +40,7 @@ const BlackSafeArea = createGlobalStyle`
   }
 `
 
-const MultiCaptureTest = () => {
+const MultiCapture = () => {
   const navigate = useNavigate()
   const videoRef = useRef(null)
   const streamRef = useRef(null)
@@ -278,7 +279,7 @@ const MultiCaptureTest = () => {
   )
 }
 
-export default MultiCaptureTest
+export default MultiCapture
 
 /* 하단 패널의 확정 높이. 미리보기 프레임 크기를 여기서 역산하므로,
    패널 구성을 바꾸면 이 값도 함께 고쳐야 한다.

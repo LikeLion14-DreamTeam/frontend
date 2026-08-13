@@ -1,82 +1,27 @@
-import React, { useRef, useState } from 'react'
+import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 
-const DEFAULT_LOCATION = '크컴'
-
-const formatCurrentTime = () => {
-  const formatter = new Intl.DateTimeFormat('ko-KR', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  })
-
-  return formatter.format(new Date())
-}
-
 const PhotoCapture = () => {
   const navigate = useNavigate()
-  const cameraInputRef = useRef(null)
-  const [isLoading, setIsLoading] = useState(false)
 
-  const openNativeCamera = () => {
-    cameraInputRef.current?.click()
-  }
-
-  const handlePhotoSelected = (event) => {
-    const file = event.target.files?.[0]
-
-    if (!file) {
-      setIsLoading(false)
-      return
-    }
-
-    setIsLoading(true)
-
-    const photoUrl = URL.createObjectURL(file)
-    const nextRecord = {
-      photo: photoUrl,
-      photoName: file.name,
-      location: DEFAULT_LOCATION,
-      time: formatCurrentTime(),
-    }
-
-    try {
-      sessionStorage.setItem(
-        'latestPinRecord',
-        JSON.stringify({
-          photoName: nextRecord.photoName,
-          location: nextRecord.location,
-          time: nextRecord.time,
-        }),
-      )
-    } catch {
-      // A stored preview is optional until backend persistence is connected.
-    }
-
-    navigate('/record/pin-saved', { state: nextRecord })
+  // OS 카메라 앱은 한 번에 한 장만 돌려주므로 자체 카메라 화면으로 넘긴다.
+  const openCamera = () => {
+    navigate('/record/multi-capture')
   }
 
   return (
     <CaptureShell>
-      <NativeCameraInput
-        ref={cameraInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        onChange={handlePhotoSelected}
-      />
-
       <CameraPreviewArea>
         <TopControls>
           <TinyDot aria-hidden="true" />
-          <CameraIcon type="button" aria-label="기본 카메라 열기" onClick={openNativeCamera}>
+          <CameraIcon type="button" aria-label="카메라 열기" onClick={openCamera}>
             ⧉
           </CameraIcon>
         </TopControls>
 
-        <CameraOpenButton type="button" onClick={openNativeCamera} disabled={isLoading}>
-          {isLoading ? '저장 중' : '기본 카메라 열기'}
+        <CameraOpenButton type="button" onClick={openCamera}>
+          카메라 열기
         </CameraOpenButton>
       </CameraPreviewArea>
 
@@ -84,7 +29,7 @@ const PhotoCapture = () => {
         <ModeRow>
           <ModeText>비디오</ModeText>
           <ModeActive>사진</ModeActive>
-          <RotateButton type="button" aria-label="기본 카메라 열기" onClick={openNativeCamera}>
+          <RotateButton type="button" aria-label="카메라 열기" onClick={openCamera}>
             ↻
           </RotateButton>
         </ModeRow>
@@ -105,14 +50,6 @@ const CaptureShell = styled.main`
   overflow: hidden;
   position: relative;
   font-family: var(--font-sans);
-`
-
-const NativeCameraInput = styled.input`
-  position: fixed;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
 `
 
 const CameraPreviewArea = styled.section`

@@ -36,13 +36,6 @@ const Home = () => {
           <PassportPlaceholder>여권 들어갈 자리</PassportPlaceholder>
         </Section>
 
-        {/* 연속 촬영 방식 검증용 임시 버튼. 도입 여부 결정 후 제거한다. */}
-        <Section>
-          <TestButton as={Link} to="/record/multi-capture-test">
-            [테스트] 연속 촬영
-          </TestButton>
-        </Section>
-
 
       </HomeWrapper>
       
@@ -73,11 +66,6 @@ const TitleRow = styled.div`
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-`
-
-/* 연속 촬영 검증용 임시 버튼. 도입 여부 결정 후 제거한다. */
-const TestButton = styled(Button)`
-  text-decoration: none;
 `
 
 const ContinueTripButton = styled(Button)`
