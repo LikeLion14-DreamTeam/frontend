@@ -189,7 +189,7 @@ const MapPage = () => {
         <RecordButton
           type="button"
           aria-label="현재 위치에 기록 추가"
-          onClick={() => navigate('/record/camera')}
+          onClick={() => navigate('/map/pin/new')}
         >
           <img src={recordPlusIcon} alt="" />
         </RecordButton>
@@ -342,8 +342,8 @@ const Chevron = styled.img`
 const LocationButton = styled.button`
   position: absolute;
   z-index: 9;
-  top: 48px;
-  right: 5px;
+  right: 13px;
+  bottom: 129px;
   width: 76px;
   height: 76px;
   padding: 0;
@@ -360,8 +360,8 @@ const LocationButton = styled.button`
 
 const RecordButton = styled.button`
   position: absolute;
-  right: 21px;
-  bottom: 137px;
+  top: 56px;
+  right: 13px;
   z-index: 9;
   width: 60px;
   height: 60px;
