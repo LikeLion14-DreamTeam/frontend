@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import styled from 'styled-components'
+import styled, { createGlobalStyle } from 'styled-components'
 
 /**
  * 연속 촬영 테스트 화면.
@@ -23,6 +23,21 @@ const JPEG_QUALITY = 0.92
 
 // 저장 비율 3:4 고정. 미리보기 프레임도 같은 비율이라 보이는 그대로 찍힌다.
 const CAPTURE_RATIO = 3 / 4
+
+/**
+ * 상하단 안전영역(상태바 뒤, 홈 인디케이터 자리)을 검게 만든다.
+ *
+ * 그 영역은 페이지 요소가 아니라 브라우저가 칠하는 자리라 배경 이미지가 닿지 않고,
+ * 페이지의 배경 "색상"만 따라간다. 카메라 화면에서만 검은색으로 바꾸고
+ * 화면을 벗어나면 원래 색으로 돌아온다.
+ */
+const BlackSafeArea = createGlobalStyle`
+  html,
+  body,
+  #root {
+    background-color: #000;
+  }
+`
 
 const MultiCaptureTest = () => {
   const navigate = useNavigate()
@@ -170,6 +185,8 @@ const MultiCaptureTest = () => {
 
   return (
     <CaptureShell>
+      <BlackSafeArea />
+
       <PreviewArea>
         <PreviewFrame>
           <Preview ref={videoRef} playsInline muted autoPlay />
