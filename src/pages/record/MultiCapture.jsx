@@ -284,8 +284,8 @@ const MultiCapture = () => {
 export default MultiCapture
 
 /* 하단 패널의 확정 높이. 뷰파인더가 남은 공간을 채우므로 구성을 바꾸면 함께 고친다.
-   13(라벨) + 11 + 66(썸네일) + 20 + 72(컨트롤) + 38(아래 여백) */
-const BOTTOM_PANEL_HEIGHT = '220px'
+   13(라벨) + 11 + 66(썸네일) + 35 + 72(컨트롤) + 58(아래 여백) */
+const BOTTOM_PANEL_HEIGHT = '255px'
 
 const CaptureShell = styled.main`
   width: 100%;
@@ -406,7 +406,7 @@ const RetryButton = styled.button`
 const BottomPanel = styled.section`
   flex: 0 0 auto;
   height: calc(${BOTTOM_PANEL_HEIGHT} + env(safe-area-inset-bottom));
-  padding: 0 24px calc(38px + env(safe-area-inset-bottom));
+  padding: 0 24px calc(58px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
 `
@@ -489,7 +489,9 @@ const DeleteButton = styled.button`
 const ControlRow = styled.div`
   flex: 0 0 72px;
   height: 72px;
-  margin-top: 20px;
+  margin-top: 35px;
+  /* 패널 좌우 여백 24 + 30 = 시안의 54px */
+  padding: 0 30px;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
@@ -497,7 +499,7 @@ const ControlRow = styled.div`
 
 const TextButton = styled.button`
   justify-self: ${({ $accent }) => ($accent ? 'end' : 'start')};
-  padding: 8px;
+  padding: 8px 0;
   border: 0;
   background: none;
   color: ${({ $accent }) => ($accent ? 'var(--Accent-Gold)' : 'rgb(242 233 220 / 80%)')};
@@ -557,6 +559,7 @@ const PreviewClose = styled.button`
   position: absolute;
   top: 0;
   right: 20px;
+  z-index: 1;
   width: 40px;
   height: 40px;
   padding: 0;
@@ -572,8 +575,8 @@ const PreviewClose = styled.button`
 `
 
 const PreviewPhoto = styled.img`
-  width: calc(100% - 2px);
-  margin-top: 65px;
+  width: 100%;
+  margin-top: 59px;
   aspect-ratio: 3 / 4;
   display: block;
   object-fit: cover;
@@ -581,7 +584,7 @@ const PreviewPhoto = styled.img`
 `
 
 const PreviewIndex = styled.p`
-  margin-top: 25px;
+  margin-top: 35px;
   display: flex;
   align-items: baseline;
   gap: 7px;
