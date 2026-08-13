@@ -1,4 +1,4 @@
-import React from 'react'
+import { useEffect, useState } from 'react'
 import { googleLogout } from '@react-oauth/google'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
@@ -8,7 +8,7 @@ import {
   clearSessionToken,
   getSessionToken,
 } from '../../api/session'
-import { logout } from '../../features/auth/authApi'
+import { getMyAccount, logout } from '../../features/auth/authApi'
 import useAuthStore from '../../features/auth/useAuthStore'
 import addIcon from '../../assets/icons/mypage/add.svg'
 import briefcaseIcon from '../../assets/icons/mypage/briefcase.svg'
@@ -46,7 +46,54 @@ const settings = [
 
 const MyPage = () => {
   const navigate = useNavigate()
+  const storedUser = useAuthStore((state) => state.user)
+  const setUser = useAuthStore((state) => state.setUser)
   const clearUser = useAuthStore((state) => state.clearUser)
+  const [account, setAccount] = useState(storedUser)
+  const [isAccountLoading, setIsAccountLoading] = useState(true)
+  const [accountError, setAccountError] = useState('')
+  const [accountRequestKey, setAccountRequestKey] = useState(0)
+
+  useEffect(() => {
+    let ignore = false
+
+    const loadAccount = async () => {
+      setIsAccountLoading(true)
+      setAccountError('')
+
+      try {
+        const currentUser = await getMyAccount()
+
+        if (!ignore) {
+          setAccount(currentUser)
+          setUser(currentUser)
+        }
+      } catch (error) {
+        if (ignore) {
+          return
+        }
+
+        if (error.code === 'UNAUTHENTICATED') {
+          clearSessionToken()
+          clearUser()
+          navigate('/login', { replace: true })
+          return
+        }
+
+        setAccountError(error.message)
+      } finally {
+        if (!ignore) {
+          setIsAccountLoading(false)
+        }
+      }
+    }
+
+    loadAccount()
+
+    return () => {
+      ignore = true
+    }
+  }, [accountRequestKey, clearUser, navigate, setUser])
 
   const handlePreferenceInput = (event) => {
     const slider = event.currentTarget
@@ -78,8 +125,23 @@ const MyPage = () => {
             <AvatarIcon src={userIcon} alt="" aria-hidden="true" />
           </Avatar>
           <ProfileText>
-            <UserName>곽효석</UserName>
-            <AccountType>Google 계정으로 연결됨</AccountType>
+            <UserName>
+              {account?.email ??
+                (isAccountLoading ? '계정 정보 불러오는 중...' : 'Orte 여행자')}
+            </UserName>
+            {accountError ? (
+              <AccountError role="alert">
+                {accountError}
+                <RetryAccountButton
+                  type="button"
+                  onClick={() => setAccountRequestKey((key) => key + 1)}
+                >
+                  재시도
+                </RetryAccountButton>
+              </AccountError>
+            ) : (
+              <AccountType>Google 계정으로 연결됨</AccountType>
+            )}
           </ProfileText>
         </ProfileSection>
 
@@ -248,6 +310,24 @@ const UserName = styled.h1`
 const AccountType = styled.p`
   color: var(--Text-Secondary);
   font: var(--text-ui-caption);
+`
+
+const AccountError = styled.p`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #b42318;
+  font: var(--text-ui-caption);
+`
+
+const RetryAccountButton = styled.button`
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--Primary-Cognac);
+  font: var(--text-ui-caption);
+  text-decoration: underline;
+  cursor: pointer;
 `
 
 const StatsGrid = styled.section`

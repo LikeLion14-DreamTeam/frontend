@@ -9,3 +9,7 @@ export const MOCK_GOOGLE_LOGIN_RESPONSE = {
     account_identifier: 'mock-google-oauth-sub-id',
   },
 }
+
+export const MOCK_CURRENT_USER_RESPONSE = {
+  ...MOCK_GOOGLE_LOGIN_RESPONSE.user,
+}

@@ -1,5 +1,8 @@
 import apiClient from '../../api/client'
-import { MOCK_GOOGLE_LOGIN_RESPONSE } from './authMock'
+import {
+  MOCK_CURRENT_USER_RESPONSE,
+  MOCK_GOOGLE_LOGIN_RESPONSE,
+} from './authMock'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK_API === 'true'
 
@@ -27,4 +30,12 @@ export const logout = async (sessionToken) => {
       Authorization: `Bearer ${sessionToken}`,
     },
   })
+}
+
+export const getMyAccount = async () => {
+  if (USE_MOCK) {
+    return { ...MOCK_CURRENT_USER_RESPONSE }
+  }
+
+  return apiClient.get('/users/me')
 }
