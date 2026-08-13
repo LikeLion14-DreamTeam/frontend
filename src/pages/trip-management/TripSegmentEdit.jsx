@@ -7,7 +7,12 @@ import Header from '../../components/layout/Header'
 import checkboxCheckedIcon from '../../assets/icons/trip-checkbox-checked.svg'
 import editBackIcon from '../../assets/icons/trip-edit-back.svg'
 import selectChevronIcon from '../../assets/icons/trip-select-chevron.svg'
-import { getTrip, getTripPins, updateTrip } from '../../features/trips/tripApi'
+import {
+  deleteTrip,
+  getTrip,
+  getTripPins,
+  updateTrip,
+} from '../../features/trips/tripApi'
 
 // 아직 포토북에서 넘어오는 경로가 없어 segmentId 가 비면 이 값을 쓴다.
 const FALLBACK_SEGMENT_ID = 12
@@ -43,6 +48,8 @@ const TripSegmentEdit = () => {
   const [includedIds, setIncludedIds] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
   useEffect(() => {
@@ -137,6 +144,21 @@ const TripSegmentEdit = () => {
       setErrorMessage(error.message)
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    setIsDeleting(true)
+    setErrorMessage('')
+
+    try {
+      await deleteTrip(segmentId)
+      // 구간과 함께 포토북까지 사라지므로 목록으로 보내고 뒤로가기를 막는다.
+      navigate('/archive', { replace: true })
+    } catch (error) {
+      setErrorMessage(error.message)
+      setIsDeleting(false)
+      setIsConfirmingDelete(false)
     }
   }
 
@@ -349,9 +371,48 @@ const TripSegmentEdit = () => {
               {errorMessage && (
                 <SaveError role="alert">{errorMessage}</SaveError>
               )}
-              <SaveButton type="button" onClick={handleSave} disabled={isSaving}>
+              <SaveButton
+                type="button"
+                onClick={handleSave}
+                disabled={isSaving || isDeleting}
+              >
                 {isSaving ? '저장 중...' : '변경사항 저장'}
               </SaveButton>
+
+              {/* TODO: 임시 UI. 디자인 문의 회신 오면 위치·문구·색상을 맞춘다.
+                  현재 index.css 에 위험 동작용 색상 토큰이 없어 코냑색을 쓴다. */}
+              {isConfirmingDelete ? (
+                <DeleteConfirm>
+                  <DeleteWarning>
+                    이 구간의 핀·사진·음성 메모와 포토북이 모두 삭제됩니다.
+                    되돌릴 수 없습니다.
+                  </DeleteWarning>
+                  <DeleteActions>
+                    <DeleteCancelButton
+                      type="button"
+                      onClick={() => setIsConfirmingDelete(false)}
+                      disabled={isDeleting}
+                    >
+                      취소
+                    </DeleteCancelButton>
+                    <DeleteConfirmButton
+                      type="button"
+                      onClick={handleDelete}
+                      disabled={isDeleting}
+                    >
+                      {isDeleting ? '삭제 중...' : '삭제할게요'}
+                    </DeleteConfirmButton>
+                  </DeleteActions>
+                </DeleteConfirm>
+              ) : (
+                <DeleteTrigger
+                  type="button"
+                  onClick={() => setIsConfirmingDelete(true)}
+                  disabled={isSaving}
+                >
+                  구간 삭제
+                </DeleteTrigger>
+              )}
             </Footer>
           </>
         )}
@@ -376,6 +437,79 @@ const SaveError = styled.p`
   font: var(--text-ui-caption);
   text-align: center;
   word-break: keep-all;
+`
+
+/* 아래는 디자인 회신 전까지 쓰는 임시 스타일이다. */
+const DeleteTrigger = styled.button`
+  width: 100%;
+  min-height: 44px;
+  margin-top: 10px;
+  border: 0;
+  background: none;
+  color: var(--Text-Secondary);
+  font: var(--text-ui-button);
+  text-decoration: underline;
+  cursor: pointer;
+
+  &:disabled {
+    color: var(--State-Disabled-Text);
+    cursor: not-allowed;
+  }
+`
+
+const DeleteConfirm = styled.div`
+  margin-top: 10px;
+  border: 1px solid var(--Primary-Cognac);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgb(181 118 59 / 9%);
+`
+
+const DeleteWarning = styled.p`
+  color: var(--Text-Primary);
+  font: var(--text-ui-caption);
+  text-align: center;
+  word-break: keep-all;
+`
+
+const DeleteActions = styled.div`
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+`
+
+const DeleteCancelButton = styled.button`
+  min-height: 44px;
+  border: 1px solid var(--Border-Default);
+  border-radius: 22px;
+  background: var(--Surface-Base);
+  color: var(--Text-Secondary);
+  font: var(--text-ui-button);
+  cursor: pointer;
+
+  &:disabled {
+    color: var(--State-Disabled-Text);
+    cursor: not-allowed;
+  }
+`
+
+const DeleteConfirmButton = styled.button`
+  min-height: 44px;
+  border: 0;
+  border-radius: 22px;
+  background: var(--Primary-Cognac);
+  color: var(--Text-Inverse);
+  font: var(--text-ui-button);
+  cursor: pointer;
+
+  &:disabled {
+    background: var(--State-Disabled-Fill);
+    color: var(--State-Disabled-Text);
+    cursor: not-allowed;
+  }
 `
 
 const PageSurface = styled.div`
