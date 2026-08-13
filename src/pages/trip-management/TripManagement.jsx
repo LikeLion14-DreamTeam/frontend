@@ -127,7 +127,9 @@ const TripManagement = () => {
         height="104px"
         topPadding="58px"
         barHeight="24px"
-        rightContent={<EditLink to="/trip-management/edit">구간 편집</EditLink>}
+        rightContent={
+          <EditLink to={`/trip-management/${segmentId}/edit`}>구간 편집</EditLink>
+        }
       />
 
       <TripManagementWrapper>

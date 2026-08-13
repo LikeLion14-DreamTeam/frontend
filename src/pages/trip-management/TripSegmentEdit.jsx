@@ -1,5 +1,5 @@
-import React from 'react'
-import { Link } from 'react-router-dom'
+import React, { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import styled from 'styled-components'
 import Button from '../../components/common/Button'
 import Card from '../../components/common/Card'
@@ -7,69 +7,143 @@ import Header from '../../components/layout/Header'
 import checkboxCheckedIcon from '../../assets/icons/trip-checkbox-checked.svg'
 import editBackIcon from '../../assets/icons/trip-edit-back.svg'
 import selectChevronIcon from '../../assets/icons/trip-select-chevron.svg'
+import { getTrip, getTripPins, updateTrip } from '../../features/trips/tripApi'
 
-const dateOptions = [
-  '2024.11.03',
-  '2024.11.04',
-  '2024.11.05',
-  '2024.11.06',
-  '2024.11.07',
-  '2024.11.08',
-  '2024.11.09',
-  '2024.11.10',
-]
+// 아직 포토북에서 넘어오는 경로가 없어 segmentId 가 비면 이 값을 쓴다.
+const FALLBACK_SEGMENT_ID = 12
 
-const pinOptions = [
-  { value: 'pin-1', label: '핀 1 · 파리 에펠탑 근처' },
-  { value: 'pin-2', label: '핀 2 · 루브르 박물관 앞' },
-  { value: 'pin-3', label: '핀 3 · 몽마르트르 언덕' },
-  { value: 'pin-4', label: '핀 4 · 센 강변 산책로' },
-  { value: 'pin-7', label: '핀 7 · 베르사유 궁전 정원' },
-]
+const pad2 = (value) => String(value).padStart(2, '0')
 
-const pins = [
-  {
-    id: 1,
-    label: '핀 1',
-    title: '파리 에펠탑 근처',
-    meta: '11.03 오전 10:24 · 사진 8장',
-    checked: true,
-  },
-  {
-    id: 2,
-    label: '핀 2',
-    title: '루브르 박물관 앞',
-    meta: '11.04 오후 2:11 · 사진 6장',
-    checked: true,
-  },
-  {
-    id: 3,
-    label: '핀 3',
-    title: '몽마르트르 언덕',
-    meta: '11.05 오전 11:05 · 사진 11장',
-    checked: true,
-  },
-  {
-    id: 4,
-    label: '핀 4',
-    title: '센 강변 산책로',
-    meta: '11.06 오후 3:48 · 사진 5장',
-    checked: true,
-  },
-  {
-    id: 5,
-    label: '핀 5',
-    title: '베르사유 궁전 정원',
-    meta: '11.08 오전 9:30 · 사진 7장',
-    checked: true,
-  },
-]
+const formatDateValue = (isoString) => {
+  if (!isoString) return ''
+
+  const date = new Date(isoString)
+
+  return `${date.getFullYear()}.${pad2(date.getMonth() + 1)}.${pad2(date.getDate())}`
+}
+
+const pinTimeFormatter = new Intl.DateTimeFormat('ko-KR', {
+  month: '2-digit',
+  day: '2-digit',
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true,
+})
+
+const formatPinTime = (taggedAt) =>
+  taggedAt ? pinTimeFormatter.format(new Date(taggedAt)) : ''
 
 const TripSegmentEdit = () => {
+  const navigate = useNavigate()
+  const { segmentId = FALLBACK_SEGMENT_ID } = useParams()
+
+  const [trip, setTrip] = useState(null)
+  const [pins, setPins] = useState([])
+  const [name, setName] = useState('')
+  const [includedIds, setIncludedIds] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
+
+  useEffect(() => {
+    let ignore = false
+
+    const load = async () => {
+      setIsLoading(true)
+      setErrorMessage('')
+
+      try {
+        const [tripData, pinData] = await Promise.all([
+          getTrip(segmentId),
+          getTripPins(segmentId),
+        ])
+
+        if (ignore) return
+
+        setTrip(tripData)
+        setPins(pinData.pins)
+        setName(tripData.name)
+        setIncludedIds(
+          pinData.pins
+            .filter((pin) => pin.included_in_segment)
+            .map((pin) => pin.pin_id),
+        )
+      } catch (error) {
+        if (ignore) return
+        setErrorMessage(error.message)
+      } finally {
+        if (!ignore) setIsLoading(false)
+      }
+    }
+
+    load()
+
+    return () => {
+      ignore = true
+    }
+  }, [segmentId])
+
+  const includedSet = useMemo(() => new Set(includedIds), [includedIds])
+
+  const pinOptions = pins.map((pin, index) => ({
+    value: String(pin.pin_id),
+    label: `핀 ${index + 1} · ${pin.place_name || '이름 없는 장소'}`,
+  }))
+
+  const includedIndexes = pins
+    .map((pin, index) => (includedSet.has(pin.pin_id) ? index : -1))
+    .filter((index) => index >= 0)
+
+  const firstIncludedIndex = includedIndexes[0] ?? 0
+  const lastIncludedIndex = includedIndexes.at(-1) ?? pins.length - 1
+
+  /** 범위를 바꾸면 그 사이 핀만 선택 상태로 다시 맞춘다. */
+  const applyRange = (startIndex, endIndex) => {
+    const [from, to] =
+      startIndex <= endIndex ? [startIndex, endIndex] : [endIndex, startIndex]
+
+    setIncludedIds(pins.slice(from, to + 1).map((pin) => pin.pin_id))
+  }
+
+  const togglePin = (pinId) => {
+    setIncludedIds((prev) =>
+      prev.includes(pinId)
+        ? prev.filter((id) => id !== pinId)
+        : [...prev, pinId],
+    )
+  }
+
+  const handleSave = async () => {
+    // 명세 4.3: 핀을 하나도 남기지 않고 전부 제외하면 VALIDATION_ERROR
+    if (includedIds.length === 0) {
+      setErrorMessage('핀을 최소 한 개는 남겨야 저장할 수 있습니다.')
+      return
+    }
+
+    setIsSaving(true)
+    setErrorMessage('')
+
+    try {
+      await updateTrip(segmentId, {
+        name,
+        pinInclusions: pins.map((pin) => ({
+          pin_id: pin.pin_id,
+          included_in_segment: includedSet.has(pin.pin_id),
+        })),
+      })
+
+      navigate(`/trip-management/${segmentId}`)
+    } catch (error) {
+      setErrorMessage(error.message)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   return (
     <PageSurface>
       <Header
-        to="/trip-management"
+        to={`/trip-management/${segmentId}`}
         title="구간 편집"
         height="136px"
         topPadding="58px"
@@ -81,142 +155,228 @@ const TripSegmentEdit = () => {
       />
 
       <TripSegmentEditWrapper>
-        <InfoSection>
-          <SectionTitle>구간 정보</SectionTitle>
+        {isLoading && <StateMessage>불러오는 중...</StateMessage>}
 
-          <FieldGroup>
-            <FieldLabel htmlFor="segmentName">구간 이름</FieldLabel>
-            <TextInput id="segmentName" type="text" aria-label="구간 이름" />
-          </FieldGroup>
+        {!isLoading && !trip && errorMessage && (
+          <StateMessage role="alert">{errorMessage}</StateMessage>
+        )}
 
-          <DateGrid>
-            <FieldGroup>
-              <FieldLabel htmlFor="startDate">시작일</FieldLabel>
-              <SelectShell>
-                <Select id="startDate" defaultValue="2024.11.03">
-                  {dateOptions.map((date) => (
-                    <option key={date} value={date}>
-                      {date}
-                    </option>
-                  ))}
-                </Select>
-                <ChevronIcon src={selectChevronIcon} alt="" aria-hidden="true" />
-              </SelectShell>
-            </FieldGroup>
+        {!isLoading && trip && (
+          <>
+            <InfoSection>
+              <SectionTitle>구간 정보</SectionTitle>
 
-            <FieldGroup>
-              <FieldLabel htmlFor="endDate">종료일</FieldLabel>
-              <SelectShell>
-                <Select id="endDate" defaultValue="2024.11.10">
-                  {dateOptions.map((date) => (
-                    <option key={date} value={date}>
-                      {date}
-                    </option>
-                  ))}
-                </Select>
-                <ChevronIcon src={selectChevronIcon} alt="" aria-hidden="true" />
-              </SelectShell>
-            </FieldGroup>
-          </DateGrid>
-        </InfoSection>
+              <FieldGroup>
+                <FieldLabel htmlFor="segmentName">구간 이름</FieldLabel>
+                <TextInput
+                  id="segmentName"
+                  type="text"
+                  aria-label="구간 이름"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                />
+              </FieldGroup>
 
-        <EditSection>
-          <RangeSection>
-            <SectionTitle>포함 핀 범위</SectionTitle>
-            <SectionDescription>
-              범위를 바꾸면 아래 목록이 자동으로 다시 선택돼요
-            </SectionDescription>
+              {/* TODO: 기간 수정 대기.
+                  PATCH /trips/{segmentId} Body 에 start_at / end_at 이 없어
+                  값을 보낼 수 없다. 백엔드에 추가 요청 후 열어야 한다.
+                  그때까지는 서버 값을 읽기 전용으로만 보여준다. */}
+              <DateGrid>
+                <FieldGroup>
+                  <FieldLabel htmlFor="startDate">시작일</FieldLabel>
+                  <SelectShell>
+                    <Select id="startDate" value={formatDateValue(trip.start_at)} disabled>
+                      <option value={formatDateValue(trip.start_at)}>
+                        {formatDateValue(trip.start_at)}
+                      </option>
+                    </Select>
+                    <ChevronIcon
+                      src={selectChevronIcon}
+                      alt=""
+                      aria-hidden="true"
+                    />
+                  </SelectShell>
+                </FieldGroup>
 
-            <RangeSelectRow>
-              <RangeLabel>첫 번째 핀</RangeLabel>
-              <RangeValue>{pinOptions[0].label}</RangeValue>
-              <RangeSelect
-                id="firstPin"
-                defaultValue="pin-1"
-                aria-label="첫 번째 핀"
-              >
-                {pinOptions.map((pin) => (
-                  <option key={pin.value} value={pin.value}>
-                    {pin.label}
-                  </option>
-                ))}
-              </RangeSelect>
-              <ChevronIcon src={selectChevronIcon} alt="" aria-hidden="true" />
-            </RangeSelectRow>
+                <FieldGroup>
+                  <FieldLabel htmlFor="endDate">종료일</FieldLabel>
+                  <SelectShell>
+                    <Select id="endDate" value={formatDateValue(trip.end_at)} disabled>
+                      <option value={formatDateValue(trip.end_at)}>
+                        {formatDateValue(trip.end_at)}
+                      </option>
+                    </Select>
+                    <ChevronIcon
+                      src={selectChevronIcon}
+                      alt=""
+                      aria-hidden="true"
+                    />
+                  </SelectShell>
+                </FieldGroup>
+              </DateGrid>
+            </InfoSection>
 
-            <RangeSelectRow>
-              <RangeLabel>마지막 핀</RangeLabel>
-              <RangeValue>{pinOptions[4].label}</RangeValue>
-              <RangeSelect
-                id="lastPin"
-                defaultValue="pin-7"
-                aria-label="마지막 핀"
-              >
-                {pinOptions.map((pin) => (
-                  <option key={pin.value} value={pin.value}>
-                    {pin.label}
-                  </option>
-                ))}
-              </RangeSelect>
-              <ChevronIcon src={selectChevronIcon} alt="" aria-hidden="true" />
-            </RangeSelectRow>
-          </RangeSection>
+            <EditSection>
+              <RangeSection>
+                <SectionTitle>포함 핀 범위</SectionTitle>
+                <SectionDescription>
+                  범위를 바꾸면 아래 목록이 자동으로 다시 선택돼요
+                </SectionDescription>
 
-          <PinSection>
-            <ListHeader>
-              <ListTitle>핀 목록</ListTitle>
-              <ListMeta>5개 중 5개 선택</ListMeta>
-            </ListHeader>
+                <RangeSelectRow>
+                  <RangeLabel>첫 번째 핀</RangeLabel>
+                  <RangeValue>
+                    {pinOptions[firstIncludedIndex]?.label}
+                  </RangeValue>
+                  <RangeSelect
+                    id="firstPin"
+                    aria-label="첫 번째 핀"
+                    value={pinOptions[firstIncludedIndex]?.value ?? ''}
+                    onChange={(event) =>
+                      applyRange(
+                        pinOptions.findIndex(
+                          (option) => option.value === event.target.value,
+                        ),
+                        lastIncludedIndex,
+                      )
+                    }
+                  >
+                    {pinOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </RangeSelect>
+                  <ChevronIcon
+                    src={selectChevronIcon}
+                    alt=""
+                    aria-hidden="true"
+                  />
+                </RangeSelectRow>
 
-            <PinAndResult>
-              <PinList>
-                {pins.map((pin) => (
-                  <PinRow key={pin.id}>
-                    <PinNumber>{pin.label}</PinNumber>
-                    <PinText>
-                      <PinTitle>{pin.title}</PinTitle>
-                      <PinMeta>{pin.meta}</PinMeta>
-                    </PinText>
-                    <PinCheckboxWrap>
-                      <PinCheckbox
-                        type="checkbox"
-                        defaultChecked={pin.checked}
-                        aria-label={`${pin.title} 선택`}
-                      />
-                      <PinCheckboxVisual aria-hidden="true">
-                        <PinCheckboxIcon src={checkboxCheckedIcon} alt="" />
-                      </PinCheckboxVisual>
-                    </PinCheckboxWrap>
-                  </PinRow>
-                ))}
-              </PinList>
+                <RangeSelectRow>
+                  <RangeLabel>마지막 핀</RangeLabel>
+                  <RangeValue>{pinOptions[lastIncludedIndex]?.label}</RangeValue>
+                  <RangeSelect
+                    id="lastPin"
+                    aria-label="마지막 핀"
+                    value={pinOptions[lastIncludedIndex]?.value ?? ''}
+                    onChange={(event) =>
+                      applyRange(
+                        firstIncludedIndex,
+                        pinOptions.findIndex(
+                          (option) => option.value === event.target.value,
+                        ),
+                      )
+                    }
+                  >
+                    {pinOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </RangeSelect>
+                  <ChevronIcon
+                    src={selectChevronIcon}
+                    alt=""
+                    aria-hidden="true"
+                  />
+                </RangeSelectRow>
+              </RangeSection>
 
-              <ResultCard>
-                <ResultRow>
-                  <ResultLabel>선택한 핀</ResultLabel>
-                  <ResultValue>5개</ResultValue>
-                </ResultRow>
-                <ResultDivider />
-                <ResultRow>
-                  <ResultLabel>연결된 사진</ResultLabel>
-                  <ResultValue>37장</ResultValue>
-                </ResultRow>
-              </ResultCard>
-            </PinAndResult>
-          </PinSection>
-        </EditSection>
+              <PinSection>
+                <ListHeader>
+                  <ListTitle>핀 목록</ListTitle>
+                  <ListMeta>
+                    {pins.length}개 중 {includedIds.length}개 선택
+                  </ListMeta>
+                </ListHeader>
 
-        <Footer>
-          <SaveButton as={Link} to="/trip-management">
-            변경사항 저장
-          </SaveButton>
-        </Footer>
+                <PinAndResult>
+                  <PinList>
+                    {pins.map((pin, index) => {
+                      const title = pin.place_name || '이름 없는 장소'
+                      const hasCoordinates =
+                        pin.latitude !== null && pin.longitude !== null
+
+                      return (
+                        <PinRow key={pin.pin_id}>
+                          <PinNumber>핀 {index + 1}</PinNumber>
+                          <PinText>
+                            <PinTitle>{title}</PinTitle>
+                            <PinMeta>
+                              {formatPinTime(pin.tagged_at)}
+                              {!hasCoordinates && ' · 위치 정보 없음'}
+                            </PinMeta>
+                          </PinText>
+                          <PinCheckboxWrap>
+                            <PinCheckbox
+                              type="checkbox"
+                              checked={includedSet.has(pin.pin_id)}
+                              onChange={() => togglePin(pin.pin_id)}
+                              aria-label={`${title} 선택`}
+                            />
+                            <PinCheckboxVisual aria-hidden="true">
+                              <PinCheckboxIcon
+                                src={checkboxCheckedIcon}
+                                alt=""
+                              />
+                            </PinCheckboxVisual>
+                          </PinCheckboxWrap>
+                        </PinRow>
+                      )
+                    })}
+                  </PinList>
+
+                  <ResultCard>
+                    <ResultRow>
+                      <ResultLabel>선택한 핀</ResultLabel>
+                      <ResultValue>{includedIds.length}개</ResultValue>
+                    </ResultRow>
+                    <ResultDivider />
+                    <ResultRow>
+                      <ResultLabel>연결된 사진</ResultLabel>
+                      {/* 핀별 사진 수가 응답에 없어 실시간 재집계가 불가능하다.
+                          저장하면 서버가 다시 계산한 값이 내려온다. */}
+                      <ResultValue>{trip.photo_count}장</ResultValue>
+                    </ResultRow>
+                  </ResultCard>
+                </PinAndResult>
+              </PinSection>
+            </EditSection>
+
+            <Footer>
+              {errorMessage && (
+                <SaveError role="alert">{errorMessage}</SaveError>
+              )}
+              <SaveButton type="button" onClick={handleSave} disabled={isSaving}>
+                {isSaving ? '저장 중...' : '변경사항 저장'}
+              </SaveButton>
+            </Footer>
+          </>
+        )}
       </TripSegmentEditWrapper>
     </PageSurface>
   )
 }
 
 export default TripSegmentEdit
+
+const StateMessage = styled.p`
+  padding: 24px 0;
+  color: var(--Text-Secondary);
+  font: var(--text-ui-body-m);
+  text-align: center;
+  word-break: keep-all;
+`
+
+const SaveError = styled.p`
+  margin-bottom: 10px;
+  color: var(--Primary-Cognac);
+  font: var(--text-ui-caption);
+  text-align: center;
+  word-break: keep-all;
+`
 
 const PageSurface = styled.div`
   width: 100%;

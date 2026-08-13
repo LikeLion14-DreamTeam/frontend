@@ -45,6 +45,10 @@ function App() {
       <Route path="/trip-management" element={<TripManagement />} />
       <Route path="/trip-management/:segmentId" element={<TripManagement />} />
       <Route path="/trip-management/edit" element={<TripSegmentEdit />} />
+      <Route
+        path="/trip-management/:segmentId/edit"
+        element={<TripSegmentEdit />}
+      />
     </Routes>
   )
 }
