@@ -21,6 +21,9 @@ const VIDEO_CONSTRAINTS = {
 
 const JPEG_QUALITY = 0.92
 
+// 저장 비율 3:4 고정. 미리보기 프레임도 같은 비율이라 보이는 그대로 찍힌다.
+const CAPTURE_RATIO = 3 / 4
+
 const MultiCaptureTest = () => {
   const navigate = useNavigate()
   const videoRef = useRef(null)
@@ -99,10 +102,33 @@ const MultiCaptureTest = () => {
     const video = videoRef.current
     if (!video || status !== 'ready') return
 
+    // 원본 프레임에서 3:4 영역만 가운데 기준으로 잘라낸다.
+    // 미리보기가 object-fit: cover 라 화면에 보이던 영역과 동일하다.
+    const sourceWidth = video.videoWidth
+    const sourceHeight = video.videoHeight
+    const isSourceWider = sourceWidth / sourceHeight > CAPTURE_RATIO
+
+    const cropWidth = isSourceWider ? sourceHeight * CAPTURE_RATIO : sourceWidth
+    const cropHeight = isSourceWider ? sourceHeight : sourceWidth / CAPTURE_RATIO
+    const cropX = (sourceWidth - cropWidth) / 2
+    const cropY = (sourceHeight - cropHeight) / 2
+
     const canvas = document.createElement('canvas')
-    canvas.width = video.videoWidth
-    canvas.height = video.videoHeight
-    canvas.getContext('2d').drawImage(video, 0, 0)
+    canvas.width = Math.round(cropWidth)
+    canvas.height = Math.round(cropHeight)
+    canvas
+      .getContext('2d')
+      .drawImage(
+        video,
+        cropX,
+        cropY,
+        cropWidth,
+        cropHeight,
+        0,
+        0,
+        canvas.width,
+        canvas.height,
+      )
 
     canvas.toBlob(
       (blob) => {
@@ -145,7 +171,9 @@ const MultiCaptureTest = () => {
   return (
     <CaptureShell>
       <PreviewArea>
-        <Preview ref={videoRef} playsInline muted autoPlay />
+        <PreviewFrame>
+          <Preview ref={videoRef} playsInline muted autoPlay />
+        </PreviewFrame>
 
         {status !== 'ready' && (
           <Overlay>
@@ -205,12 +233,12 @@ const MultiCaptureTest = () => {
           </SideButton>
         </ControlRow>
 
-        {shots.length > 0 && (
-          <DebugInfo>
-            마지막 촬영 {shots.at(-1).width}×{shots.at(-1).height} ·{' '}
-            {Math.round(shots.at(-1).size / 1024)}KB
-          </DebugInfo>
-        )}
+        {/* 높이가 흔들리면 미리보기 프레임 계산이 어긋나므로 항상 렌더한다. */}
+        <DebugInfo>
+          {shots.length > 0
+            ? `마지막 촬영 ${shots.at(-1).width}×${shots.at(-1).height} · ${Math.round(shots.at(-1).size / 1024)}KB`
+            : ''}
+        </DebugInfo>
       </BottomPanel>
 
       {previewShot && (
@@ -235,13 +263,20 @@ const MultiCaptureTest = () => {
 
 export default MultiCaptureTest
 
+/* 하단 패널의 확정 높이. 미리보기 프레임 크기를 여기서 역산하므로,
+   패널 구성을 바꾸면 이 값도 함께 고쳐야 한다.
+   12(위 여백) + 64(썸네일) + 10 + 68(셔터) + 10 + 18(정보) + 12(아래 여백) */
+const BOTTOM_PANEL_HEIGHT = '194px'
+
 const CaptureShell = styled.main`
   width: 100%;
   max-width: 450px;
-  min-height: var(--app-viewport-height);
+  /* 스크롤 없이 한 화면에 들어가도록 높이를 고정한다. */
+  height: var(--app-viewport-height);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: #000;
   color: #fff;
   font-family: var(--font-sans);
@@ -251,6 +286,27 @@ const PreviewArea = styled.section`
   position: relative;
   flex: 1;
   min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #000;
+`
+
+/* 3:4 고정 프레임. 남는 위아래는 검은 여백이 되고, 기기 높이에 따라 여백 크기가 달라진다.
+   폭이 넘칠 때를 대비해 남은 세로 공간에서 역산한 값과 100% 중 작은 쪽을 쓴다. */
+const PreviewFrame = styled.div`
+  position: relative;
+  width: min(
+    100%,
+    calc(
+      (
+          var(--app-viewport-height) - ${BOTTOM_PANEL_HEIGHT} -
+            env(safe-area-inset-bottom)
+        ) * 3 / 4
+    )
+  );
+  aspect-ratio: 3 / 4;
   overflow: hidden;
   background: #111;
 `
@@ -303,14 +359,16 @@ const ShotCount = styled.span`
 
 const BottomPanel = styled.section`
   flex: 0 0 auto;
-  padding: 12px 16px calc(16px + env(safe-area-inset-bottom));
+  height: calc(${BOTTOM_PANEL_HEIGHT} + env(safe-area-inset-bottom));
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   background: #000;
 `
 
 const ThumbnailStrip = styled.div`
+  flex: 0 0 64px;
   height: 64px;
   display: flex;
   align-items: center;
@@ -416,6 +474,8 @@ const RemoveButton = styled.button`
 `
 
 const ControlRow = styled.div`
+  flex: 0 0 68px;
+  height: 68px;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
@@ -453,7 +513,10 @@ const SideButton = styled.button`
 `
 
 const DebugInfo = styled.p`
+  flex: 0 0 18px;
+  height: 18px;
   color: #8a8a8a;
   font: var(--text-ui-caption);
+  line-height: 18px;
   text-align: center;
 `
