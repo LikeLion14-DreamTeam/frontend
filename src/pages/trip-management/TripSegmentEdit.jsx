@@ -221,7 +221,6 @@ export default TripSegmentEdit
 const PageSurface = styled.div`
   width: 100%;
   min-height: 100vh;
-  background: var(--Background-Base);
 `
 
 const TripSegmentEditWrapper = styled.main`
@@ -233,7 +232,6 @@ const TripSegmentEditWrapper = styled.main`
   display: flex;
   flex-direction: column;
   gap: 30px;
-  background: var(--Background-Base);
   color: var(--Text-Primary);
 `
 

@@ -129,7 +129,6 @@ const EditLink = styled(Link)`
 const PageSurface = styled.div`
   width: 100%;
   min-height: 100vh;
-  background: var(--Background-Base);
 `
 
 const TripManagementWrapper = styled.main`
@@ -141,7 +140,6 @@ const TripManagementWrapper = styled.main`
   display: flex;
   flex-direction: column;
   gap: 18px;
-  background: var(--Background-Base);
   color: var(--Text-Primary);
 `
 
