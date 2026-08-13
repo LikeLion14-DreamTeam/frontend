@@ -47,7 +47,12 @@ function App() {
         <Route path="/archive/trip/:tripID" element={<TripArchive />} />
         <Route path="/mypage" element={<MyPage />} />
         <Route path="/trip-management" element={<TripManagement />} />
+        <Route path="/trip-management/:segmentId" element={<TripManagement />} />
         <Route path="/trip-management/edit" element={<TripSegmentEdit />} />
+        <Route
+          path="/trip-management/:segmentId/edit"
+          element={<TripSegmentEdit />}
+        />
       </Route>
     </Routes>
   )
