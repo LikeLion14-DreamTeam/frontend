@@ -1,56 +1,125 @@
-import React from 'react'
-import { Link } from 'react-router-dom'
+import React, { useEffect, useState } from 'react'
+import { Link, useParams } from 'react-router-dom'
 import styled from 'styled-components'
 import Card from '../../components/common/Card'
 import Header from '../../components/layout/Header'
 import NavBar from '../../components/layout/NavBar'
+import { getTrip, getTripPins } from '../../features/trips/tripApi'
 
-const segment = {
-  name: '파리 · 베르사유',
-  period: '2024.11.03 – 11.10',
-  duration: '8일간의 구간',
-  pinRange: '핀 1 – 핀 7',
+// 아직 포토북에서 넘어오는 경로가 없어 segmentId 가 비면 이 값을 쓴다.
+// 6.1 / 6.2 에서 진입 경로가 생기면 제거한다.
+const FALLBACK_SEGMENT_ID = 12
+
+const pad2 = (value) => String(value).padStart(2, '0')
+
+const formatPeriod = (startAt, endAt) => {
+  if (!startAt || !endAt) return ''
+
+  const start = new Date(startAt)
+  const end = new Date(endAt)
+
+  return `${start.getFullYear()}.${pad2(start.getMonth() + 1)}.${pad2(start.getDate())} – ${pad2(end.getMonth() + 1)}.${pad2(end.getDate())}`
 }
 
-const settings = [
-  { label: '구간 이름', value: segment.name },
-  { label: '여행 기간', value: '11.03 – 11.10' },
-  { label: '포함 핀 범위', value: segment.pinRange },
-]
+const formatShortRange = (startAt, endAt) => {
+  if (!startAt || !endAt) return ''
 
-const metrics = [
-  { label: '선택된 핀', value: '12' },
-  { label: '연결된 사진', value: '2' },
-]
+  const start = new Date(startAt)
+  const end = new Date(endAt)
 
-const includedPins = [
-  {
-    id: 1,
-    label: '핀 1',
-    title: '파리 에펠탑 근처',
-    meta: '11.03 오전 10:24 · 사진 8장',
-  },
-  {
-    id: 2,
-    label: '핀 2',
-    title: '루브르 박물관 앞',
-    meta: '11.04 오후 2:11 · 사진 6장',
-  },
-  {
-    id: 3,
-    label: '핀 3',
-    title: '몽마르트르 언덕',
-    meta: '11.05 오전 11:05 · 사진 11장',
-  },
-  {
-    id: 5,
-    label: '핀 5',
-    title: '베르사유 궁전 정원',
-    meta: '11.08 오전 9:30 · 사진 7장',
-  },
-]
+  return `${pad2(start.getMonth() + 1)}.${pad2(start.getDate())} – ${pad2(end.getMonth() + 1)}.${pad2(end.getDate())}`
+}
+
+const formatDuration = (startAt, endAt) => {
+  if (!startAt || !endAt) return ''
+
+  const days =
+    Math.floor((new Date(endAt) - new Date(startAt)) / 86400000) + 1
+
+  return `${days}일간의 구간`
+}
+
+const pinTimeFormatter = new Intl.DateTimeFormat('ko-KR', {
+  month: '2-digit',
+  day: '2-digit',
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true,
+})
+
+const formatPinTime = (taggedAt) =>
+  taggedAt ? pinTimeFormatter.format(new Date(taggedAt)) : ''
+
+/** 수록된 핀이 전체 목록에서 몇 번째인지로 범위 문구를 만든다. */
+const formatPinRange = (pins) => {
+  const includedNumbers = pins
+    .map((pin, index) => (pin.included_in_segment ? index + 1 : null))
+    .filter(Boolean)
+
+  if (includedNumbers.length === 0) return '없음'
+  if (includedNumbers.length === 1) return `핀 ${includedNumbers[0]}`
+
+  return `핀 ${includedNumbers[0]} – 핀 ${includedNumbers.at(-1)}`
+}
 
 const TripManagement = () => {
+  const { segmentId = FALLBACK_SEGMENT_ID } = useParams()
+
+  const [trip, setTrip] = useState(null)
+  const [pins, setPins] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [errorMessage, setErrorMessage] = useState('')
+
+  useEffect(() => {
+    let ignore = false
+
+    const load = async () => {
+      setIsLoading(true)
+      setErrorMessage('')
+
+      try {
+        const [tripData, pinData] = await Promise.all([
+          getTrip(segmentId),
+          getTripPins(segmentId),
+        ])
+
+        if (ignore) return
+
+        setTrip(tripData)
+        setPins(pinData.pins)
+      } catch (error) {
+        if (ignore) return
+        setErrorMessage(error.message)
+      } finally {
+        if (!ignore) setIsLoading(false)
+      }
+    }
+
+    load()
+
+    return () => {
+      ignore = true
+    }
+  }, [segmentId])
+
+  const settings = trip
+    ? [
+        { label: '구간 이름', value: trip.name },
+        {
+          label: '여행 기간',
+          value: formatShortRange(trip.start_at, trip.end_at),
+        },
+        { label: '포함 핀 범위', value: formatPinRange(pins) },
+      ]
+    : []
+
+  const metrics = trip
+    ? [
+        { label: '선택된 핀', value: trip.pin_count },
+        { label: '연결된 사진', value: trip.photo_count },
+      ]
+    : []
+
   return (
     <PageSurface>
       <Header
@@ -62,54 +131,86 @@ const TripManagement = () => {
       />
 
       <TripManagementWrapper>
-        <SegmentIdentity>
-          <SegmentText>
-            <SegmentTitle>{segment.name}</SegmentTitle>
-            <SegmentMeta>
-              {segment.period} · {segment.duration}
-            </SegmentMeta>
-          </SegmentText>
-        </SegmentIdentity>
+        {isLoading && <StateMessage>불러오는 중...</StateMessage>}
 
-        <SettingsCard>
-          {settings.map((item, index) => (
-            <React.Fragment key={item.label}>
-              <SettingRow>
-                <SettingLabel>{item.label}</SettingLabel>
-                <SettingValue>{item.value}</SettingValue>
-              </SettingRow>
-              {index < settings.length - 1 ? <Divider /> : null}
-            </React.Fragment>
-          ))}
-        </SettingsCard>
+        {!isLoading && errorMessage && (
+          <StateMessage role="alert">{errorMessage}</StateMessage>
+        )}
 
-        <StatsGrid aria-label="구간 요약">
-          {metrics.map((metric) => (
-            <MetricCard key={metric.label}>
-              <MetricValue>{metric.value}</MetricValue>
-              <MetricLabel>{metric.label}</MetricLabel>
-            </MetricCard>
-          ))}
-        </StatsGrid>
+        {!isLoading && !errorMessage && trip && (
+          <>
+            <SegmentIdentity>
+              <SegmentText>
+                <SegmentTitle>{trip.name}</SegmentTitle>
+                <SegmentMeta>
+                  {formatPeriod(trip.start_at, trip.end_at)} ·{' '}
+                  {formatDuration(trip.start_at, trip.end_at)}
+                </SegmentMeta>
+              </SegmentText>
+            </SegmentIdentity>
 
-        <PinSection>
-          <SectionHeader>
-            <SectionTitle>포함된 핀 기록</SectionTitle>
-            <SectionMeta>시간순</SectionMeta>
-          </SectionHeader>
+            <SettingsCard>
+              {settings.map((item, index) => (
+                <React.Fragment key={item.label}>
+                  <SettingRow>
+                    <SettingLabel>{item.label}</SettingLabel>
+                    <SettingValue>{item.value}</SettingValue>
+                  </SettingRow>
+                  {index < settings.length - 1 ? <Divider /> : null}
+                </React.Fragment>
+              ))}
+            </SettingsCard>
 
-          <PinList>
-            {includedPins.map((pin) => (
-              <PinCard key={pin.id}>
-                <PinNumber>{pin.label}</PinNumber>
-                <PinText>
-                  <PinTitle>{pin.title}</PinTitle>
-                  <PinMeta>{pin.meta}</PinMeta>
-                </PinText>
-              </PinCard>
-            ))}
-          </PinList>
-        </PinSection>
+            <StatsGrid aria-label="구간 요약">
+              {metrics.map((metric) => (
+                <MetricCard key={metric.label}>
+                  <MetricValue>{metric.value}</MetricValue>
+                  <MetricLabel>{metric.label}</MetricLabel>
+                </MetricCard>
+              ))}
+            </StatsGrid>
+
+            <PinSection>
+              <SectionHeader>
+                <SectionTitle>포함된 핀 기록</SectionTitle>
+                <SectionMeta>시간순</SectionMeta>
+              </SectionHeader>
+
+              {pins.length === 0 ? (
+                <StateMessage>이 구간에 포함된 핀이 없습니다.</StateMessage>
+              ) : (
+                <PinList>
+                  {pins.map((pin, index) => {
+                    const hasCoordinates =
+                      pin.latitude !== null && pin.longitude !== null
+
+                    return (
+                      <PinCard key={pin.pin_id}>
+                        <PinNumber>핀 {index + 1}</PinNumber>
+                        <PinText>
+                          <PinTitle>
+                            {pin.place_name || '이름 없는 장소'}
+                          </PinTitle>
+                          {/* TODO: 핀별 사진 수(`사진 8장`) 표시 대기.
+                              GET /trips/{segmentId}/pins 응답에 photo_count 가 없어
+                              프론트에서 셀 방법이 없다. 백엔드에 추가 요청해둔 상태이며,
+                              필드가 오면 아래 줄에 ` · 사진 {pin.photo_count}장` 을 붙인다. */}
+                          <PinMeta>
+                            {formatPinTime(pin.tagged_at)}
+                            {!hasCoordinates && ' · 위치 정보 없음'}
+                          </PinMeta>
+                        </PinText>
+                        {!pin.included_in_segment && (
+                          <PinBadge>포토북 미수록</PinBadge>
+                        )}
+                      </PinCard>
+                    )
+                  })}
+                </PinList>
+              )}
+            </PinSection>
+          </>
+        )}
       </TripManagementWrapper>
 
       <NavBar activeOverride="archive" />
@@ -143,6 +244,14 @@ const TripManagementWrapper = styled.main`
   flex-direction: column;
   gap: 18px;
   color: var(--Text-Primary);
+`
+
+const StateMessage = styled.p`
+  padding: 24px 0;
+  color: var(--Text-Secondary);
+  font: var(--text-ui-body-m);
+  text-align: center;
+  word-break: keep-all;
 `
 
 const SegmentIdentity = styled.section`
@@ -290,6 +399,7 @@ const PinNumber = styled.p`
 `
 
 const PinText = styled.div`
+  flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -304,4 +414,14 @@ const PinTitle = styled.p`
 const PinMeta = styled.p`
   color: var(--Text-Secondary);
   font: var(--text-ui-caption);
+`
+
+const PinBadge = styled.span`
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: var(--State-Disabled-Fill);
+  color: var(--State-Disabled-Text);
+  font: var(--text-ui-nav);
+  white-space: nowrap;
 `
