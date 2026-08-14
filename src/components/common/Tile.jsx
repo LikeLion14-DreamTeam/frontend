@@ -16,7 +16,13 @@ import checkIcon from '../../assets/icons/check-circle-24.svg'
  *   (피그마 402px 화면 기준 본문 354 = 111.33 x 3 + 10 x 2)
  * - 세로 간격은 402px 무드보드 화면이 아직 없어 미확정이다. 적용 시 피그마에서 확인할 것.
  */
-const Tile = ({ selected = false, interactive = true, ...rest }) => {
+const Tile = ({
+  selected = false,
+  interactive = true,
+  src,
+  alt = '',
+  ...rest
+}) => {
   return (
     <TileButton
       as={interactive ? 'button' : 'div'}
@@ -26,6 +32,16 @@ const Tile = ({ selected = false, interactive = true, ...rest }) => {
       aria-pressed={interactive ? selected : undefined}
       {...rest}
     >
+      {src && (
+        <TileImage
+          key={src}
+          src={src}
+          alt={alt}
+          onError={(event) => {
+            event.currentTarget.hidden = true
+          }}
+        />
+      )}
       {selected && <CheckIcon src={checkIcon} alt="" />}
     </TileButton>
   )
@@ -38,6 +54,7 @@ const TileButton = styled.button`
   width: 100%;
   /* 피그마 402px 화면 기준 111.33 x 124. 폭이 변해도 비율을 유지한다. */
   aspect-ratio: 111.33 / 124;
+  overflow: hidden;
   padding: 0;
   border-radius: 12px;
   cursor: ${({ $interactive }) => ($interactive ? 'pointer' : 'default')};
@@ -45,16 +62,35 @@ const TileButton = styled.button`
     $selected
       ? '2px solid var(--Primary-Cognac)'
       : '1px solid var(--Border-Default)'};
-  background: ${({ $selected }) =>
-    $selected
-      ? 'linear-gradient(rgb(181 118 59 / 18%), rgb(181 118 59 / 18%)), var(--Map-Land)'
-      : 'var(--Map-Land)'};
+  background: var(--Map-Land);
+
+  &:disabled {
+    cursor: default;
+  }
+
+  &::after {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    content: '';
+    background: ${({ $selected }) =>
+      $selected ? 'rgb(181 118 59 / 18%)' : 'transparent'};
+    pointer-events: none;
+  }
+`
+
+const TileImage = styled.img`
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
 `
 
 const CheckIcon = styled.img`
   position: absolute;
   top: 6px;
   right: 6px;
+  z-index: 2;
   width: 24px;
   height: 24px;
   display: block;

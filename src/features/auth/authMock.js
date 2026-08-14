@@ -13,3 +13,19 @@ export const MOCK_GOOGLE_LOGIN_RESPONSE = {
 export const MOCK_CURRENT_USER_RESPONSE = {
   ...MOCK_GOOGLE_LOGIN_RESPONSE.user,
 }
+
+export const updateMockAccount = ({
+  onboarding_completed,
+  permission_intro_shown,
+}) => {
+  const updatedAccount = {
+    user_id: MOCK_CURRENT_USER_RESPONSE.user_id,
+    onboarding_completed,
+    permission_intro_shown,
+  }
+
+  Object.assign(MOCK_CURRENT_USER_RESPONSE, updatedAccount)
+  Object.assign(MOCK_GOOGLE_LOGIN_RESPONSE.user, updatedAccount)
+
+  return { ...updatedAccount }
+}

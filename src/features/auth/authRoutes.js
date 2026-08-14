@@ -3,7 +3,7 @@ export const getAuthenticatedEntryPath = (user) => {
     return '/permission'
   }
 
-  if (user?.onboarding_completed === false) {
+  if (user.onboarding_completed === false) {
     return '/onboarding/preference-start'
   }
 
