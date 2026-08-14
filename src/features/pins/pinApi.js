@@ -77,6 +77,28 @@ export const updatePin = async (pinId, { placeName, textNote }) => {
 }
 
 /**
+ * 5.4 핀 사진 목록 조회
+ *
+ * 명세 0-1 에 따라 태깅 세션 개념이 없으므로, 한 핀의 사진이 곧 하나의 촬영 묶음이다.
+ * `is_pin_cover` 가 대표사진 표시다.
+ */
+export const getPinPhotos = async (
+  pinId,
+  { cursor = null, limit = 50 } = {},
+) => {
+  if (USE_MOCK) {
+    if (!mockPinStore.pins[pinId]) throw mockNotFound()
+
+    return {
+      photos: mockPinStore.photos[pinId] ?? [],
+      next_cursor: null,
+    }
+  }
+
+  return apiClient.get(`/pins/${pinId}/photos`, { params: { cursor, limit } })
+}
+
+/**
  * 5.3 핀 삭제
  *
  * 아직 여정으로 배정되지 않은(segment_id = null, 진행 중) 핀만 삭제할 수 있다.

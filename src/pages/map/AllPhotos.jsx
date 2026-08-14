@@ -1,41 +1,71 @@
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import styled from 'styled-components'
-import Tile from '../../components/common/Tile'
 import backIcon from '../../assets/icons/Back.svg'
+import { getPin, getPinPhotos } from '../../features/pins/pinApi'
 
-const photoGroups = Array.from({ length: 4 }, (_, groupIndex) => ({
-  id: `group-${groupIndex + 1}`,
-  time: '오후 1: 32',
-  count: 3,
-  tiles: Array.from(
-    { length: 4 },
-    (_, tileIndex) => `photo-${groupIndex + 1}-${tileIndex + 1}`,
-  ),
-}))
+// 핀 상세를 거치지 않고 들어왔을 때를 위한 기본값.
+const FALLBACK_PIN_ID = 101
 
-const PhotoCarousel = ({ group }) => {
-  return (
-    <PhotoStrip
-      role="region"
-      aria-roledescription="carousel"
-      aria-label={`${group.time} 사진 ${group.count}장`}
-    >
-      {group.tiles.map((photoId, index) => (
-        <PhotoTile
-          key={photoId}
-          interactive={false}
-          role="img"
-          aria-label={`${group.time} 사진 ${index + 1}`}
-          aria-posinset={index + 1}
-          aria-setsize={group.tiles.length}
-        />
-      ))}
-    </PhotoStrip>
-  )
-}
+const dateFormatter = new Intl.DateTimeFormat('ko-KR', {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
+
+const timeFormatter = new Intl.DateTimeFormat('ko-KR', {
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true,
+})
+
+const formatDate = (isoString) =>
+  isoString ? dateFormatter.format(new Date(isoString)).replace(/\.$/, '') : ''
+
+const formatTime = (isoString) =>
+  isoString ? timeFormatter.format(new Date(isoString)) : ''
 
 const AllPhotos = () => {
   const navigate = useNavigate()
+  const { pinID = FALLBACK_PIN_ID } = useParams()
+
+  const [pin, setPin] = useState(null)
+  const [photos, setPhotos] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [errorMessage, setErrorMessage] = useState('')
+
+  useEffect(() => {
+    let ignore = false
+
+    const load = async () => {
+      setIsLoading(true)
+      setErrorMessage('')
+
+      try {
+        const [pinData, photoList] = await Promise.all([
+          getPin(pinID),
+          getPinPhotos(pinID),
+        ])
+
+        if (ignore) return
+
+        setPin(pinData)
+        setPhotos(photoList.photos)
+      } catch (error) {
+        if (!ignore) setErrorMessage(error.message)
+      } finally {
+        if (!ignore) setIsLoading(false)
+      }
+    }
+
+    load()
+
+    return () => {
+      ignore = true
+    }
+  }, [pinID])
+
+  const title = pin?.place_name || pin?.address || '이름 없는 장소'
 
   return (
     <Page>
@@ -59,22 +89,55 @@ const AllPhotos = () => {
 
       <Heading>
         <Title>이 장소의 사진</Title>
-        <Meta>경복궁 광화문 앞 · 2025.06.14 · 12장</Meta>
+        {pin && (
+          <Meta>
+            {title} · {formatDate(pin.tagged_at)} · {photos.length}장
+          </Meta>
+        )}
       </Heading>
 
-      <PhotoGroups>
-        {photoGroups.map((group) => (
-          <PhotoGroup key={group.id}>
+      {isLoading && <StateMessage>불러오는 중...</StateMessage>}
+
+      {!isLoading && errorMessage && (
+        <StateMessage role="alert">{errorMessage}</StateMessage>
+      )}
+
+      {!isLoading && !errorMessage && photos.length === 0 && (
+        <StateMessage>아직 사진이 없습니다.</StateMessage>
+      )}
+
+      {/* 명세 0-1 에 따라 태깅 세션 개념이 없어 한 핀의 사진이 하나의 묶음이다.
+          기능명세 5.3 은 세션별로 나눠 보여주지만 응답에 세션 정보가 없다. */}
+      {!isLoading && !errorMessage && photos.length > 0 && (
+        <PhotoGroups>
+          <PhotoGroup>
             <GroupHeading>
-              <Time>{group.time}</Time>
+              <Time>{formatTime(photos[0].captured_at)}</Time>
               <Rule />
-              <Count>{group.count}장</Count>
+              <Count>{photos.length}장</Count>
             </GroupHeading>
 
-            <PhotoCarousel group={group} />
+            <PhotoStrip
+              role="region"
+              aria-roledescription="carousel"
+              aria-label={`사진 ${photos.length}장`}
+            >
+              {photos.map((photo, index) => (
+                <PhotoTile
+                  key={photo.photo_id}
+                  aria-posinset={index + 1}
+                  aria-setsize={photos.length}
+                >
+                  <PhotoImage
+                    src={photo.file_path}
+                    alt={`${index + 1}번째 사진`}
+                  />
+                </PhotoTile>
+              ))}
+            </PhotoStrip>
           </PhotoGroup>
-        ))}
-      </PhotoGroups>
+        </PhotoGroups>
+      )}
     </Page>
   )
 }
@@ -220,10 +283,28 @@ const PhotoStrip = styled.div`
 
 `
 
-const PhotoTile = styled(Tile)`
+/* 공용 Tile 은 선택용 버튼이라 사진을 담을 수 없어, 같은 크기·모양으로 따로 둔다. */
+const PhotoTile = styled.div`
   width: 111.333px;
   height: 124px;
   flex: 0 0 auto;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--Map-Land);
   scroll-snap-align: start;
   scroll-snap-stop: always;
+`
+
+const PhotoImage = styled.img`
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+`
+
+const StateMessage = styled.p`
+  padding: 40px 24px 40px 0;
+  color: var(--Text-Secondary);
+  font: var(--text-ui-body-m);
+  word-break: keep-all;
 `

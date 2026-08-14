@@ -10,7 +10,12 @@ import photoAddIcon from '../../assets/map/photo-add.svg'
 import refreshIcon from '../../assets/map/refresh.svg'
 import voicePlayIcon from '../../assets/map/voice-play.svg'
 import { MAP_STYLES } from './mapStyles'
-import { deletePin, getPin, updatePin } from '../../features/pins/pinApi'
+import {
+  deletePin,
+  getPin,
+  getPinPhotos,
+  updatePin,
+} from '../../features/pins/pinApi'
 import { getTrip, getTripPins } from '../../features/trips/tripApi'
 
 // 지도에서 넘어오는 경로가 아직 없어 pinID 가 비면 이 값을 쓴다.
@@ -52,6 +57,7 @@ const PinDetail = () => {
 
   const [isPlaying, setIsPlaying] = useState(false)
   const [pin, setPin] = useState(null)
+  const [photoCount, setPhotoCount] = useState(0)
   const [journey, setJourney] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
@@ -73,8 +79,16 @@ const PinDetail = () => {
       setErrorMessage('')
 
       try {
-        const data = await getPin(pinID)
-        if (!ignore) setPin(data)
+        // 사진 수는 5.1 응답에 없어 5.4 목록 길이로 센다.
+        const [data, photoList] = await Promise.all([
+          getPin(pinID),
+          getPinPhotos(pinID),
+        ])
+
+        if (!ignore) {
+          setPin(data)
+          setPhotoCount(photoList.photos.length)
+        }
       } catch (error) {
         if (!ignore) setErrorMessage(error.message)
       } finally {
@@ -190,6 +204,8 @@ const PinDetail = () => {
     : null
   const title = pin.place_name || pin.address || '이름 없는 장소'
   const representativePhotos = pin.representative_photos ?? []
+  // 대표사진 자리에 안 보이는 나머지 장수
+  const hiddenPhotoCount = Math.max(photoCount - representativePhotos.length, 0)
   // 5.3: 여정에 배정되기 전(진행 중)인 핀만 삭제할 수 있다.
   const isDeletable = pin.segment_id === null
   const hasMemo =
@@ -335,9 +351,6 @@ const PinDetail = () => {
               </TextAction>
             </SectionHeading>
 
-            {/* TODO: 세 번째 사진 위의 `+5` 배지 복구 대기.
-                5.1 응답에 핀의 전체 사진 수가 없어 계산할 수 없다.
-                5.4 사진 목록을 붙이면 그 개수로 표시한다. */}
             <PhotoGrid>
               <Photo $tone="main">
                 {representativePhotos[0] && (
@@ -353,6 +366,12 @@ const PinDetail = () => {
                 <Photo $tone="dark">
                   {representativePhotos[2] && (
                     <PhotoImage src={representativePhotos[2].url} alt="" />
+                  )}
+                  {hiddenPhotoCount > 0 && (
+                    <>
+                      <PhotoOverlay />
+                      <PhotoCount>+{hiddenPhotoCount}</PhotoCount>
+                    </>
                   )}
                 </Photo>
               </PhotoStack>
