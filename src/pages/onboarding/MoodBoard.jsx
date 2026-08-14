@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import Button from '../../components/common/Button'
 import Progress from '../../components/common/Progress'
@@ -8,46 +8,98 @@ import Header from '../../components/layout/Header'
 import { updateMyAccount } from '../../features/auth/authApi'
 import { getAuthenticatedEntryPath } from '../../features/auth/authRoutes'
 import useAuthStore from '../../features/auth/useAuthStore'
+import {
+  replaceSelectionPhotos,
+  syncSelectionPhotos,
+} from '../../features/onboarding/selectionPhotoApi'
+import { MOODBOARD_PHOTO_ROUNDS } from '../../features/onboarding/selectionPhotoData'
+import {
+  getOnboardingFlowPath,
+  isRelearningFlow,
+} from '../../features/onboarding/onboardingFlow'
 
-const TOTAL_ROUND = 2
+const TOTAL_ROUND = MOODBOARD_PHOTO_ROUNDS.length
 const SELECT_LIMIT = 3
 
-const photos = Array.from({ length: 9 }, (_, index) => index)
-
 const MoodBoard = () => {
+  const location = useLocation()
   const navigate = useNavigate()
+  const isRelearning = isRelearningFlow(location.search)
   const user = useAuthStore((state) => state.user)
   const setUser = useAuthStore((state) => state.setUser)
   const [round, setRound] = useState(1)
-  const [selected, setSelected] = useState([])
+  const [answers, setAnswers] = useState(() =>
+    Array.from({ length: TOTAL_ROUND }, () => []),
+  )
+  const [savedPhotoIds, setSavedPhotoIds] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
+  const photoRound = MOODBOARD_PHOTO_ROUNDS[round - 1]
+  const selectedPhotoIds = answers[round - 1]
   const isLastRound = round === TOTAL_ROUND
-  const isFilled = selected.length === SELECT_LIMIT
+  const isFilled = selectedPhotoIds.length === SELECT_LIMIT
 
-  const handleSelect = (photo) => {
-    if (selected.includes(photo)) {
-      setSelected(selected.filter((item) => item !== photo))
-      return
-    }
-    if (isFilled) return
+  const handleSelect = (photoId) => {
+    if (isSubmitting) return
 
-    setSelected([...selected, photo])
+    setAnswers((currentAnswers) => {
+      const currentSelection = currentAnswers[round - 1]
+      const isSelected = currentSelection.includes(photoId)
+
+      if (!isSelected && currentSelection.length === SELECT_LIMIT) {
+        return currentAnswers
+      }
+
+      const nextAnswers = currentAnswers.map((answer) => [...answer])
+      nextAnswers[round - 1] = isSelected
+        ? currentSelection.filter((item) => item !== photoId)
+        : [...currentSelection, photoId]
+
+      return nextAnswers
+    })
+    setErrorMessage('')
   }
 
   const handleNext = async () => {
-    // TODO: 선택한 사진 저장
-    if (!isLastRound) {
-      setRound(round + 1)
-      setSelected([])
-      return
-    }
+    if (!isFilled || isSubmitting) return
 
     setIsSubmitting(true)
     setErrorMessage('')
 
     try {
+      if (isRelearning) {
+        await replaceSelectionPhotos({
+          roundNo: photoRound.roundNo,
+          candidatePhotoIds: photoRound.photos.map((photo) => photo.photoId),
+          selectedPhotoIds,
+        })
+      } else {
+        await syncSelectionPhotos({
+          roundNo: photoRound.roundNo,
+          previousPhotoIds: savedPhotoIds[photoRound.roundNo] ?? [],
+          selectedPhotoIds,
+        })
+      }
+
+      setSavedPhotoIds((currentPhotoIds) => ({
+        ...currentPhotoIds,
+        [photoRound.roundNo]: [...selectedPhotoIds],
+      }))
+
+      if (!isLastRound) {
+        setRound((currentRound) => currentRound + 1)
+        return
+      }
+
+      if (isRelearning) {
+        navigate('/mypage', {
+          replace: true,
+          state: { relearningCompleted: true },
+        })
+        return
+      }
+
       const updatedAccount = await updateMyAccount({
         onboarding_completed: true,
         permission_intro_shown: user?.permission_intro_shown ?? false,
@@ -59,7 +111,7 @@ const MoodBoard = () => {
     } catch (error) {
       setErrorMessage(
         error.message ??
-          '온보딩 완료 상태를 저장하지 못했습니다. 다시 시도해 주세요.',
+          '선택 결과를 저장하지 못했어요. 다시 시도해 주세요.',
       )
     } finally {
       setIsSubmitting(false)
@@ -67,13 +119,18 @@ const MoodBoard = () => {
   }
 
   const handlePrev = () => {
-    setRound(round - 1)
-    setSelected([])
+    setRound((currentRound) => currentRound - 1)
+    setErrorMessage('')
   }
 
   return (
     <>
-      <Header to="/onboarding/ab-preference" />
+      <Header
+        to={getOnboardingFlowPath(
+          '/onboarding/ab-preference',
+          isRelearning,
+        )}
+      />
 
       <OnboardingWrapper>
 
@@ -89,16 +146,19 @@ const MoodBoard = () => {
 
           <CounterRow>
             <Counter>
-              {selected.length} / {SELECT_LIMIT} 선택됨
+              {selectedPhotoIds.length} / {SELECT_LIMIT} 선택됨
             </Counter>
           </CounterRow>
 
           <PhotoGrid>
-            {photos.map((photo) => (
+            {photoRound.photos.map((photo) => (
               <Tile
-                key={photo}
-                selected={selected.includes(photo)}
-                onClick={() => handleSelect(photo)}
+                key={photo.photoId}
+                src={photo.src}
+                alt={photo.alt}
+                selected={selectedPhotoIds.includes(photo.photoId)}
+                onClick={() => handleSelect(photo.photoId)}
+                disabled={isSubmitting}
               />
             ))}
           </PhotoGrid>
@@ -108,7 +168,11 @@ const MoodBoard = () => {
           {errorMessage && (
             <ErrorMessage role="alert">{errorMessage}</ErrorMessage>
           )}
-          <Button onClick={handleNext} disabled={!isFilled || isSubmitting}>
+          <Button
+            type="button"
+            onClick={handleNext}
+            disabled={!isFilled || isSubmitting}
+          >
             {isSubmitting
               ? '저장 중...'
               : !isFilled
@@ -117,7 +181,12 @@ const MoodBoard = () => {
                 ? '완료'
                 : '다음'}
           </Button>
-          <Button $variant="ghost" onClick={handlePrev} disabled={round === 1}>
+          <Button
+            type="button"
+            $variant="ghost"
+            onClick={handlePrev}
+            disabled={round === 1 || isSubmitting}
+          >
             이전으로
           </Button>
         </Footer>

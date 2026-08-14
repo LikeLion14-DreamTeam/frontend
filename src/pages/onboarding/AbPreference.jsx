@@ -1,12 +1,21 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import Button from '../../components/common/Button'
 import Choice from '../../components/common/Choice'
 import Progress from '../../components/common/Progress'
 import Header from '../../components/layout/Header'
+import {
+  replaceSelectionPhotos,
+  syncSelectionPhotos,
+} from '../../features/onboarding/selectionPhotoApi'
+import { AB_PHOTO_ROUNDS } from '../../features/onboarding/selectionPhotoData'
+import {
+  getOnboardingFlowPath,
+  isRelearningFlow,
+} from '../../features/onboarding/onboardingFlow'
 
-const TOTAL_ROUND = 5
+const TOTAL_ROUND = AB_PHOTO_ROUNDS.length
 
 const question = {
   text: 'A/B 취향 파악',
@@ -14,34 +23,89 @@ const question = {
 }
 
 const AbPreference = () => {
+  const location = useLocation()
   const navigate = useNavigate()
+  const isRelearning = isRelearningFlow(location.search)
   const [round, setRound] = useState(1)
-  const [selected, setSelected] = useState(null)
+  const [answers, setAnswers] = useState(() =>
+    Array(TOTAL_ROUND).fill(null),
+  )
+  const [savedPhotoIds, setSavedPhotoIds] = useState({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
 
+  const photoRound = AB_PHOTO_ROUNDS[round - 1]
+  const selectedPhotoId = answers[round - 1]
   const isLastRound = round === TOTAL_ROUND
 
-  const handleSelect = (choice) => {
-    setSelected(choice)
+  const handleSelect = (photoId) => {
+    if (isSubmitting) return
+
+    setAnswers((currentAnswers) => {
+      const nextAnswers = [...currentAnswers]
+      nextAnswers[round - 1] = photoId
+      return nextAnswers
+    })
+    setErrorMessage('')
   }
 
-  const handleNext = () => {
-    // TODO: 선택한 사진 저장
-    if (!isLastRound) {
-      setRound(round + 1)
-      setSelected(null)
-      return
+  const handleNext = async () => {
+    if (!selectedPhotoId || isSubmitting) return
+
+    setIsSubmitting(true)
+    setErrorMessage('')
+
+    try {
+      if (isRelearning) {
+        await replaceSelectionPhotos({
+          roundNo: photoRound.roundNo,
+          candidatePhotoIds: photoRound.photos.map((photo) => photo.photoId),
+          selectedPhotoIds: [selectedPhotoId],
+        })
+      } else {
+        await syncSelectionPhotos({
+          roundNo: photoRound.roundNo,
+          previousPhotoIds: savedPhotoIds[photoRound.roundNo]
+            ? [savedPhotoIds[photoRound.roundNo]]
+            : [],
+          selectedPhotoIds: [selectedPhotoId],
+        })
+      }
+
+      setSavedPhotoIds((currentPhotoIds) => ({
+        ...currentPhotoIds,
+        [photoRound.roundNo]: selectedPhotoId,
+      }))
+
+      if (!isLastRound) {
+        setRound((currentRound) => currentRound + 1)
+        return
+      }
+
+      navigate(getOnboardingFlowPath('/onboarding/moodboard', isRelearning))
+    } catch (error) {
+      setErrorMessage(
+        error.message ??
+          '선택한 사진을 저장하지 못했어요. 다시 시도해 주세요.',
+      )
+    } finally {
+      setIsSubmitting(false)
     }
-    navigate('/onboarding/moodboard')
   }
 
   const handlePrev = () => {
-    setRound(round - 1)
-    setSelected(null)
+    setRound((currentRound) => currentRound - 1)
+    setErrorMessage('')
   }
 
   return (
     <>
-      <Header to="/onboarding/basic-question" />
+      <Header
+        to={getOnboardingFlowPath(
+          '/onboarding/basic-question',
+          isRelearning,
+        )}
+      />
 
       <OnboardingWrapper>
 
@@ -55,25 +119,38 @@ const AbPreference = () => {
             </QuestionArea>
 
             <PhotoPair>
-              <Choice
-                label="A"
-                selected={selected === 'A'}
-                onClick={() => handleSelect('A')}
-              />
-              <Choice
-                label="B"
-                selected={selected === 'B'}
-                onClick={() => handleSelect('B')}
-              />
+              {photoRound.photos.map((photo) => (
+                <Choice
+                  key={photo.photoId}
+                  label={photo.label}
+                  src={photo.src}
+                  alt={photo.alt}
+                  selected={selectedPhotoId === photo.photoId}
+                  onClick={() => handleSelect(photo.photoId)}
+                  disabled={isSubmitting}
+                />
+              ))}
             </PhotoPair>
           </Content>
         </Body>
 
         <Footer>
-          <Button onClick={handleNext} disabled={!selected}>
-            {isLastRound ? '완료' : '다음'}
+          {errorMessage && (
+            <ErrorMessage role="alert">{errorMessage}</ErrorMessage>
+          )}
+          <Button
+            type="button"
+            onClick={handleNext}
+            disabled={!selectedPhotoId || isSubmitting}
+          >
+            {isSubmitting ? '저장 중...' : isLastRound ? '완료' : '다음'}
           </Button>
-          <Button $variant="ghost" onClick={handlePrev} disabled={round === 1}>
+          <Button
+            type="button"
+            $variant="ghost"
+            onClick={handlePrev}
+            disabled={round === 1 || isSubmitting}
+          >
             이전으로
           </Button>
         </Footer>
@@ -139,4 +216,11 @@ const Footer = styled.footer`
   display: flex;
   flex-direction: column;
   gap: 10px;
+`
+
+const ErrorMessage = styled.p`
+  color: #b42318;
+  font: var(--text-ui-caption);
+  text-align: center;
+  word-break: keep-all;
 `
