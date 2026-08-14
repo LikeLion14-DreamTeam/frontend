@@ -7,6 +7,7 @@ import backIcon from '../../assets/icons/Back.svg'
 import { uploadPhoto } from '../../api/uploads'
 import {
   addPinPhotos,
+  deletePhoto,
   getPin,
   getPinPhotos,
 } from '../../features/pins/pinApi'
@@ -72,6 +73,11 @@ const AllPhotos = () => {
   const [addResult, setAddResult] = useState(null)
   const [addError, setAddError] = useState('')
 
+  const [isSelectMode, setIsSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState([])
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+
   useEffect(() => {
     let ignore = false
 
@@ -106,6 +112,41 @@ const AllPhotos = () => {
   const title = pin?.place_name || pin?.address || '이름 없는 장소'
   // 5.5: 이미 종료된 여행의 핀에는 사진을 추가할 수 없다.
   const canAddPhotos = pin?.segment_id === null
+
+  const exitSelectMode = () => {
+    setIsSelectMode(false)
+    setSelectedIds([])
+    setIsConfirmingDelete(false)
+  }
+
+  const toggleSelected = (photoId) => {
+    setSelectedIds((prev) =>
+      prev.includes(photoId)
+        ? prev.filter((id) => id !== photoId)
+        : [...prev, photoId],
+    )
+  }
+
+  const handleDeleteSelected = async () => {
+    setIsDeleting(true)
+    setAddError('')
+
+    try {
+      // 5.7 은 사진 하나씩 지운다. 선택한 만큼 순서대로 호출한다.
+      for (const photoId of selectedIds) {
+        await deletePhoto(photoId)
+      }
+
+      const photoList = await getPinPhotos(pinID)
+      setPhotos(photoList.photos)
+      exitSelectMode()
+    } catch (error) {
+      setAddError(error.message)
+      setIsConfirmingDelete(false)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
 
   const handleFilesSelected = async (event) => {
     const files = Array.from(event.target.files ?? [])
@@ -161,18 +202,36 @@ const AllPhotos = () => {
           onChange={handleFilesSelected}
         />
 
-        <AddNearbyButton
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={!canAddPhotos || isUploading}
-          aria-label={
-            canAddPhotos
-              ? '주변 사진 추가'
-              : '종료된 여행의 핀에는 사진을 추가할 수 없습니다'
-          }
-        >
-          {isUploading ? '추가 중...' : '주변 사진 추가'}
-        </AddNearbyButton>
+        <ToolbarActions>
+          {isSelectMode ? (
+            <ToolbarButton type="button" onClick={exitSelectMode}>
+              취소
+            </ToolbarButton>
+          ) : (
+            <>
+              <ToolbarButton
+                type="button"
+                onClick={() => setIsSelectMode(true)}
+                disabled={photos.length === 0}
+              >
+                선택
+              </ToolbarButton>
+
+              <AddNearbyButton
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={!canAddPhotos || isUploading}
+                aria-label={
+                  canAddPhotos
+                    ? '주변 사진 추가'
+                    : '종료된 여행의 핀에는 사진을 추가할 수 없습니다'
+                }
+              >
+                {isUploading ? '추가 중...' : '주변 사진 추가'}
+              </AddNearbyButton>
+            </>
+          )}
+        </ToolbarActions>
       </Toolbar>
 
       <Heading>
@@ -235,7 +294,13 @@ const AllPhotos = () => {
               {photos.map((photo, index) => (
                 <PhotoTile
                   key={photo.photo_id}
-                  interactive={false}
+                  interactive={isSelectMode}
+                  selected={selectedIds.includes(photo.photo_id)}
+                  onClick={
+                    isSelectMode
+                      ? () => toggleSelected(photo.photo_id)
+                      : undefined
+                  }
                   src={photo.file_path}
                   alt={`${index + 1}번째 사진`}
                   aria-posinset={index + 1}
@@ -245,6 +310,37 @@ const AllPhotos = () => {
             </PhotoStrip>
           </PhotoGroup>
         </PhotoGroups>
+      )}
+
+      {isSelectMode && (
+        <SelectionBar>
+          <SelectionCount>{selectedIds.length}장 선택됨</SelectionCount>
+
+          {isConfirmingDelete ? (
+            <>
+              {/* 대표사진이 지워지면 서버가 남은 사진에서 대체 1장을 채운다. */}
+              <ConfirmText>
+                선택한 사진을 삭제할까요? 되돌릴 수 없고, 대표사진이 포함돼
+                있으면 추천이 다시 계산됩니다.
+              </ConfirmText>
+              <DeleteButton
+                type="button"
+                onClick={handleDeleteSelected}
+                disabled={isDeleting}
+              >
+                {isDeleting ? '삭제 중...' : '삭제'}
+              </DeleteButton>
+            </>
+          ) : (
+            <DeleteButton
+              type="button"
+              onClick={() => setIsConfirmingDelete(true)}
+              disabled={selectedIds.length === 0}
+            >
+              삭제
+            </DeleteButton>
+          )}
+        </SelectionBar>
       )}
     </Page>
   )
@@ -296,6 +392,27 @@ const BackButton = styled.button`
     width: 9px;
     height: 16px;
     display: block;
+  }
+`
+
+const ToolbarActions = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 16px;
+`
+
+const ToolbarButton = styled.button`
+  height: 40px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--Text-Secondary);
+  font: var(--text-ui-button);
+  cursor: pointer;
+
+  &:disabled {
+    color: var(--State-Disabled-Text);
+    cursor: not-allowed;
   }
 `
 
@@ -425,6 +542,47 @@ const ResultLine = styled.p`
   color: var(--Text-Secondary);
   font: var(--text-ui-caption);
   word-break: keep-all;
+`
+
+const SelectionBar = styled.div`
+  position: sticky;
+  bottom: 0;
+  width: 354px;
+  margin-top: 30px;
+  border: 1px solid var(--Primary-Cognac);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgb(181 118 59 / 9%);
+`
+
+const SelectionCount = styled.p`
+  color: var(--Text-Primary);
+  font: var(--text-ui-label);
+`
+
+const ConfirmText = styled.p`
+  color: var(--Text-Secondary);
+  font: var(--text-ui-caption);
+  word-break: keep-all;
+`
+
+const DeleteButton = styled.button`
+  min-height: 44px;
+  border: 0;
+  border-radius: 22px;
+  background: var(--Primary-Cognac);
+  color: var(--Text-Inverse);
+  font: var(--text-ui-button);
+  cursor: pointer;
+
+  &:disabled {
+    background: var(--State-Disabled-Fill);
+    color: var(--State-Disabled-Text);
+    cursor: not-allowed;
+  }
 `
 
 const StateMessage = styled.p`

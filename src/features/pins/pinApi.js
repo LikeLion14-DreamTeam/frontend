@@ -182,6 +182,45 @@ export const addPinPhotos = async (pinId, photos) => {
 }
 
 /**
+ * 5.7 사진 삭제
+ *
+ * 삭제된 사진이 대표사진이었다면 남은 사진 중에서 서버가 자동으로 대체 1장을 채워
+ * 항상 최대 3장을 유지한다. 204 No Content 라 반환값이 없다.
+ */
+export const deletePhoto = async (photoId) => {
+  if (USE_MOCK) {
+    const targetId = Number(photoId)
+
+    const entry = Object.entries(mockPinStore.photos).find(([, list]) =>
+      list.some((photo) => photo.photo_id === targetId),
+    )
+
+    if (!entry) {
+      throw new ApiError({
+        status: 404,
+        code: 'NOT_FOUND',
+        message: '사진을 찾을 수 없습니다.',
+      })
+    }
+
+    const [pinId, list] = entry
+    const removed = list.find((photo) => photo.photo_id === targetId)
+    const remaining = list.filter((photo) => photo.photo_id !== targetId)
+
+    if (removed.is_pin_cover) {
+      const replacement = remaining.find((photo) => !photo.is_pin_cover)
+      if (replacement) replacement.is_pin_cover = true
+    }
+
+    mockPinStore.photos[pinId] = remaining
+
+    return null
+  }
+
+  return apiClient.delete(`/photos/${photoId}`)
+}
+
+/**
  * 5.6 대표사진 새로고침
  *
  * 핀의 사진을 새로고침 시점의 취향 프로파일 기준으로 재정렬해 상위 10개를 뽑고,
