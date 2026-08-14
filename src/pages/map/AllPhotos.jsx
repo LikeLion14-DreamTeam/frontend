@@ -353,7 +353,7 @@ const Page = styled.main`
   max-width: 402px;
   height: var(--app-viewport-height);
   margin: 0 auto;
-  padding: 58px 0 40px 24px;
+  padding: 58px 24px 40px;
   overflow-x: hidden;
   overflow-y: auto;
   background: var(--Background-Base);
@@ -494,9 +494,15 @@ const Count = styled.span`
   white-space: nowrap;
 `
 
+/* 첫 장과 마지막 장은 본문 여백(24)에 맞춰 서지만, 넘기는 동안에는 화면 좌우
+   끝까지 흘러가며 잘린다. 페이지의 좌우 여백을 음수 마진으로 상쇄하고 같은 값을
+   스크롤 영역 안쪽에 준다.
+   scroll-padding 이 없으면 스냅이 첫 장을 화면 끝(0)으로 당겨버린다. */
 const PhotoStrip = styled.div`
-  width: calc(100vw - 24px);
-  max-width: 378px;
+  width: 100vw;
+  max-width: 402px;
+  margin: 0 -24px;
+  padding: 0 24px;
   display: flex;
   align-items: flex-start;
   gap: 10px;
@@ -504,13 +510,13 @@ const PhotoStrip = styled.div`
   overscroll-behavior-x: contain;
   scroll-behavior: smooth;
   scroll-snap-type: x mandatory;
+  scroll-padding-left: 24px;
   scrollbar-width: none;
   touch-action: pan-x;
 
   &::-webkit-scrollbar {
     display: none;
   }
-
 `
 
 const PhotoTile = styled(Tile)`
