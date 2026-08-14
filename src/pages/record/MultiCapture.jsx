@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled, { createGlobalStyle } from 'styled-components'
-import deleteIcon from '../../assets/icons/capture-delete.svg'
+import trashIcon from '../../assets/icons/capture-trash.svg'
 import closeIcon from '../../assets/icons/capture-close.svg'
 
 /**
@@ -163,16 +163,23 @@ const MultiCapture = () => {
     )
   }
 
-  const handleRemove = (id) => {
-    setShots((prev) => {
-      const target = prev.find((shot) => shot.id === id)
-      if (target) URL.revokeObjectURL(target.url)
-      return prev.filter((shot) => shot.id !== id)
-    })
+  /**
+   * 삭제는 미리보기에서만 할 수 있다. 썸네일의 x 버튼은 크게 보려다 잘못 눌러
+   * 지우는 일이 있어 시안에서 빠졌다.
+   *
+   * 지운 뒤에는 같은 자리의 다음 사진으로 넘어가고, 마지막 한 장이었으면 닫는다.
+   */
+  const handleRemovePreview = () => {
+    const removed = shots[previewIndex]
+    if (!removed) return
 
-    if (previewId === id) {
-      setPreviewId(null)
-    }
+    URL.revokeObjectURL(removed.url)
+
+    const remaining = shots.filter((shot) => shot.id !== removed.id)
+    const next = remaining[previewIndex] ?? remaining[previewIndex - 1] ?? null
+
+    setShots(remaining)
+    setPreviewId(next?.id ?? null)
   }
 
   const handleDone = () => {
@@ -214,29 +221,16 @@ const MultiCapture = () => {
       </ViewfinderArea>
 
       <BottomPanel>
-        <StripHeader>
-          <StripTitle>방금 찍은 사진</StripTitle>
-          {shots.length > 0 && <StripHint>탭하여 크게 보기</StripHint>}
-        </StripHeader>
-
         <ThumbnailStrip aria-label="촬영한 사진">
           {shots.map((shot, index) => (
-            <Thumbnail key={shot.id}>
-              <ThumbnailButton
-                type="button"
-                aria-label={`${index + 1}번째 사진 크게 보기`}
-                onClick={() => setPreviewId(shot.id)}
-              >
-                <ThumbnailImage src={shot.url} alt="" />
-              </ThumbnailButton>
-              <DeleteButton
-                type="button"
-                aria-label="이 사진 삭제"
-                onClick={() => handleRemove(shot.id)}
-              >
-                <img src={deleteIcon} alt="" aria-hidden="true" />
-              </DeleteButton>
-            </Thumbnail>
+            <ThumbnailButton
+              key={shot.id}
+              type="button"
+              aria-label={`${index + 1}번째 사진 크게 보기`}
+              onClick={() => setPreviewId(shot.id)}
+            >
+              <ThumbnailImage src={shot.url} alt="" />
+            </ThumbnailButton>
           ))}
         </ThumbnailStrip>
 
@@ -275,6 +269,13 @@ const MultiCapture = () => {
             <IndexSlash>/</IndexSlash>
             <IndexTotal>{shots.length}</IndexTotal>
           </PreviewIndex>
+
+          <PreviewActions>
+            <PreviewDeleteButton type="button" onClick={handleRemovePreview}>
+              <img src={trashIcon} alt="" aria-hidden="true" />
+              삭제
+            </PreviewDeleteButton>
+          </PreviewActions>
         </PreviewLayer>
       )}
     </CaptureShell>
@@ -284,10 +285,10 @@ const MultiCapture = () => {
 export default MultiCapture
 
 /* 하단 패널의 확정 높이. 뷰파인더가 남은 공간을 채우므로 구성을 바꾸면 함께 고친다.
-   13(라벨) + 11 + 66(썸네일) + 24 + 72(컨트롤) + 4(아래 여백)
+   66(썸네일) + 45(간격) + 72(컨트롤) + 7(아래 여백)
 
-   시안은 간격 35 · 아래 여백 58이지만 사파리 하단 주소창이 약 95px을 가져가,
-   그대로 두면 뷰파인더가 폭을 못 채우고 좌우에 여백이 생긴다. 그만큼을 덜어낸다. */
+   시안의 아래 여백은 58이지만 사파리 하단 주소창이 약 95px을 가져가, 그대로 두면
+   뷰파인더가 폭을 못 채우고 좌우에 여백이 생긴다. 부족한 만큼을 여기서 덜어낸다. */
 const BOTTOM_PANEL_HEIGHT = '190px'
 
 const CaptureShell = styled.main`
@@ -410,50 +411,24 @@ const RetryButton = styled.button`
 const BottomPanel = styled.section`
   flex: 0 0 auto;
   height: calc(${BOTTOM_PANEL_HEIGHT} + env(safe-area-inset-bottom));
-  padding: 0 24px calc(4px + env(safe-area-inset-bottom));
+  padding: 0 24px calc(7px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
-`
-
-const StripHeader = styled.div`
-  flex: 0 0 13px;
-  height: 13px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-`
-
-const StripTitle = styled.p`
-  color: rgb(242 233 220 / 60%);
-  font-size: 11px;
-`
-
-const StripHint = styled.p`
-  color: rgb(197 161 91 / 90%);
-  font-size: 10px;
 `
 
 const ThumbnailStrip = styled.div`
   flex: 0 0 66px;
   height: 66px;
-  margin-top: 11px;
   display: flex;
   align-items: center;
   gap: 9px;
   overflow-x: auto;
-  overflow-y: visible;
-`
-
-const Thumbnail = styled.div`
-  position: relative;
-  flex: 0 0 auto;
-  width: 66px;
-  height: 66px;
 `
 
 const ThumbnailButton = styled.button`
-  width: 100%;
-  height: 100%;
+  flex: 0 0 auto;
+  width: 66px;
+  height: 66px;
   padding: 0;
   border: 0;
   border-radius: 10px;
@@ -472,28 +447,10 @@ const ThumbnailImage = styled.img`
   pointer-events: none;
 `
 
-const DeleteButton = styled.button`
-  position: absolute;
-  top: -4px;
-  right: -6px;
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: pointer;
-
-  img {
-    width: 20px;
-    height: 20px;
-    display: block;
-  }
-`
-
 const ControlRow = styled.div`
   flex: 0 0 72px;
   height: 72px;
-  margin-top: 24px;
+  margin-top: 45px;
   /* 패널 좌우 여백 24 + 30 = 시안의 54px */
   padding: 0 30px;
   display: grid;
@@ -609,4 +566,31 @@ const IndexSlash = styled.span`
 const IndexTotal = styled.span`
   color: rgb(242 233 220 / 60%);
   font: var(--text-ui-body-l);
+`
+
+const PreviewActions = styled.div`
+  margin-top: 35px;
+  display: flex;
+  align-items: center;
+`
+
+const PreviewDeleteButton = styled.button`
+  padding: 13px 22px 13px 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgb(242 233 220 / 35%);
+  border-radius: 24px;
+  background: none;
+  color: rgb(242 233 220 / 85%);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+
+  img {
+    width: 16px;
+    height: 15px;
+    display: block;
+  }
 `
