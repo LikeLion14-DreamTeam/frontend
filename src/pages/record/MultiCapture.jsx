@@ -199,10 +199,10 @@ const MultiCapture = () => {
           <GridLine $vertical style={{ left: '66.666%' }} aria-hidden="true" />
           <GridLine style={{ top: '33.333%' }} aria-hidden="true" />
           <GridLine style={{ top: '66.666%' }} aria-hidden="true" />
-        </Viewfinder>
 
-        <TagChip>{TAG_CONTEXT}</TagChip>
-        <CountChip>{shots.length} 장</CountChip>
+          <TagChip>{TAG_CONTEXT}</TagChip>
+          <CountChip>{shots.length} 장</CountChip>
+        </Viewfinder>
 
         {status !== 'ready' && (
           <StatusOverlay>
@@ -288,6 +288,10 @@ export default MultiCapture
    66(썸네일) + 45(간격) + 72(컨트롤) + 58(아래 여백) */
 const BOTTOM_PANEL_HEIGHT = '241px'
 
+/* 뷰파인더와 썸네일 사이의 최소 간격(시안 값). 남는 높이가 있으면 위아래로
+   나뉘어 이보다 벌어지고, 화면이 짧으면 뷰파인더가 줄어 이 간격을 지킨다. */
+const VIEWFINDER_GAP = '39px'
+
 const CaptureShell = styled.main`
   width: 100%;
   max-width: 450px;
@@ -304,6 +308,7 @@ const ViewfinderArea = styled.section`
   position: relative;
   flex: 1;
   min-height: 0;
+  padding-bottom: ${VIEWFINDER_GAP};
   display: flex;
   /* 남는 높이를 위아래로 나눠 뷰파인더를 가운데 둔다. */
   align-items: center;
@@ -318,7 +323,7 @@ const Viewfinder = styled.div`
     calc(
       (
           var(--app-viewport-height) - ${BOTTOM_PANEL_HEIGHT} -
-            env(safe-area-inset-bottom)
+            ${VIEWFINDER_GAP} - env(safe-area-inset-bottom)
         ) * 3 / 4
     )
   );
@@ -349,9 +354,11 @@ const GridLine = styled.span`
       : 'left: 0; right: 0; height: 1px;'}
 `
 
+/* 뷰파인더 모서리 기준 위치. 화면이 짧아 뷰파인더가 줄어도 칩이 함께 따라간다. */
 const chipBase = `
   position: absolute;
-  top: 20px;
+  z-index: 1;
+  top: 11px;
   display: inline-flex;
   align-items: center;
   background: rgb(36 28 22 / 60%);
@@ -361,7 +368,7 @@ const chipBase = `
 
 const TagChip = styled.span`
   ${chipBase}
-  left: 24px;
+  left: 8px;
   padding: 7px 14px 7px 11px;
   border-radius: 16px;
   color: rgb(242 233 220 / 92%);
@@ -369,7 +376,7 @@ const TagChip = styled.span`
 
 const CountChip = styled.span`
   ${chipBase}
-  right: 24px;
+  right: 8px;
   padding: 6px 11px;
   border-radius: 20px;
   color: #f2e9dc;
