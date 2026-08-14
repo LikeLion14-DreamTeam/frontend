@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import styled from 'styled-components'
 import exifr from 'exifr'
+import Tile from '../../components/common/Tile'
 import backIcon from '../../assets/icons/Back.svg'
 import { uploadPhoto } from '../../api/uploads'
 import {
@@ -234,14 +235,12 @@ const AllPhotos = () => {
               {photos.map((photo, index) => (
                 <PhotoTile
                   key={photo.photo_id}
+                  interactive={false}
+                  src={photo.file_path}
+                  alt={`${index + 1}번째 사진`}
                   aria-posinset={index + 1}
                   aria-setsize={photos.length}
-                >
-                  <PhotoImage
-                    src={photo.file_path}
-                    alt={`${index + 1}번째 사진`}
-                  />
-                </PhotoTile>
+                />
               ))}
             </PhotoStrip>
           </PhotoGroup>
@@ -397,25 +396,11 @@ const PhotoStrip = styled.div`
 
 `
 
-/* TODO: 공용 Tile 이 사진을 받을 수 있게 바뀌면 styled(Tile) 로 되돌린다.
-   지금은 Tile 이 선택용 버튼이라 자식을 렌더하지 않아 사진을 넣을 수 없어,
-   같은 크기·모양(111.33 x 124, radius 12)으로 따로 둔다. */
-const PhotoTile = styled.div`
+const PhotoTile = styled(Tile)`
   width: 111.333px;
-  height: 124px;
   flex: 0 0 auto;
-  border-radius: 12px;
-  overflow: hidden;
-  background: var(--Map-Land);
   scroll-snap-align: start;
   scroll-snap-stop: always;
-`
-
-const PhotoImage = styled.img`
-  width: 100%;
-  height: 100%;
-  display: block;
-  object-fit: cover;
 `
 
 const HiddenFileInput = styled.input`
