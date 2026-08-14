@@ -420,13 +420,23 @@ const BottomPanel = styled.section`
   flex-direction: column;
 `
 
+/* 첫 장은 본문 여백(24)에 맞춰 시작하지만, 넘기면 화면 끝까지 흘러가며 잘린다.
+   패널의 좌우 여백을 음수 마진으로 상쇄하고 같은 값을 스크롤 영역 안쪽에 준다. */
 const ThumbnailStrip = styled.div`
   flex: 0 0 66px;
   height: 66px;
+  margin: 0 -24px;
+  padding: 0 24px;
   display: flex;
   align-items: center;
   gap: 9px;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 `
 
 const ThumbnailButton = styled.button`
