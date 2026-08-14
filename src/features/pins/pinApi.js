@@ -182,6 +182,24 @@ export const addPinPhotos = async (pinId, photos) => {
 }
 
 /**
+ * 5.8 음성 메모 조회
+ *
+ * 5.1 은 음성 메모의 존재 여부와 길이만 준다. 재생용 파일 주소(`audio_file`)는
+ * 이 API 로만 받을 수 있어, 재생 버튼을 붙이려면 한 번 더 호출해야 한다.
+ */
+export const getPinVoiceMemos = async (pinId) => {
+  if (USE_MOCK) {
+    if (!mockPinStore.pins[pinId]) throw mockNotFound()
+
+    const voiceMemo = mockPinStore.voiceMemos[pinId]
+
+    return { voice_memos: voiceMemo ? [voiceMemo] : [] }
+  }
+
+  return apiClient.get(`/pins/${pinId}/voice-memos`)
+}
+
+/**
  * 5.7 사진 삭제
  *
  * 삭제된 사진이 대표사진이었다면 남은 사진 중에서 서버가 자동으로 대체 1장을 채워

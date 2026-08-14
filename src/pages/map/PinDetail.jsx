@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import styled from 'styled-components'
 import { Marker } from '@vis.gl/react-google-maps'
@@ -14,6 +14,7 @@ import {
   deletePin,
   getPin,
   getPinPhotos,
+  getPinVoiceMemos,
   refreshRepresentativePhotos,
   updatePin,
 } from '../../features/pins/pinApi'
@@ -56,7 +57,11 @@ const PinDetail = () => {
   const navigate = useNavigate()
   const { pinID = FALLBACK_PIN_ID } = useParams()
 
+  const audioRef = useRef(null)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [audioSrc, setAudioSrc] = useState(null)
+  const [playedRatio, setPlayedRatio] = useState(0)
+  const [voiceError, setVoiceError] = useState('')
   const [pin, setPin] = useState(null)
   const [photos, setPhotos] = useState([])
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -104,6 +109,40 @@ const PinDetail = () => {
       ignore = true
     }
   }, [pinID])
+
+  /**
+   * 5.8. 5.1 은 음성 메모의 길이만 주고 재생할 파일 주소는 주지 않는다.
+   * 메모가 있는 핀에서만 한 번 더 받아 재생 버튼에 물린다.
+   */
+  useEffect(() => {
+    const voiceMemoId = pin?.voice_memo?.voice_memo_id
+
+    if (!voiceMemoId) {
+      setAudioSrc(null)
+      return undefined
+    }
+
+    let ignore = false
+
+    const loadVoiceMemo = async () => {
+      try {
+        const { voice_memos: voiceMemos } = await getPinVoiceMemos(pinID)
+        const memo = voiceMemos.find(
+          (item) => item.voice_memo_id === voiceMemoId,
+        )
+
+        if (!ignore) setAudioSrc(memo?.audio_file ?? null)
+      } catch {
+        if (!ignore) setVoiceError('음성 메모를 불러오지 못했어요.')
+      }
+    }
+
+    loadVoiceMemo()
+
+    return () => {
+      ignore = true
+    }
+  }, [pinID, pin?.voice_memo?.voice_memo_id])
 
   /**
    * 여정 칩(`n개 핀 중 m번째`)에 필요한 값은 5.1 응답에 없어서 4번 API로 따로 받는다.
@@ -182,6 +221,23 @@ const PinDetail = () => {
       setNoteError(error.message)
     } finally {
       setIsSavingNote(false)
+    }
+  }
+
+  const handleTogglePlay = async () => {
+    const audio = audioRef.current
+    if (!audio) return
+
+    if (isPlaying) {
+      audio.pause()
+      return
+    }
+
+    try {
+      setVoiceError('')
+      await audio.play()
+    } catch {
+      setVoiceError('음성을 재생할 수 없어요.')
     }
   }
 
@@ -330,28 +386,58 @@ const PinDetail = () => {
                   )}
 
                   {pin.voice_memo && (
-                    <VoiceBar>
-                      <PlayButton
-                        type="button"
-                        aria-label={isPlaying ? '음성 일시정지' : '음성 재생'}
-                        aria-pressed={isPlaying}
-                        onClick={() => setIsPlaying((playing) => !playing)}
-                      >
-                        <img src={voicePlayIcon} alt="" />
-                      </PlayButton>
-                      <Waveform aria-hidden="true">
-                        {waveHeights.map((height, index) => (
-                          <Wave
-                            key={`${height}-${index}`}
-                            $height={height}
-                            $played={index < (isPlaying ? 32 : 18)}
-                          />
-                        ))}
-                      </Waveform>
-                      <Duration>
-                        {formatDuration(pin.voice_memo.duration_sec)}
-                      </Duration>
-                    </VoiceBar>
+                    <>
+                      <VoiceBar>
+                        <PlayButton
+                          type="button"
+                          aria-label={isPlaying ? '음성 일시정지' : '음성 재생'}
+                          aria-pressed={isPlaying}
+                          onClick={handleTogglePlay}
+                          disabled={!audioSrc}
+                        >
+                          <img src={voicePlayIcon} alt="" />
+                        </PlayButton>
+                        <Waveform aria-hidden="true">
+                          {waveHeights.map((height, index) => (
+                            <Wave
+                              key={`${height}-${index}`}
+                              $height={height}
+                              $played={
+                                index < waveHeights.length * playedRatio
+                              }
+                            />
+                          ))}
+                        </Waveform>
+                        <Duration>
+                          {formatDuration(pin.voice_memo.duration_sec)}
+                        </Duration>
+                      </VoiceBar>
+
+                      <audio
+                        ref={audioRef}
+                        src={audioSrc ?? undefined}
+                        preload="none"
+                        onPlay={() => setIsPlaying(true)}
+                        onPause={() => setIsPlaying(false)}
+                        onTimeUpdate={(event) => {
+                          const { currentTime, duration } = event.currentTarget
+                          setPlayedRatio(
+                            duration ? currentTime / duration : 0,
+                          )
+                        }}
+                        onEnded={() => {
+                          setIsPlaying(false)
+                          setPlayedRatio(0)
+                        }}
+                        onError={() =>
+                          setVoiceError('음성을 재생할 수 없어요.')
+                        }
+                      />
+
+                      {voiceError && (
+                        <VoiceError role="alert">{voiceError}</VoiceError>
+                      )}
+                    </>
                   )}
                 </MemoBody>
               </Memo>
@@ -851,6 +937,17 @@ const PlayButton = styled.button`
     height: 22px;
     display: block;
   }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.4;
+  }
+`
+
+const VoiceError = styled.p`
+  color: var(--Text-Secondary);
+  font: var(--text-ui-caption);
+  word-break: keep-all;
 `
 
 const Waveform = styled.span`

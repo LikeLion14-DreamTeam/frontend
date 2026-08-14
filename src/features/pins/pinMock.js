@@ -10,6 +10,44 @@
 // mock 전용 이미지. 실제로는 S3 URL 이 온다.
 const photoUrl = (seed) => `https://picsum.photos/seed/${seed}/600/600`
 
+/**
+ * 사진은 picsum 으로 대신하지만 음성은 그럴 만한 곳이 없어, 길이만 맞춘 WAV 를
+ * 직접 만들어 쓴다. 재생·일시정지·파형 진행을 목업만으로 확인하기 위한 것이다.
+ */
+const createMockAudioUrl = (durationSec) => {
+  const sampleRate = 8000
+  const frameCount = sampleRate * durationSec
+  const buffer = new ArrayBuffer(44 + frameCount * 2)
+  const view = new DataView(buffer)
+
+  const writeText = (offset, text) => {
+    for (let i = 0; i < text.length; i += 1) {
+      view.setUint8(offset + i, text.charCodeAt(i))
+    }
+  }
+
+  // 16비트 모노 PCM WAV 헤더.
+  writeText(0, 'RIFF')
+  view.setUint32(4, 36 + frameCount * 2, true)
+  writeText(8, 'WAVEfmt ')
+  view.setUint32(16, 16, true)
+  view.setUint16(20, 1, true)
+  view.setUint16(22, 1, true)
+  view.setUint32(24, sampleRate, true)
+  view.setUint32(28, sampleRate * 2, true)
+  view.setUint16(32, 2, true)
+  view.setUint16(34, 16, true)
+  writeText(36, 'data')
+  view.setUint32(40, frameCount * 2, true)
+
+  for (let i = 0; i < frameCount; i += 1) {
+    const sample = Math.sin((2 * Math.PI * 220 * i) / sampleRate) * 0.2
+    view.setInt16(44 + i * 2, sample * 32767, true)
+  }
+
+  return URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }))
+}
+
 const createInitialState = () => ({
   // 핀 번호와 segment_id 는 tripMock 의 구간 12 와 맞춘다.
   // 어긋나면 핀 상세의 여정 칩(`n개 핀 중 m번째`)이 이상하게 표시된다.
@@ -129,7 +167,7 @@ const createInitialState = () => ({
   voiceMemos: {
     101: {
       voice_memo_id: 55,
-      audio_file: 'https://cdn.orte.app/voices/55.m4a',
+      audio_file: createMockAudioUrl(18),
       duration_sec: 18,
       saved_at: '2024-11-03T01:24:30.000000Z',
     },
