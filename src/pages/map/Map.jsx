@@ -50,6 +50,13 @@ const pins = [
     lat: 48.8049,
     lng: 2.1204,
   },
+  {
+    // 진행 중인 여정의 핀. 핀 삭제(5.3) 흐름 확인용이라 좌표만 파리 쪽에 맞춰둔다.
+    id: 106,
+    name: '서울시청 앞',
+    lat: 48.8656,
+    lng: 2.3212,
+  },
 ]
 
 const routePath = pins.map(({ lat, lng }) => ({ lat, lng }))

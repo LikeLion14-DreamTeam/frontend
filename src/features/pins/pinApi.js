@@ -75,3 +75,34 @@ export const updatePin = async (pinId, { placeName, textNote }) => {
     text_note: textNote,
   })
 }
+
+/**
+ * 5.3 핀 삭제
+ *
+ * 아직 여정으로 배정되지 않은(segment_id = null, 진행 중) 핀만 삭제할 수 있다.
+ * 이미 종료된 여행에 속한 핀은 4.3 의 제외(included_in_segment=false)를 사용한다.
+ * segment_id 가 채워진 핀에 호출하면 409 CONFLICT (USE_TRIP_EXCLUSION) 이 온다.
+ */
+export const deletePin = async (pinId) => {
+  if (USE_MOCK) {
+    const pin = mockPinStore.pins[pinId]
+    if (!pin) throw mockNotFound()
+
+    if (pin.segment_id !== null) {
+      throw new ApiError({
+        status: 409,
+        code: 'USE_TRIP_EXCLUSION',
+        message:
+          '이미 종료된 여행의 핀은 삭제할 수 없습니다. 여행 구간 편집에서 제외해주세요.',
+      })
+    }
+
+    delete mockPinStore.pins[pinId]
+    delete mockPinStore.photos[pinId]
+    delete mockPinStore.voiceMemos[pinId]
+
+    return null
+  }
+
+  return apiClient.delete(`/pins/${pinId}`)
+}

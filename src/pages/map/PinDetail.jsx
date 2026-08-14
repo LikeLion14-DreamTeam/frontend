@@ -10,7 +10,7 @@ import photoAddIcon from '../../assets/map/photo-add.svg'
 import refreshIcon from '../../assets/map/refresh.svg'
 import voicePlayIcon from '../../assets/map/voice-play.svg'
 import { MAP_STYLES } from './mapStyles'
-import { getPin, updatePin } from '../../features/pins/pinApi'
+import { deletePin, getPin, updatePin } from '../../features/pins/pinApi'
 import { getTrip, getTripPins } from '../../features/trips/tripApi'
 
 // 지도에서 넘어오는 경로가 아직 없어 pinID 가 비면 이 값을 쓴다.
@@ -60,6 +60,10 @@ const PinDetail = () => {
   const [noteDraft, setNoteDraft] = useState('')
   const [isSavingNote, setIsSavingNote] = useState(false)
   const [noteError, setNoteError] = useState('')
+
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   useEffect(() => {
     let ignore = false
@@ -165,6 +169,20 @@ const PinDetail = () => {
     }
   }
 
+  const handleDelete = async () => {
+    setIsDeleting(true)
+    setDeleteError('')
+
+    try {
+      await deletePin(pinID)
+      navigate('/map', { replace: true })
+    } catch (error) {
+      setDeleteError(error.message)
+      setIsDeleting(false)
+      setIsConfirmingDelete(false)
+    }
+  }
+
   // 위치 권한을 거부한 상태로 저장된 핀은 좌표가 없다. 지도를 그리지 않는다.
   const hasCoordinates = pin.latitude !== null && pin.longitude !== null
   const position = hasCoordinates
@@ -172,6 +190,8 @@ const PinDetail = () => {
     : null
   const title = pin.place_name || pin.address || '이름 없는 장소'
   const representativePhotos = pin.representative_photos ?? []
+  // 5.3: 여정에 배정되기 전(진행 중)인 핀만 삭제할 수 있다.
+  const isDeletable = pin.segment_id === null
   const hasMemo =
     Boolean(pin.text_note) || Boolean(pin.voice_memo) || isEditingNote
 
@@ -365,6 +385,44 @@ const PinDetail = () => {
               ))}
             </SuggestedGrid>
           </SuggestedSection>
+
+          {/* TODO: 임시 UI. 시안에 핀 삭제가 없어 위치·문구·색상을 임의로 정했다. */}
+          {isDeletable && (
+            <DeleteSection>
+              {deleteError && <DeleteError role="alert">{deleteError}</DeleteError>}
+
+              {isConfirmingDelete ? (
+                <DeleteConfirm>
+                  <DeleteWarning>
+                    이 핀의 사진과 음성 메모가 함께 삭제됩니다. 되돌릴 수 없습니다.
+                  </DeleteWarning>
+                  <DeleteActions>
+                    <DeleteCancelButton
+                      type="button"
+                      onClick={() => setIsConfirmingDelete(false)}
+                      disabled={isDeleting}
+                    >
+                      취소
+                    </DeleteCancelButton>
+                    <DeleteConfirmButton
+                      type="button"
+                      onClick={handleDelete}
+                      disabled={isDeleting}
+                    >
+                      {isDeleting ? '삭제 중...' : '삭제할게요'}
+                    </DeleteConfirmButton>
+                  </DeleteActions>
+                </DeleteConfirm>
+              ) : (
+                <DeleteTrigger
+                  type="button"
+                  onClick={() => setIsConfirmingDelete(true)}
+                >
+                  이 핀 삭제
+                </DeleteTrigger>
+              )}
+            </DeleteSection>
+          )}
         </DetailContent>
       </DetailSheet>
     </Page>
@@ -386,6 +444,85 @@ const Page = styled.main`
   &::-webkit-scrollbar {
     display: none;
   }
+`
+
+/* 아래 삭제 관련 스타일은 디자인 회신 전까지 쓰는 임시 스타일이다. */
+const DeleteSection = styled.section`
+  display: flex;
+  flex-direction: column;
+`
+
+const DeleteTrigger = styled.button`
+  width: 100%;
+  min-height: 44px;
+  border: 0;
+  background: none;
+  color: var(--Text-Secondary);
+  font: var(--text-ui-button);
+  text-decoration: underline;
+  cursor: pointer;
+`
+
+const DeleteConfirm = styled.div`
+  border: 1px solid var(--Primary-Cognac);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgb(181 118 59 / 9%);
+`
+
+const DeleteWarning = styled.p`
+  color: var(--Text-Primary);
+  font: var(--text-ui-caption);
+  text-align: center;
+  word-break: keep-all;
+`
+
+const DeleteActions = styled.div`
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+`
+
+const DeleteCancelButton = styled.button`
+  min-height: 44px;
+  border: 1px solid var(--Border-Default);
+  border-radius: 22px;
+  background: var(--Surface-Base);
+  color: var(--Text-Secondary);
+  font: var(--text-ui-button);
+  cursor: pointer;
+
+  &:disabled {
+    color: var(--State-Disabled-Text);
+    cursor: not-allowed;
+  }
+`
+
+const DeleteConfirmButton = styled.button`
+  min-height: 44px;
+  border: 0;
+  border-radius: 22px;
+  background: var(--Primary-Cognac);
+  color: var(--Text-Inverse);
+  font: var(--text-ui-button);
+  cursor: pointer;
+
+  &:disabled {
+    background: var(--State-Disabled-Fill);
+    color: var(--State-Disabled-Text);
+    cursor: not-allowed;
+  }
+`
+
+const DeleteError = styled.p`
+  margin-bottom: 10px;
+  color: var(--Primary-Cognac);
+  font: var(--text-ui-caption);
+  text-align: center;
+  word-break: keep-all;
 `
 
 const NoLocation = styled.p`

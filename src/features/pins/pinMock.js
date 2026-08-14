@@ -36,6 +36,17 @@ const createInitialState = () => ({
       tagged_at: '2024-11-06T07:40:00.000000Z',
       text_note: '',
     },
+    106: {
+      // 진행 중인 여정의 핀. segment_id 가 null 이라 5.3 삭제가 가능하다.
+      pin_id: 106,
+      segment_id: null,
+      latitude: 37.5665,
+      longitude: 126.978,
+      address: '서울 중구 세종대로',
+      place_name: '서울시청 앞',
+      tagged_at: '2025-08-14T02:10:00.000000Z',
+      text_note: '퇴근길에 잠깐 들렀다.',
+    },
   },
 
   /** 5.4 GET /pins/{pinId}/photos. is_pin_cover 가 대표사진 표시다. */
@@ -98,6 +109,20 @@ const createInitialState = () => ({
         is_pin_cover: true,
       },
     ],
+    106: [
+      {
+        photo_id: 960,
+        captured_at: '2025-08-14T02:10:12.000000Z',
+        file_path: photoUrl('orte-960'),
+        is_pin_cover: true,
+      },
+      {
+        photo_id: 961,
+        captured_at: '2025-08-14T02:11:40.000000Z',
+        file_path: photoUrl('orte-961'),
+        is_pin_cover: true,
+      },
+    ],
   },
 
   /** 5.8 GET /pins/{pinId}/voice-memos. 없으면 null 이 온다. */
@@ -109,6 +134,7 @@ const createInitialState = () => ({
       saved_at: '2024-11-03T01:24:30.000000Z',
     },
     104: null,
+    106: null,
   },
 })
 
