@@ -14,6 +14,7 @@ import {
   deletePin,
   getPin,
   getPinPhotos,
+  refreshRepresentativePhotos,
   updatePin,
 } from '../../features/pins/pinApi'
 import { getTrip, getTripPins } from '../../features/trips/tripApi'
@@ -57,7 +58,8 @@ const PinDetail = () => {
 
   const [isPlaying, setIsPlaying] = useState(false)
   const [pin, setPin] = useState(null)
-  const [photoCount, setPhotoCount] = useState(0)
+  const [photos, setPhotos] = useState([])
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [journey, setJourney] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
@@ -79,7 +81,7 @@ const PinDetail = () => {
       setErrorMessage('')
 
       try {
-        // 사진 수는 5.1 응답에 없어 5.4 목록 길이로 센다.
+        // PHOTOS 그리드에 쓸 사진 목록은 5.1 응답에 없어 5.4 로 따로 받는다.
         const [data, photoList] = await Promise.all([
           getPin(pinID),
           getPinPhotos(pinID),
@@ -87,7 +89,7 @@ const PinDetail = () => {
 
         if (!ignore) {
           setPin(data)
-          setPhotoCount(photoList.photos.length)
+          setPhotos(photoList.photos)
         }
       } catch (error) {
         if (!ignore) setErrorMessage(error.message)
@@ -183,6 +185,22 @@ const PinDetail = () => {
     }
   }
 
+  const handleRefreshSuggested = async () => {
+    setIsRefreshing(true)
+
+    try {
+      const result = await refreshRepresentativePhotos(pinID)
+      setPin((prev) => ({
+        ...prev,
+        representative_photos: result.representative_photos,
+      }))
+    } catch (error) {
+      setErrorMessage(error.message)
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
+
   const handleDelete = async () => {
     setIsDeleting(true)
     setDeleteError('')
@@ -204,8 +222,9 @@ const PinDetail = () => {
     : null
   const title = pin.place_name || pin.address || '이름 없는 장소'
   const representativePhotos = pin.representative_photos ?? []
-  // 대표사진 자리에 안 보이는 나머지 장수
-  const hiddenPhotoCount = Math.max(photoCount - representativePhotos.length, 0)
+  const previewPhotos = photos.slice(0, 3)
+  // 미리보기 세 칸에 안 들어간 나머지 장수
+  const hiddenPhotoCount = Math.max(photos.length - previewPhotos.length, 0)
   // 5.3: 여정에 배정되기 전(진행 중)인 핀만 삭제할 수 있다.
   const isDeletable = pin.segment_id === null
   const hasMemo =
@@ -353,19 +372,19 @@ const PinDetail = () => {
 
             <PhotoGrid>
               <Photo $tone="main">
-                {representativePhotos[0] && (
-                  <PhotoImage src={representativePhotos[0].url} alt="" />
+                {previewPhotos[0] && (
+                  <PhotoImage src={previewPhotos[0].file_path} alt="" />
                 )}
               </Photo>
               <PhotoStack>
                 <Photo $tone="light">
-                  {representativePhotos[1] && (
-                    <PhotoImage src={representativePhotos[1].url} alt="" />
+                  {previewPhotos[1] && (
+                    <PhotoImage src={previewPhotos[1].file_path} alt="" />
                   )}
                 </Photo>
                 <Photo $tone="dark">
-                  {representativePhotos[2] && (
-                    <PhotoImage src={representativePhotos[2].url} alt="" />
+                  {previewPhotos[2] && (
+                    <PhotoImage src={previewPhotos[2].file_path} alt="" />
                   )}
                   {hiddenPhotoCount > 0 && (
                     <>
@@ -382,12 +401,16 @@ const PinDetail = () => {
             <SuggestedHeading>
               <SuggestedTitle>
                 <EditorialTitle>SUGGESTED</EditorialTitle>
-                <SuggestedCount>3</SuggestedCount>
+                <SuggestedCount>{representativePhotos.length}</SuggestedCount>
               </SuggestedTitle>
               <HeadingLine />
-              <RefreshButton type="button">
+              <RefreshButton
+                type="button"
+                onClick={handleRefreshSuggested}
+                disabled={isRefreshing || photos.length === 0}
+              >
                 <img src={refreshIcon} alt="" />
-                재추천
+                {isRefreshing ? '고르는 중...' : '재추천'}
               </RefreshButton>
             </SuggestedHeading>
             <SuggestedDescription>
@@ -395,9 +418,20 @@ const PinDetail = () => {
             </SuggestedDescription>
 
             <SuggestedGrid>
-              {['soft', 'warm', 'main'].map((tone) => (
-                <SuggestedPhoto key={tone} $tone={tone}>
-                  <AddButton type="button" aria-label="추천 사진 추가">
+              {representativePhotos.map((photo, index) => (
+                <SuggestedPhoto
+                  key={photo.photo_id}
+                  $tone={['soft', 'warm', 'main'][index] ?? 'main'}
+                >
+                  <PhotoImage src={photo.url} alt="" />
+                  {/* TODO: 기능명세 5.2.2(추천 사진 추가·제외)에 해당하는 엔드포인트가
+                      API 명세서에 없어 동작을 붙이지 못했다. 누르면 아무 일도 없는
+                      상태로 두면 오해를 사서 비활성으로 표시한다. */}
+                  <AddButton
+                    type="button"
+                    disabled
+                    aria-label="추천 사진 추가 (준비 중)"
+                  >
                     <img src={photoAddIcon} alt="" />
                   </AddButton>
                 </SuggestedPhoto>

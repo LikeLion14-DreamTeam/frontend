@@ -182,6 +182,40 @@ export const addPinPhotos = async (pinId, photos) => {
 }
 
 /**
+ * 5.6 대표사진 새로고침
+ *
+ * 핀의 사진을 새로고침 시점의 취향 프로파일 기준으로 재정렬해 상위 10개를 뽑고,
+ * 그중 무작위 3개를 대표사진으로 지정한다(기존 3장 해제 후 새 3장에 is_pin_cover=true).
+ * 이전 추천 이력은 보존하지 않으며, 이 행위 자체는 취향 학습에 반영되지 않는다.
+ *
+ * mock 에는 취향 프로파일이 없어 무작위 3장으로만 다시 지정한다.
+ */
+export const refreshRepresentativePhotos = async (pinId) => {
+  if (USE_MOCK) {
+    const pin = mockPinStore.pins[pinId]
+    if (!pin) throw mockNotFound()
+
+    const photos = mockPinStore.photos[pinId] ?? []
+    const picked = [...photos]
+      .sort(() => Math.random() - 0.5)
+      .slice(0, Math.min(3, photos.length))
+    const pickedIds = new Set(picked.map((photo) => photo.photo_id))
+
+    photos.forEach((photo) => {
+      photo.is_pin_cover = pickedIds.has(photo.photo_id)
+    })
+
+    return {
+      representative_photos: photos
+        .filter((photo) => photo.is_pin_cover)
+        .map((photo) => ({ photo_id: photo.photo_id, url: photo.file_path })),
+    }
+  }
+
+  return apiClient.post(`/pins/${pinId}/representative-photos/refresh`)
+}
+
+/**
  * 5.3 핀 삭제
  *
  * 아직 여정으로 배정되지 않은(segment_id = null, 진행 중) 핀만 삭제할 수 있다.
