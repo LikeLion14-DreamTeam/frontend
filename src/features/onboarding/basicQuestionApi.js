@@ -1,5 +1,6 @@
 import apiClient from '../../api/client'
 import { saveMockBasicQuestionResponse } from './basicQuestionMock'
+import { recordMockApiCall } from './onboardingDebug'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK_API === 'true'
 
@@ -11,7 +12,13 @@ export const saveBasicQuestionResponse = async ({ roundNo, response }) => {
   }
 
   if (USE_MOCK) {
-    return saveMockBasicQuestionResponse(basicQuestionResponse)
+    const savedResponse = saveMockBasicQuestionResponse(basicQuestionResponse)
+    recordMockApiCall({
+      endpoint: '/users/me/basic-question-responses',
+      payload: basicQuestionResponse,
+      response: savedResponse,
+    })
+    return savedResponse
   }
 
   return apiClient.post(
@@ -19,4 +26,3 @@ export const saveBasicQuestionResponse = async ({ roundNo, response }) => {
     basicQuestionResponse,
   )
 }
-

@@ -43,17 +43,15 @@ const BasicQuestion = () => {
   const [answers, setAnswers] = useState(() =>
     Array(TOTAL_ROUND).fill(null),
   )
-  const [savedResponses, setSavedResponses] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
   const question = questions[round - 1]
   const selected = answers[round - 1]
   const isLastRound = round === TOTAL_ROUND
-  const isSaved = Boolean(savedResponses[round])
 
   const handleSelect = (option) => {
-    if (isSubmitting || isSaved) return
+    if (isSubmitting) return
 
     setAnswers((currentAnswers) => {
       const nextAnswers = [...currentAnswers]
@@ -63,20 +61,11 @@ const BasicQuestion = () => {
     setErrorMessage('')
   }
 
-  const moveToNextRound = () => {
-    if (!isLastRound) {
-      setRound((currentRound) => currentRound + 1)
-      return
-    }
-
-    navigate('/onboarding/ab-preference')
-  }
-
   const handleNext = async () => {
     if (!selected || isSubmitting) return
 
-    if (isSaved) {
-      moveToNextRound()
+    if (!isLastRound) {
+      setRound((currentRound) => currentRound + 1)
       return
     }
 
@@ -84,16 +73,15 @@ const BasicQuestion = () => {
     setErrorMessage('')
 
     try {
-      const savedResponse = await saveBasicQuestionResponse({
-        roundNo: round,
-        response: selected,
-      })
-
-      setSavedResponses((currentResponses) => ({
-        ...currentResponses,
-        [round]: savedResponse,
-      }))
-      moveToNextRound()
+      await Promise.all(
+        answers.map((response, index) =>
+          saveBasicQuestionResponse({
+            roundNo: index + 1,
+            response,
+          }),
+        ),
+      )
+      navigate('/onboarding/ab-preference')
     } catch (error) {
       setErrorMessage(
         error.message ??
@@ -129,7 +117,7 @@ const BasicQuestion = () => {
                 key={option}
                 selected={selected === option}
                 onClick={() => handleSelect(option)}
-                disabled={isSubmitting || isSaved}
+                disabled={isSubmitting}
               >
                 {option}
               </Option>
