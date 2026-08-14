@@ -58,3 +58,32 @@ export const syncSelectionPhotos = async ({
 
   return savedSelections
 }
+
+/**
+ * 재학습 라운드에서 후보 전체의 상태를 다시 기록한다.
+ * 기존 선택 조회 API가 없으므로 알려진 후보를 false로 해제한 뒤 새 선택을 true로 저장한다.
+ */
+export const replaceSelectionPhotos = async ({
+  roundNo,
+  candidatePhotoIds,
+  selectedPhotoIds,
+}) => {
+  const selectedPhotoIdSet = new Set(selectedPhotoIds)
+  const savedSelections = []
+
+  for (const photoId of candidatePhotoIds) {
+    if (selectedPhotoIdSet.has(photoId)) continue
+
+    savedSelections.push(
+      await saveSelectionPhoto({ photoId, roundNo, status: false }),
+    )
+  }
+
+  for (const photoId of selectedPhotoIds) {
+    savedSelections.push(
+      await saveSelectionPhoto({ photoId, roundNo, status: true }),
+    )
+  }
+
+  return savedSelections
+}

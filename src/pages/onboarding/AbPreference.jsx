@@ -1,12 +1,19 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import Button from '../../components/common/Button'
 import Choice from '../../components/common/Choice'
 import Progress from '../../components/common/Progress'
 import Header from '../../components/layout/Header'
-import { syncSelectionPhotos } from '../../features/onboarding/selectionPhotoApi'
+import {
+  replaceSelectionPhotos,
+  syncSelectionPhotos,
+} from '../../features/onboarding/selectionPhotoApi'
 import { AB_PHOTO_ROUNDS } from '../../features/onboarding/selectionPhotoData'
+import {
+  getOnboardingFlowPath,
+  isRelearningFlow,
+} from '../../features/onboarding/onboardingFlow'
 
 const TOTAL_ROUND = AB_PHOTO_ROUNDS.length
 
@@ -16,7 +23,9 @@ const question = {
 }
 
 const AbPreference = () => {
+  const location = useLocation()
   const navigate = useNavigate()
+  const isRelearning = isRelearningFlow(location.search)
   const [round, setRound] = useState(1)
   const [answers, setAnswers] = useState(() =>
     Array(TOTAL_ROUND).fill(null),
@@ -47,13 +56,21 @@ const AbPreference = () => {
     setErrorMessage('')
 
     try {
-      await syncSelectionPhotos({
-        roundNo: photoRound.roundNo,
-        previousPhotoIds: savedPhotoIds[photoRound.roundNo]
-          ? [savedPhotoIds[photoRound.roundNo]]
-          : [],
-        selectedPhotoIds: [selectedPhotoId],
-      })
+      if (isRelearning) {
+        await replaceSelectionPhotos({
+          roundNo: photoRound.roundNo,
+          candidatePhotoIds: photoRound.photos.map((photo) => photo.photoId),
+          selectedPhotoIds: [selectedPhotoId],
+        })
+      } else {
+        await syncSelectionPhotos({
+          roundNo: photoRound.roundNo,
+          previousPhotoIds: savedPhotoIds[photoRound.roundNo]
+            ? [savedPhotoIds[photoRound.roundNo]]
+            : [],
+          selectedPhotoIds: [selectedPhotoId],
+        })
+      }
 
       setSavedPhotoIds((currentPhotoIds) => ({
         ...currentPhotoIds,
@@ -65,7 +82,7 @@ const AbPreference = () => {
         return
       }
 
-      navigate('/onboarding/moodboard')
+      navigate(getOnboardingFlowPath('/onboarding/moodboard', isRelearning))
     } catch (error) {
       setErrorMessage(
         error.message ??
@@ -83,7 +100,12 @@ const AbPreference = () => {
 
   return (
     <>
-      <Header to="/onboarding/basic-question" />
+      <Header
+        to={getOnboardingFlowPath(
+          '/onboarding/basic-question',
+          isRelearning,
+        )}
+      />
 
       <OnboardingWrapper>
 

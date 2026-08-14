@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import Button from '../../components/common/Button'
 import Progress from '../../components/common/Progress'
@@ -8,14 +8,23 @@ import Header from '../../components/layout/Header'
 import { updateMyAccount } from '../../features/auth/authApi'
 import { getAuthenticatedEntryPath } from '../../features/auth/authRoutes'
 import useAuthStore from '../../features/auth/useAuthStore'
-import { syncSelectionPhotos } from '../../features/onboarding/selectionPhotoApi'
+import {
+  replaceSelectionPhotos,
+  syncSelectionPhotos,
+} from '../../features/onboarding/selectionPhotoApi'
 import { MOODBOARD_PHOTO_ROUNDS } from '../../features/onboarding/selectionPhotoData'
+import {
+  getOnboardingFlowPath,
+  isRelearningFlow,
+} from '../../features/onboarding/onboardingFlow'
 
 const TOTAL_ROUND = MOODBOARD_PHOTO_ROUNDS.length
 const SELECT_LIMIT = 3
 
 const MoodBoard = () => {
+  const location = useLocation()
   const navigate = useNavigate()
+  const isRelearning = isRelearningFlow(location.search)
   const user = useAuthStore((state) => state.user)
   const setUser = useAuthStore((state) => state.setUser)
   const [round, setRound] = useState(1)
@@ -59,11 +68,19 @@ const MoodBoard = () => {
     setErrorMessage('')
 
     try {
-      await syncSelectionPhotos({
-        roundNo: photoRound.roundNo,
-        previousPhotoIds: savedPhotoIds[photoRound.roundNo] ?? [],
-        selectedPhotoIds,
-      })
+      if (isRelearning) {
+        await replaceSelectionPhotos({
+          roundNo: photoRound.roundNo,
+          candidatePhotoIds: photoRound.photos.map((photo) => photo.photoId),
+          selectedPhotoIds,
+        })
+      } else {
+        await syncSelectionPhotos({
+          roundNo: photoRound.roundNo,
+          previousPhotoIds: savedPhotoIds[photoRound.roundNo] ?? [],
+          selectedPhotoIds,
+        })
+      }
 
       setSavedPhotoIds((currentPhotoIds) => ({
         ...currentPhotoIds,
@@ -72,6 +89,14 @@ const MoodBoard = () => {
 
       if (!isLastRound) {
         setRound((currentRound) => currentRound + 1)
+        return
+      }
+
+      if (isRelearning) {
+        navigate('/mypage', {
+          replace: true,
+          state: { relearningCompleted: true },
+        })
         return
       }
 
@@ -100,7 +125,12 @@ const MoodBoard = () => {
 
   return (
     <>
-      <Header to="/onboarding/ab-preference" />
+      <Header
+        to={getOnboardingFlowPath(
+          '/onboarding/ab-preference',
+          isRelearning,
+        )}
+      />
 
       <OnboardingWrapper>
 

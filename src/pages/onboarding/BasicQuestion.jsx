@@ -1,11 +1,15 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import Button from '../../components/common/Button'
 import Option from '../../components/common/Option'
 import Progress from '../../components/common/Progress'
 import Header from '../../components/layout/Header'
 import { saveBasicQuestionResponse } from '../../features/onboarding/basicQuestionApi'
+import {
+  getOnboardingFlowPath,
+  isRelearningFlow,
+} from '../../features/onboarding/onboardingFlow'
 
 const questions = [
   {
@@ -38,7 +42,9 @@ const questions = [
 const TOTAL_ROUND = questions.length
 
 const BasicQuestion = () => {
+  const location = useLocation()
   const navigate = useNavigate()
+  const isRelearning = isRelearningFlow(location.search)
   const [round, setRound] = useState(1)
   const [answers, setAnswers] = useState(() =>
     Array(TOTAL_ROUND).fill(null),
@@ -78,10 +84,13 @@ const BasicQuestion = () => {
           saveBasicQuestionResponse({
             roundNo: index + 1,
             response,
+            replaceExisting: isRelearning,
           }),
         ),
       )
-      navigate('/onboarding/ab-preference')
+      navigate(
+        getOnboardingFlowPath('/onboarding/ab-preference', isRelearning),
+      )
     } catch (error) {
       setErrorMessage(
         error.message ??
@@ -99,7 +108,7 @@ const BasicQuestion = () => {
 
   return (
     <>
-      <Header to="/permission" />
+      <Header to={isRelearning ? '/mypage' : '/permission'} />
 
       <OnboardingWrapper>
 

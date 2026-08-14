@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { googleLogout } from '@react-oauth/google'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import Button from '../../components/common/Button'
 import NavBar from '../../components/layout/NavBar'
@@ -10,7 +10,11 @@ import {
 } from '../../api/session'
 import { getMyAccount, logout } from '../../features/auth/authApi'
 import useAuthStore from '../../features/auth/useAuthStore'
-import { getTasteProfileAxes } from '../../features/onboarding/tasteProfileApi'
+import {
+  getTasteProfileAxes,
+  updateTasteProfileAxis,
+} from '../../features/onboarding/tasteProfileApi'
+import { getOnboardingFlowPath } from '../../features/onboarding/onboardingFlow'
 import addIcon from '../../assets/icons/mypage/add.svg'
 import briefcaseIcon from '../../assets/icons/mypage/briefcase.svg'
 import chevronRightIcon from '../../assets/icons/mypage/chevron-right.svg'
@@ -33,6 +37,20 @@ const TASTE_AXIS_PRESENTATION = [
   { axisCode: 'framing', left: '클로즈업', right: '넓게' },
   { axisCode: 'angle', left: '정면', right: '뒷모습·옆모습' },
 ]
+
+const TASTE_AXIS_COMMIT_KEYS = new Set([
+  'ArrowLeft',
+  'ArrowRight',
+  'ArrowDown',
+  'ArrowUp',
+  'Home',
+  'End',
+  'PageDown',
+  'PageUp',
+])
+
+const RELEARNING_COMPLETED_MESSAGE =
+  '취향 프로필이 갱신되었습니다. 기존 추천은 유지되며, 이후 생성하거나 재추천한 사진부터 새 기준이 적용됩니다.'
 
 const getAxisValue = (value) => {
   if (value === null || value === undefined) return 50
@@ -70,6 +88,7 @@ const settings = [
 ]
 
 const MyPage = () => {
+  const location = useLocation()
   const navigate = useNavigate()
   const storedUser = useAuthStore((state) => state.user)
   const setUser = useAuthStore((state) => state.setUser)
@@ -82,6 +101,15 @@ const MyPage = () => {
   const [isTasteAxesLoading, setIsTasteAxesLoading] = useState(true)
   const [tasteAxesError, setTasteAxesError] = useState('')
   const [tasteAxesRequestKey, setTasteAxesRequestKey] = useState(0)
+  const [savingTasteAxisCodes, setSavingTasteAxisCodes] = useState([])
+  const [tasteAxisSaveError, setTasteAxisSaveError] = useState('')
+  const savedTasteAxisValuesRef = useRef(new Map())
+  const savingTasteAxisCodesRef = useRef(new Set())
+  const [relearningNotice] = useState(() =>
+    location.state?.relearningCompleted
+      ? RELEARNING_COMPLETED_MESSAGE
+      : '',
+  )
 
   useEffect(() => {
     let ignore = false
@@ -135,7 +163,15 @@ const MyPage = () => {
         const tasteProfile = await getTasteProfileAxes()
 
         if (!ignore) {
-          setTasteAxes(createTasteAxisPresentation(tasteProfile.axes))
+          const presentedTasteAxes = createTasteAxisPresentation(
+            tasteProfile.axes,
+          )
+
+          setTasteAxes(presentedTasteAxes)
+          savedTasteAxisValuesRef.current = new Map(
+            presentedTasteAxes.map((axis) => [axis.axisCode, axis.value]),
+          )
+          setTasteAxisSaveError('')
         }
       } catch (error) {
         if (ignore) return
@@ -148,6 +184,7 @@ const MyPage = () => {
         }
 
         setTasteAxes([])
+        savedTasteAxisValuesRef.current = new Map()
         setTasteAxesError(
           error.message ?? '취향 프로필을 불러오지 못했습니다.',
         )
@@ -164,6 +201,90 @@ const MyPage = () => {
       ignore = true
     }
   }, [clearUser, navigate, tasteAxesRequestKey])
+
+  const handleTasteAxisChange = (axisCode, rawValue) => {
+    const value = getAxisValue(rawValue)
+
+    setTasteAxes((currentAxes) =>
+      currentAxes.map((axis) =>
+        axis.axisCode === axisCode ? { ...axis, value } : axis,
+      ),
+    )
+    setTasteAxisSaveError('')
+  }
+
+  const commitTasteAxisValue = async (axisCode, rawValue) => {
+    const value = getAxisValue(rawValue)
+    const savedValue = savedTasteAxisValuesRef.current.get(axisCode)
+
+    if (
+      savedValue === value ||
+      savingTasteAxisCodesRef.current.has(axisCode)
+    ) {
+      return
+    }
+
+    savingTasteAxisCodesRef.current.add(axisCode)
+    setSavingTasteAxisCodes([...savingTasteAxisCodesRef.current])
+    setTasteAxisSaveError('')
+
+    try {
+      const updatedAxis = await updateTasteProfileAxis({ axisCode, value })
+      const updatedValue = getAxisValue(updatedAxis.value)
+
+      savedTasteAxisValuesRef.current.set(axisCode, updatedValue)
+      setTasteAxes((currentAxes) =>
+        currentAxes.map((axis) =>
+          axis.axisCode === axisCode
+            ? {
+                ...axis,
+                value: updatedValue,
+                status: updatedAxis.status,
+              }
+            : axis,
+        ),
+      )
+    } catch (error) {
+      if (error.code === 'UNAUTHENTICATED') {
+        clearSessionToken()
+        clearUser()
+        navigate('/login', { replace: true })
+        return
+      }
+
+      setTasteAxes((currentAxes) =>
+        currentAxes.map((axis) =>
+          axis.axisCode === axisCode
+            ? { ...axis, value: savedValue }
+            : axis,
+        ),
+      )
+      setTasteAxisSaveError(
+        error.message ?? '취향 값을 저장하지 못했습니다. 다시 시도해 주세요.',
+      )
+    } finally {
+      savingTasteAxisCodesRef.current.delete(axisCode)
+      setSavingTasteAxisCodes([...savingTasteAxisCodesRef.current])
+    }
+  }
+
+  const handleTasteAxisKeyUp = (axisCode, event) => {
+    if (!TASTE_AXIS_COMMIT_KEYS.has(event.key)) return
+
+    void commitTasteAxisValue(axisCode, event.currentTarget.value)
+  }
+
+  const handleStartRelearning = () => {
+    const shouldStartRelearning = window.confirm(
+      '재학습을 완료하면 기존 취향 프로필이 새 응답으로 교체됩니다. 완료 전까지는 기존 프로필이 유지됩니다. 재학습을 시작할까요?',
+    )
+
+    if (!shouldStartRelearning) return
+
+    navigate(
+      getOnboardingFlowPath('/onboarding/basic-question', true),
+    )
+  }
 
   const handleLogout = () => {
     const sessionToken = getSessionToken()
@@ -216,10 +337,14 @@ const MyPage = () => {
           ))}
         </StatsGrid>
 
+        {relearningNotice && (
+          <RelearningNotice role="status">{relearningNotice}</RelearningNotice>
+        )}
+
         <Panel>
           <SectionHeader>
             <SectionTitle>취향 프로필</SectionTitle>
-            <RelearnButton type="button">
+            <RelearnButton type="button" onClick={handleStartRelearning}>
               재학습
               <RefreshIcon src={refreshIcon} alt="" aria-hidden="true" />
             </RelearnButton>
@@ -240,34 +365,85 @@ const MyPage = () => {
               </RetryButton>
             </PreferenceFeedback>
           ) : (
-            <PreferenceList>
-              {tasteAxes.map((preference) => (
-                <PreferenceItem
-                  key={preference.axisCode}
-                  aria-busy={preference.status === 'PENDING'}
-                >
-                  <PreferenceLabels>
-                    <span>{preference.left}</span>
-                    <span>{preference.right}</span>
-                  </PreferenceLabels>
-                  <PreferenceSlider
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="0.1"
-                    value={preference.value}
-                    style={{
-                      '--slider-progress': `${preference.value}%`,
-                    }}
-                    aria-label={`${preference.left}에서 ${preference.right} 사이의 취향 값`}
-                    aria-valuetext={`${Math.round(preference.value)}점${
-                      preference.status === 'PENDING' ? ', 반영 중' : ''
-                    }`}
-                    disabled
-                  />
-                </PreferenceItem>
-              ))}
-            </PreferenceList>
+            <>
+              <PreferenceList>
+                {tasteAxes.map((preference) => {
+                  const isSaving = savingTasteAxisCodes.includes(
+                    preference.axisCode,
+                  )
+
+                  return (
+                    <PreferenceItem
+                      key={preference.axisCode}
+                      aria-busy={
+                        preference.status === 'PENDING' || isSaving
+                      }
+                    >
+                      <PreferenceLabels>
+                        <span>{preference.left}</span>
+                        <span>{preference.right}</span>
+                      </PreferenceLabels>
+                      <PreferenceSlider
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="1"
+                        value={preference.value}
+                        style={{
+                          '--slider-progress': `${preference.value}%`,
+                        }}
+                        aria-label={`${preference.left}에서 ${preference.right} 사이의 취향 값`}
+                        aria-valuetext={`${Math.round(preference.value)}점${
+                          isSaving
+                            ? ', 저장 중'
+                            : preference.status === 'PENDING'
+                              ? ', 반영 중'
+                              : ''
+                        }`}
+                        onChange={(event) =>
+                          handleTasteAxisChange(
+                            preference.axisCode,
+                            event.currentTarget.value,
+                          )
+                        }
+                        onPointerUp={(event) =>
+                          void commitTasteAxisValue(
+                            preference.axisCode,
+                            event.currentTarget.value,
+                          )
+                        }
+                        onPointerCancel={(event) =>
+                          void commitTasteAxisValue(
+                            preference.axisCode,
+                            event.currentTarget.value,
+                          )
+                        }
+                        onKeyUp={(event) =>
+                          handleTasteAxisKeyUp(preference.axisCode, event)
+                        }
+                        onBlur={(event) =>
+                          void commitTasteAxisValue(
+                            preference.axisCode,
+                            event.currentTarget.value,
+                          )
+                        }
+                        disabled={isSaving}
+                      />
+                    </PreferenceItem>
+                  )
+                })}
+              </PreferenceList>
+              {savingTasteAxisCodes.length > 0 && !tasteAxisSaveError && (
+                <PreferenceUpdateFeedback role="status">
+                  변경사항 저장 중...
+                </PreferenceUpdateFeedback>
+              )}
+              {tasteAxisSaveError && (
+                <PreferenceUpdateFeedback role="alert" $error>
+                  {tasteAxisSaveError}
+                </PreferenceUpdateFeedback>
+              )}
+            </>
           )}
         </Panel>
 
@@ -503,6 +679,17 @@ const PreferenceList = styled.div`
   gap: 14px;
 `
 
+const RelearningNotice = styled.p`
+  padding: 12px 14px;
+  border: 1px solid rgb(181 118 59 / 35%);
+  border-radius: 10px;
+  background: rgb(181 118 59 / 8%);
+  color: var(--Text-Secondary);
+  font: var(--text-ui-caption);
+  line-height: 1.55;
+  word-break: keep-all;
+`
+
 const PreferenceFeedback = styled.p`
   min-height: 132px;
   display: flex;
@@ -510,6 +697,12 @@ const PreferenceFeedback = styled.p`
   align-items: center;
   justify-content: center;
   gap: 8px;
+  color: ${({ $error }) => ($error ? '#b42318' : 'var(--Text-Secondary)')};
+  font: var(--text-ui-caption);
+  text-align: center;
+`
+
+const PreferenceUpdateFeedback = styled.p`
   color: ${({ $error }) => ($error ? '#b42318' : 'var(--Text-Secondary)')};
   font: var(--text-ui-caption);
   text-align: center;

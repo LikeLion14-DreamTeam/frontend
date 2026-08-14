@@ -10,7 +10,10 @@ const createValidationError = () =>
   })
 
 /** API 명세 2.1과 동일한 형태로 기본 질문 응답을 메모리에 저장한다. */
-export const saveMockBasicQuestionResponse = ({ round_no, response }) => {
+export const saveMockBasicQuestionResponse = (
+  { round_no, response },
+  { replaceExisting = false } = {},
+) => {
   if (
     !Number.isInteger(round_no) ||
     round_no < 1 ||
@@ -22,12 +25,13 @@ export const saveMockBasicQuestionResponse = ({ round_no, response }) => {
 
   // 동일 라운드가 연속으로 제출되면 먼저 저장된 응답을 유지한다.
   const savedResponse = mockBasicQuestionResponses.get(round_no)
-  if (savedResponse) {
+  if (savedResponse && !replaceExisting) {
     return { ...savedResponse }
   }
 
   const basicQuestionResponse = {
-    response_id: 500 + mockBasicQuestionResponses.size + 1,
+    response_id:
+      savedResponse?.response_id ?? 500 + mockBasicQuestionResponses.size + 1,
     user_id: 1,
     round_no,
     response,
@@ -38,4 +42,3 @@ export const saveMockBasicQuestionResponse = ({ round_no, response }) => {
 
   return { ...basicQuestionResponse }
 }
-
