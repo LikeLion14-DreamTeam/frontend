@@ -1,5 +1,6 @@
 import apiClient from '../../api/client'
 import { ApiError } from '../../api/errors'
+import { getMockUploadedUrl } from '../../api/uploads'
 import { mockPinStore } from './pinMock'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK_API === 'true'
@@ -96,6 +97,88 @@ export const getPinPhotos = async (
   }
 
   return apiClient.get(`/pins/${pinId}/photos`, { params: { cursor, limit } })
+}
+
+/** mock 전용. 두 좌표 사이 거리(m). 5.5 반경 검증에 쓴다. */
+const distanceInMeters = (from, to) => {
+  const toRadian = (degree) => (degree * Math.PI) / 180
+  const earthRadius = 6371000
+
+  const dLat = toRadian(to.lat - from.lat)
+  const dLng = toRadian(to.lng - from.lng)
+
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRadian(from.lat)) *
+      Math.cos(toRadian(to.lat)) *
+      Math.sin(dLng / 2) ** 2
+
+  return 2 * earthRadius * Math.asin(Math.sqrt(a))
+}
+
+const PHOTO_RADIUS_METERS = 1000
+
+/**
+ * 5.5 사진 등록
+ *
+ * 핀 반경 1km 이내에서 촬영된 사진만 등록한다. 반경 밖이거나 좌표가 없는 사진은
+ * 그것만 제외하고 나머지는 정상 등록한다(요청 전체를 거부하지 않음).
+ * 다만 핀이 이미 종료된 여행에 속해 있으면 요청 전체를 409 로 거부한다.
+ *
+ * `photos` 는 `[{ file_id, captured_at, latitude, longitude }]` 형태이며,
+ * file_id 는 `api/uploads` 의 2단계 업로드로 먼저 받아둔다.
+ */
+export const addPinPhotos = async (pinId, photos) => {
+  if (USE_MOCK) {
+    const pin = mockPinStore.pins[pinId]
+    if (!pin) throw mockNotFound()
+
+    if (pin.segment_id !== null) {
+      throw new ApiError({
+        status: 409,
+        code: 'CONFLICT',
+        message: '이미 종료된 여행에는 사진을 추가할 수 없습니다.',
+      })
+    }
+
+    const added = []
+    const rejected = []
+    const stored = mockPinStore.photos[pinId] ?? []
+
+    photos.forEach((photo) => {
+      if (photo.latitude == null || photo.longitude == null) {
+        rejected.push({ file_id: photo.file_id, reason: 'MISSING_COORDINATES' })
+        return
+      }
+
+      const distance = distanceInMeters(
+        { lat: pin.latitude, lng: pin.longitude },
+        { lat: photo.latitude, lng: photo.longitude },
+      )
+
+      if (distance > PHOTO_RADIUS_METERS) {
+        rejected.push({ file_id: photo.file_id, reason: 'OUT_OF_RADIUS' })
+        return
+      }
+
+      const photoId = Math.max(0, ...stored.map((item) => item.photo_id)) + 1
+
+      stored.push({
+        photo_id: photoId,
+        captured_at: photo.captured_at,
+        file_path: getMockUploadedUrl(photo.file_id),
+        is_pin_cover: false,
+      })
+
+      added.push({ photo_id: photoId, file_id: photo.file_id })
+    })
+
+    mockPinStore.photos[pinId] = stored
+
+    return { added, rejected }
+  }
+
+  return apiClient.post(`/pins/${pinId}/photos`, { photos })
 }
 
 /**

@@ -1,8 +1,40 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import styled from 'styled-components'
+import exifr from 'exifr'
 import backIcon from '../../assets/icons/Back.svg'
-import { getPin, getPinPhotos } from '../../features/pins/pinApi'
+import { uploadPhoto } from '../../api/uploads'
+import {
+  addPinPhotos,
+  getPin,
+  getPinPhotos,
+} from '../../features/pins/pinApi'
+
+const REJECT_REASONS = {
+  OUT_OF_RADIUS: '1km 밖에서 촬영됨',
+  MISSING_COORDINATES: '위치 정보 없음',
+}
+
+/**
+ * 갤러리 사진의 촬영 좌표·시각을 EXIF 에서 읽는다.
+ *
+ * 공유·메신저를 거친 사진은 위치 정보가 지워진 경우가 많다. 그런 사진은
+ * 좌표 없이 보내고 서버가 MISSING_COORDINATES 로 걸러낸다.
+ */
+const readPhotoMeta = async (file) => {
+  const [gps, exif] = await Promise.all([
+    exifr.gps(file).catch(() => null),
+    exifr.parse(file, ['DateTimeOriginal']).catch(() => null),
+  ])
+
+  const capturedAt = exif?.DateTimeOriginal ?? new Date(file.lastModified)
+
+  return {
+    latitude: gps?.latitude ?? null,
+    longitude: gps?.longitude ?? null,
+    captured_at: capturedAt.toISOString(),
+  }
+}
 
 // 핀 상세를 거치지 않고 들어왔을 때를 위한 기본값.
 const FALLBACK_PIN_ID = 101
@@ -33,6 +65,11 @@ const AllPhotos = () => {
   const [photos, setPhotos] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
+
+  const fileInputRef = useRef(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const [addResult, setAddResult] = useState(null)
+  const [addError, setAddError] = useState('')
 
   useEffect(() => {
     let ignore = false
@@ -66,6 +103,43 @@ const AllPhotos = () => {
   }, [pinID])
 
   const title = pin?.place_name || pin?.address || '이름 없는 장소'
+  // 5.5: 이미 종료된 여행의 핀에는 사진을 추가할 수 없다.
+  const canAddPhotos = pin?.segment_id === null
+
+  const handleFilesSelected = async (event) => {
+    const files = Array.from(event.target.files ?? [])
+    event.target.value = ''
+
+    if (files.length === 0) return
+
+    setIsUploading(true)
+    setAddError('')
+    setAddResult(null)
+
+    try {
+      // 파일마다 사전 서명 URL 을 받아 올리고, EXIF 에서 좌표·시각을 읽어 붙인다.
+      const uploaded = await Promise.all(
+        files.map(async (file) => {
+          const [fileId, meta] = await Promise.all([
+            uploadPhoto(file),
+            readPhotoMeta(file),
+          ])
+
+          return { file_id: fileId, ...meta }
+        }),
+      )
+
+      const result = await addPinPhotos(pinID, uploaded)
+      setAddResult(result)
+
+      const photoList = await getPinPhotos(pinID)
+      setPhotos(photoList.photos)
+    } catch (error) {
+      setAddError(error.message)
+    } finally {
+      setIsUploading(false)
+    }
+  }
 
   return (
     <Page>
@@ -78,12 +152,25 @@ const AllPhotos = () => {
           <img src={backIcon} alt="" />
         </BackButton>
 
+        <HiddenFileInput
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={handleFilesSelected}
+        />
+
         <AddNearbyButton
           type="button"
-          aria-disabled="true"
-          aria-label="주변 사진 추가 (준비 중)"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={!canAddPhotos || isUploading}
+          aria-label={
+            canAddPhotos
+              ? '주변 사진 추가'
+              : '종료된 여행의 핀에는 사진을 추가할 수 없습니다'
+          }
         >
-          주변 사진 추가
+          {isUploading ? '추가 중...' : '주변 사진 추가'}
         </AddNearbyButton>
       </Toolbar>
 
@@ -95,6 +182,28 @@ const AllPhotos = () => {
           </Meta>
         )}
       </Heading>
+
+      {addError && <StateMessage role="alert">{addError}</StateMessage>}
+
+      {addResult && (
+        <AddResult role="status">
+          {addResult.added.length > 0 && (
+            <ResultLine>사진 {addResult.added.length}장을 추가했어요.</ResultLine>
+          )}
+          {addResult.rejected.length > 0 && (
+            <ResultLine>
+              {addResult.rejected.length}장은 추가하지 못했어요 ·{' '}
+              {[
+                ...new Set(
+                  addResult.rejected.map(
+                    ({ reason }) => REJECT_REASONS[reason] ?? reason,
+                  ),
+                ),
+              ].join(', ')}
+            </ResultLine>
+          )}
+        </AddResult>
+      )}
 
       {isLoading && <StateMessage>불러오는 중...</StateMessage>}
 
@@ -198,7 +307,12 @@ const AddNearbyButton = styled.button`
   background: transparent;
   color: var(--Primary-Cognac);
   font: var(--text-ui-button);
-  cursor: default;
+  cursor: pointer;
+
+  &:disabled {
+    color: var(--State-Disabled-Text);
+    cursor: not-allowed;
+  }
 `
 
 const Heading = styled.div`
@@ -302,6 +416,30 @@ const PhotoImage = styled.img`
   height: 100%;
   display: block;
   object-fit: cover;
+`
+
+const HiddenFileInput = styled.input`
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+`
+
+const AddResult = styled.div`
+  margin: 0 24px 12px 0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--Surface-Base);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+`
+
+const ResultLine = styled.p`
+  color: var(--Text-Secondary);
+  font: var(--text-ui-caption);
+  word-break: keep-all;
 `
 
 const StateMessage = styled.p`
