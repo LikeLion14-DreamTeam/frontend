@@ -1,6 +1,8 @@
 import { ApiError } from '../../api/errors'
 
-export const MOCK_TASTE_PROFILE_AXES = [
+const MOCK_TASTE_PROFILE_AXES_STORAGE_KEY = 'orte:mock:taste-profile-axes'
+
+const DEFAULT_MOCK_TASTE_PROFILE_AXES = [
   { axis_code: 'brightness', value: 62, status: 'REFLECTED' },
   { axis_code: 'vividness', value: 40, status: 'REFLECTED' },
   { axis_code: 'tone', value: 55, status: 'REFLECTED' },
@@ -8,6 +10,61 @@ export const MOCK_TASTE_PROFILE_AXES = [
   { axis_code: 'framing', value: 70, status: 'REFLECTED' },
   { axis_code: 'angle', value: 45, status: 'REFLECTED' },
 ]
+
+const cloneDefaultTasteProfileAxes = () =>
+  DEFAULT_MOCK_TASTE_PROFILE_AXES.map((axis) => ({ ...axis }))
+
+const loadMockTasteProfileAxes = () => {
+  if (typeof window === 'undefined') return cloneDefaultTasteProfileAxes()
+
+  try {
+    const storedAxes = JSON.parse(
+      window.localStorage.getItem(MOCK_TASTE_PROFILE_AXES_STORAGE_KEY),
+    )
+
+    if (!Array.isArray(storedAxes)) return cloneDefaultTasteProfileAxes()
+
+    const storedAxisByCode = new Map(
+      storedAxes.map((axis) => [axis.axis_code, axis]),
+    )
+
+    return DEFAULT_MOCK_TASTE_PROFILE_AXES.map((defaultAxis) => {
+      const storedAxis = storedAxisByCode.get(defaultAxis.axis_code)
+      const storedValue = Number(storedAxis?.value)
+
+      if (
+        !Number.isFinite(storedValue) ||
+        storedValue < 0 ||
+        storedValue > 100
+      ) {
+        return { ...defaultAxis }
+      }
+
+      return {
+        ...defaultAxis,
+        value: storedValue,
+        status: storedAxis.status ?? defaultAxis.status,
+      }
+    })
+  } catch {
+    return cloneDefaultTasteProfileAxes()
+  }
+}
+
+const persistMockTasteProfileAxes = () => {
+  if (typeof window === 'undefined') return
+
+  try {
+    window.localStorage.setItem(
+      MOCK_TASTE_PROFILE_AXES_STORAGE_KEY,
+      JSON.stringify(MOCK_TASTE_PROFILE_AXES),
+    )
+  } catch {
+    // 저장소를 사용할 수 없는 환경에서도 mock API 자체는 정상 동작한다.
+  }
+}
+
+export const MOCK_TASTE_PROFILE_AXES = loadMockTasteProfileAxes()
 
 /** API 명세 2.4 응답과 동일한 형태의 취향 축 목록을 반환한다. */
 export const getMockTasteProfileAxes = () => ({
@@ -24,7 +81,12 @@ export const updateMockTasteProfileAxis = ({ axisCode, value }) => {
     })
   }
 
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 100) {
+  if (
+    typeof value !== 'number' ||
+    !Number.isFinite(value) ||
+    value < 0 ||
+    value > 100
+  ) {
     throw new ApiError({
       status: 400,
       code: 'VALIDATION_ERROR',
@@ -46,6 +108,7 @@ export const updateMockTasteProfileAxis = ({ axisCode, value }) => {
 
   tasteAxis.value = value
   tasteAxis.status = 'REFLECTED'
+  persistMockTasteProfileAxes()
 
   return {
     axis_code: tasteAxis.axis_code,

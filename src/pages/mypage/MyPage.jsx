@@ -433,11 +433,6 @@ const MyPage = () => {
                   )
                 })}
               </PreferenceList>
-              {savingTasteAxisCodes.length > 0 && !tasteAxisSaveError && (
-                <PreferenceUpdateFeedback role="status">
-                  변경사항 저장 중...
-                </PreferenceUpdateFeedback>
-              )}
               {tasteAxisSaveError && (
                 <PreferenceUpdateFeedback role="alert" $error>
                   {tasteAxisSaveError}
