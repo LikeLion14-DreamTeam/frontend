@@ -1,6 +1,10 @@
 import apiClient from '../../api/client'
 import { fetchAllPages } from '../../api/pagination'
-import { getMockPhotobook, getMockPhotobooks } from './photobookMock'
+import {
+  getMockPhotobook,
+  getMockPhotobooks,
+  updateMockPhotobookName,
+} from './photobookMock'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK_API === 'true'
 const PHOTOBOOKS_ENDPOINT = '/photobooks'
@@ -28,5 +32,17 @@ export const getPhotobook = async (photobookId) => {
 
   return apiClient.get(
     `${PHOTOBOOKS_ENDPOINT}/${encodeURIComponent(photobookId)}`,
+  )
+}
+
+/** API 명세 6.3: 연결된 여정과 무관하게 포토북 이름만 수정한다. */
+export const updatePhotobookName = async (photobookId, name) => {
+  if (USE_MOCK) {
+    return updateMockPhotobookName(photobookId, name)
+  }
+
+  return apiClient.patch(
+    `${PHOTOBOOKS_ENDPOINT}/${encodeURIComponent(photobookId)}`,
+    { name },
   )
 }

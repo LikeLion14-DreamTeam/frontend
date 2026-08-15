@@ -9,7 +9,10 @@ import {
   PhotobookCityHeader,
   PhotobookPinBlock,
 } from '../../features/photobooks/components'
-import { getPhotobook } from '../../features/photobooks/photobookApi'
+import {
+  getPhotobook,
+  updatePhotobookName,
+} from '../../features/photobooks/photobookApi'
 
 const INITIAL_PLAYER = {
   pinId: null,
@@ -144,10 +147,15 @@ const TripArchive = () => {
   const navigate = useNavigate()
   const audioRef = useRef(null)
   const audioPinIdRef = useRef(null)
+  const nameInputRef = useRef(null)
   const [photobook, setPhotobook] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
   const [player, setPlayer] = useState(INITIAL_PLAYER)
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [nameDraft, setNameDraft] = useState('')
+  const [isSavingName, setIsSavingName] = useState(false)
+  const [nameError, setNameError] = useState('')
 
   useEffect(() => {
     let ignore = false
@@ -157,6 +165,10 @@ const TripArchive = () => {
       audioRef.current = null
       audioPinIdRef.current = null
       setPlayer(INITIAL_PLAYER)
+      setIsEditingName(false)
+      setNameDraft('')
+      setIsSavingName(false)
+      setNameError('')
       setIsLoading(true)
       setErrorMessage('')
 
@@ -211,6 +223,69 @@ const TripArchive = () => {
     () => mapPins.map(({ lat, lng }) => ({ lat, lng })),
     [mapPins],
   )
+
+  const handleStartNameEdit = () => {
+    if (!archive || isSavingName) return
+
+    setNameDraft(archive.title)
+    setNameError('')
+    setIsEditingName(true)
+
+    window.requestAnimationFrame(() => {
+      nameInputRef.current?.focus()
+      nameInputRef.current?.select()
+    })
+  }
+
+  const handleCancelNameEdit = () => {
+    if (isSavingName) return
+
+    setIsEditingName(false)
+    setNameDraft('')
+    setNameError('')
+  }
+
+  const handleSubmitName = async (event) => {
+    event.preventDefault()
+    if (!archive || isSavingName) return
+
+    const nextName = nameDraft.trim()
+
+    if (!nextName) {
+      setNameError('포토북 이름을 입력해 주세요.')
+      nameInputRef.current?.focus()
+      return
+    }
+
+    if (nextName === archive.title) {
+      setIsEditingName(false)
+      setNameDraft('')
+      setNameError('')
+      return
+    }
+
+    setIsSavingName(true)
+    setNameError('')
+
+    try {
+      const updated = await updatePhotobookName(photobookId, nextName)
+      const savedName = updated.name?.trim() || nextName
+
+      setPhotobook((current) =>
+        current ? { ...current, name: savedName } : current,
+      )
+      setIsEditingName(false)
+      setNameDraft('')
+    } catch (error) {
+      setNameError(error.message ?? '포토북 이름을 수정하지 못했습니다.')
+    } finally {
+      setIsSavingName(false)
+    }
+  }
+
+  const handleNameKeyDown = (event) => {
+    if (event.key === 'Escape') handleCancelNameEdit()
+  }
 
   const handleToggleVoice = (pin) => {
     const audioUrl = pin.voiceMemo?.audioUrl
@@ -318,7 +393,44 @@ const TripArchive = () => {
               <TripSummary>
                 <TitleBlock>
                   <TitleRow>
-                    <TripTitle>{archive.title}</TripTitle>
+                    {isEditingName ? (
+                      <NameEditForm onSubmit={handleSubmitName}>
+                        <NameInput
+                          ref={nameInputRef}
+                          value={nameDraft}
+                          onChange={(event) => {
+                            setNameDraft(event.target.value)
+                            if (nameError) setNameError('')
+                          }}
+                          onKeyDown={handleNameKeyDown}
+                          aria-label="포토북 이름"
+                          disabled={isSavingName}
+                        />
+                        <NameActionButton
+                          type="submit"
+                          disabled={isSavingName}
+                        >
+                          {isSavingName ? '저장 중' : '저장'}
+                        </NameActionButton>
+                        <NameActionButton
+                          type="button"
+                          onClick={handleCancelNameEdit}
+                          disabled={isSavingName}
+                        >
+                          취소
+                        </NameActionButton>
+                      </NameEditForm>
+                    ) : (
+                      <TitleWithEdit>
+                        <TripTitle>{archive.title}</TripTitle>
+                        <EditNameButton
+                          type="button"
+                          onClick={handleStartNameEdit}
+                        >
+                          이름 수정
+                        </EditNameButton>
+                      </TitleWithEdit>
+                    )}
                     <ManageLink
                       to={
                         archive.segmentId
@@ -329,6 +441,9 @@ const TripArchive = () => {
                       여행 구간 관리
                     </ManageLink>
                   </TitleRow>
+                  {nameError ? (
+                    <NameError role="alert">{nameError}</NameError>
+                  ) : null}
                   <TripPeriod>{archive.period}</TripPeriod>
                 </TitleBlock>
 
@@ -485,6 +600,13 @@ const TitleRow = styled.div`
   gap: 16px;
 `
 
+const TitleWithEdit = styled.div`
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+`
+
 const TripTitle = styled.h1`
   min-width: 0;
   color: var(--Text-Primary);
@@ -493,6 +615,77 @@ const TripTitle = styled.h1`
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+`
+
+const EditNameButton = styled.button`
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  color: #9f9489;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  text-decoration: underline;
+  text-underline-position: from-font;
+  cursor: pointer;
+`
+
+const NameEditForm = styled.form`
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+`
+
+const NameInput = styled.input`
+  min-width: 0;
+  flex: 1;
+  height: 34px;
+  padding: 4px 8px;
+  border: 1px solid #c99a45;
+  border-radius: 6px;
+  outline: none;
+  color: var(--Text-Primary);
+  background: rgb(255 253 248 / 76%);
+  font: var(--text-ui-h2);
+  letter-spacing: -0.22px;
+
+  &:focus {
+    box-shadow: 0 0 0 2px rgb(201 154 69 / 18%);
+  }
+
+  &:disabled {
+    opacity: 0.65;
+  }
+`
+
+const NameActionButton = styled.button`
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  color: #8f8173;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  cursor: pointer;
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.55;
+  }
+`
+
+const NameError = styled.p`
+  color: #b8564f;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
 `
 
 const ManageLink = styled(Link)`

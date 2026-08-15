@@ -300,3 +300,36 @@ export const getMockPhotobook = (photobookId) => {
 
   return cloneDetail({ ...summary, ...detail })
 }
+
+/** API 명세 6.3과 동일하게 포토북 이름만 수정한다. */
+export const updateMockPhotobookName = (photobookId, name) => {
+  const id = Number(photobookId)
+  const summary = MOCK_PHOTOBOOKS.find(
+    (photobook) => photobook.photobook_id === id,
+  )
+
+  if (!summary) {
+    throw new ApiError({
+      status: 404,
+      code: 'NOT_FOUND',
+      message: '포토북을 찾을 수 없습니다.',
+    })
+  }
+
+  const nextName = typeof name === 'string' ? name.trim() : ''
+
+  if (!nextName) {
+    throw new ApiError({
+      status: 400,
+      code: 'INVALID_NAME',
+      message: '포토북 이름을 입력해 주세요.',
+    })
+  }
+
+  summary.name = nextName
+
+  return {
+    photobook_id: id,
+    name: nextName,
+  }
+}
