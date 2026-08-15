@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled, { createGlobalStyle } from 'styled-components'
-import deleteIcon from '../../assets/icons/capture-delete.svg'
+import trashIcon from '../../assets/icons/capture-trash.svg'
 import closeIcon from '../../assets/icons/capture-close.svg'
 
 /**
@@ -163,16 +163,23 @@ const MultiCapture = () => {
     )
   }
 
-  const handleRemove = (id) => {
-    setShots((prev) => {
-      const target = prev.find((shot) => shot.id === id)
-      if (target) URL.revokeObjectURL(target.url)
-      return prev.filter((shot) => shot.id !== id)
-    })
+  /**
+   * 삭제는 미리보기에서만 할 수 있다. 썸네일의 x 버튼은 크게 보려다 잘못 눌러
+   * 지우는 일이 있어 시안에서 빠졌다.
+   *
+   * 지운 뒤에는 같은 자리의 다음 사진으로 넘어가고, 마지막 한 장이었으면 닫는다.
+   */
+  const handleRemovePreview = () => {
+    const removed = shots[previewIndex]
+    if (!removed) return
 
-    if (previewId === id) {
-      setPreviewId(null)
-    }
+    URL.revokeObjectURL(removed.url)
+
+    const remaining = shots.filter((shot) => shot.id !== removed.id)
+    const next = remaining[previewIndex] ?? remaining[previewIndex - 1] ?? null
+
+    setShots(remaining)
+    setPreviewId(next?.id ?? null)
   }
 
   const handleDone = () => {
@@ -192,10 +199,10 @@ const MultiCapture = () => {
           <GridLine $vertical style={{ left: '66.666%' }} aria-hidden="true" />
           <GridLine style={{ top: '33.333%' }} aria-hidden="true" />
           <GridLine style={{ top: '66.666%' }} aria-hidden="true" />
-        </Viewfinder>
 
-        <TagChip>{TAG_CONTEXT}</TagChip>
-        <CountChip>{shots.length} 장</CountChip>
+          <TagChip>{TAG_CONTEXT}</TagChip>
+          <CountChip>{shots.length} 장</CountChip>
+        </Viewfinder>
 
         {status !== 'ready' && (
           <StatusOverlay>
@@ -214,29 +221,16 @@ const MultiCapture = () => {
       </ViewfinderArea>
 
       <BottomPanel>
-        <StripHeader>
-          <StripTitle>방금 찍은 사진</StripTitle>
-          {shots.length > 0 && <StripHint>탭하여 크게 보기</StripHint>}
-        </StripHeader>
-
         <ThumbnailStrip aria-label="촬영한 사진">
           {shots.map((shot, index) => (
-            <Thumbnail key={shot.id}>
-              <ThumbnailButton
-                type="button"
-                aria-label={`${index + 1}번째 사진 크게 보기`}
-                onClick={() => setPreviewId(shot.id)}
-              >
-                <ThumbnailImage src={shot.url} alt="" />
-              </ThumbnailButton>
-              <DeleteButton
-                type="button"
-                aria-label="이 사진 삭제"
-                onClick={() => handleRemove(shot.id)}
-              >
-                <img src={deleteIcon} alt="" aria-hidden="true" />
-              </DeleteButton>
-            </Thumbnail>
+            <ThumbnailButton
+              key={shot.id}
+              type="button"
+              aria-label={`${index + 1}번째 사진 크게 보기`}
+              onClick={() => setPreviewId(shot.id)}
+            >
+              <ThumbnailImage src={shot.url} alt="" />
+            </ThumbnailButton>
           ))}
         </ThumbnailStrip>
 
@@ -268,13 +262,44 @@ const MultiCapture = () => {
             <img src={closeIcon} alt="" aria-hidden="true" />
           </PreviewClose>
 
-          <PreviewPhoto src={previewShot.url} alt="" />
+          <PreviewStage>
+            <PreviewPhoto src={previewShot.url} alt="" />
+
+            {previewIndex > 0 && (
+              <PreviewNav
+                $side="left"
+                type="button"
+                aria-label="이전 사진"
+                onClick={() => setPreviewId(shots[previewIndex - 1].id)}
+              >
+                <Chevron $direction="left" aria-hidden="true" />
+              </PreviewNav>
+            )}
+
+            {previewIndex < shots.length - 1 && (
+              <PreviewNav
+                $side="right"
+                type="button"
+                aria-label="다음 사진"
+                onClick={() => setPreviewId(shots[previewIndex + 1].id)}
+              >
+                <Chevron $direction="right" aria-hidden="true" />
+              </PreviewNav>
+            )}
+          </PreviewStage>
 
           <PreviewIndex>
             <IndexCurrent>{previewIndex + 1}</IndexCurrent>
             <IndexSlash>/</IndexSlash>
             <IndexTotal>{shots.length}</IndexTotal>
           </PreviewIndex>
+
+          <PreviewActions>
+            <PreviewDeleteButton type="button" onClick={handleRemovePreview}>
+              <img src={trashIcon} alt="" aria-hidden="true" />
+              삭제
+            </PreviewDeleteButton>
+          </PreviewActions>
         </PreviewLayer>
       )}
     </CaptureShell>
@@ -284,11 +309,14 @@ const MultiCapture = () => {
 export default MultiCapture
 
 /* 하단 패널의 확정 높이. 뷰파인더가 남은 공간을 채우므로 구성을 바꾸면 함께 고친다.
-   13(라벨) + 11 + 66(썸네일) + 24 + 72(컨트롤) + 4(아래 여백)
+   66(썸네일) + 15(간격) + 72(컨트롤) + 20(아래 여백)
+   시안은 45 지만 화면이 짧을 때 뷰파인더가 너무 줄어 조금 좁혔다. */
+const BOTTOM_PANEL_HEIGHT = '173px'
 
-   시안은 간격 35 · 아래 여백 58이지만 사파리 하단 주소창이 약 95px을 가져가,
-   그대로 두면 뷰파인더가 폭을 못 채우고 좌우에 여백이 생긴다. 그만큼을 덜어낸다. */
-const BOTTOM_PANEL_HEIGHT = '190px'
+/* 뷰파인더와 썸네일 사이의 최소 간격. 남는 높이가 있으면 위아래로 나뉘어
+   이보다 벌어지고, 화면이 짧으면 뷰파인더가 줄어 이 간격을 지킨다.
+   시안은 39. */
+const VIEWFINDER_GAP = '15px'
 
 const CaptureShell = styled.main`
   width: 100%;
@@ -306,6 +334,7 @@ const ViewfinderArea = styled.section`
   position: relative;
   flex: 1;
   min-height: 0;
+  padding-bottom: ${VIEWFINDER_GAP};
   display: flex;
   /* 남는 높이를 위아래로 나눠 뷰파인더를 가운데 둔다. */
   align-items: center;
@@ -320,13 +349,15 @@ const Viewfinder = styled.div`
     calc(
       (
           var(--app-viewport-height) - ${BOTTOM_PANEL_HEIGHT} -
-            env(safe-area-inset-bottom)
+            ${VIEWFINDER_GAP} - env(safe-area-inset-bottom)
         ) * 3 / 4
     )
   );
   aspect-ratio: 3 / 4;
   overflow: hidden;
-  background: #9c9c9c;
+  /* 시안의 빈 뷰파인더 색은 #9c9c9c 지만, 폭이 소수점이라 영상이 채우고 남은
+     0.x px 이 밝은 테두리처럼 보인다. 화면 배경색과 맞춰 눈에 띄지 않게 한다. */
+  background: var(--Text-Primary);
 `
 
 const Preview = styled.video`
@@ -351,9 +382,11 @@ const GridLine = styled.span`
       : 'left: 0; right: 0; height: 1px;'}
 `
 
+/* 뷰파인더 모서리 기준 위치. 화면이 짧아 뷰파인더가 줄어도 칩이 함께 따라간다. */
 const chipBase = `
   position: absolute;
-  top: 20px;
+  z-index: 1;
+  top: 11px;
   display: inline-flex;
   align-items: center;
   background: rgb(36 28 22 / 60%);
@@ -363,7 +396,7 @@ const chipBase = `
 
 const TagChip = styled.span`
   ${chipBase}
-  left: 24px;
+  left: 8px;
   padding: 7px 14px 7px 11px;
   border-radius: 16px;
   color: rgb(242 233 220 / 92%);
@@ -371,7 +404,7 @@ const TagChip = styled.span`
 
 const CountChip = styled.span`
   ${chipBase}
-  right: 24px;
+  right: 8px;
   padding: 6px 11px;
   border-radius: 20px;
   color: #f2e9dc;
@@ -410,50 +443,34 @@ const RetryButton = styled.button`
 const BottomPanel = styled.section`
   flex: 0 0 auto;
   height: calc(${BOTTOM_PANEL_HEIGHT} + env(safe-area-inset-bottom));
-  padding: 0 24px calc(4px + env(safe-area-inset-bottom));
+  padding: 0 24px calc(20px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
 `
 
-const StripHeader = styled.div`
-  flex: 0 0 13px;
-  height: 13px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-`
-
-const StripTitle = styled.p`
-  color: rgb(242 233 220 / 60%);
-  font-size: 11px;
-`
-
-const StripHint = styled.p`
-  color: rgb(197 161 91 / 90%);
-  font-size: 10px;
-`
-
+/* 첫 장은 본문 여백(24)에 맞춰 시작하지만, 넘기면 화면 끝까지 흘러가며 잘린다.
+   패널의 좌우 여백을 음수 마진으로 상쇄하고 같은 값을 스크롤 영역 안쪽에 준다. */
 const ThumbnailStrip = styled.div`
   flex: 0 0 66px;
   height: 66px;
-  margin-top: 11px;
+  margin: 0 -24px;
+  padding: 0 24px;
   display: flex;
   align-items: center;
   gap: 9px;
   overflow-x: auto;
-  overflow-y: visible;
-`
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
 
-const Thumbnail = styled.div`
-  position: relative;
-  flex: 0 0 auto;
-  width: 66px;
-  height: 66px;
+  &::-webkit-scrollbar {
+    display: none;
+  }
 `
 
 const ThumbnailButton = styled.button`
-  width: 100%;
-  height: 100%;
+  flex: 0 0 auto;
+  width: 66px;
+  height: 66px;
   padding: 0;
   border: 0;
   border-radius: 10px;
@@ -472,28 +489,10 @@ const ThumbnailImage = styled.img`
   pointer-events: none;
 `
 
-const DeleteButton = styled.button`
-  position: absolute;
-  top: -4px;
-  right: -6px;
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: pointer;
-
-  img {
-    width: 20px;
-    height: 20px;
-    display: block;
-  }
-`
-
 const ControlRow = styled.div`
   flex: 0 0 72px;
   height: 72px;
-  margin-top: 24px;
+  margin-top: 15px;
   /* 패널 좌우 여백 24 + 30 = 시안의 54px */
   padding: 0 30px;
   display: grid;
@@ -578,17 +577,57 @@ const PreviewClose = styled.button`
   }
 `
 
-const PreviewPhoto = styled.img`
+const PreviewStage = styled.div`
+  position: relative;
   width: 100%;
   margin-top: 59px;
+`
+
+const PreviewPhoto = styled.img`
+  width: 100%;
   aspect-ratio: 3 / 4;
   display: block;
   object-fit: cover;
   background: #d5d5d5;
 `
 
+/* 시안에 없는 요소다. 좌우로 넘길 수단이 필요해 칩과 같은 톤으로 얹었다.
+   첫 장에서는 왼쪽, 마지막 장에서는 오른쪽 버튼을 아예 그리지 않는다. */
+const PreviewNav = styled.button`
+  position: absolute;
+  top: 50%;
+  ${({ $side }) => ($side === 'left' ? 'left: 12px;' : 'right: 12px;')}
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(36 28 22 / 60%);
+  transform: translateY(-50%);
+  cursor: pointer;
+
+  &:active {
+    background: rgb(36 28 22 / 80%);
+  }
+`
+
+const Chevron = styled.span`
+  width: 10px;
+  height: 10px;
+  border-top: 2px solid rgb(242 233 220 / 92%);
+  border-right: 2px solid rgb(242 233 220 / 92%);
+  /* 오른쪽은 45도, 왼쪽은 반대로 돌린다. 살짝 밀어 시각적 중심을 맞춘다. */
+  ${({ $direction }) =>
+    $direction === 'left'
+      ? 'transform: translateX(2px) rotate(-135deg);'
+      : 'transform: translateX(-2px) rotate(45deg);'}
+`
+
 const PreviewIndex = styled.p`
-  margin-top: 35px;
+  margin-top: 25px;
   display: flex;
   align-items: baseline;
   gap: 7px;
@@ -609,4 +648,31 @@ const IndexSlash = styled.span`
 const IndexTotal = styled.span`
   color: rgb(242 233 220 / 60%);
   font: var(--text-ui-body-l);
+`
+
+const PreviewActions = styled.div`
+  margin-top: 25px;
+  display: flex;
+  align-items: center;
+`
+
+const PreviewDeleteButton = styled.button`
+  padding: 13px 22px 13px 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgb(242 233 220 / 35%);
+  border-radius: 24px;
+  background: none;
+  color: rgb(242 233 220 / 85%);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+
+  img {
+    width: 16px;
+    height: 15px;
+    display: block;
+  }
 `
