@@ -1,82 +1,90 @@
-import ab1A from '../../assets/images/onboarding-selection/ab-1-a.webp'
-import ab1B from '../../assets/images/onboarding-selection/ab-1-b.webp'
-import ab2A from '../../assets/images/onboarding-selection/ab-2-a.webp'
-import ab2B from '../../assets/images/onboarding-selection/ab-2-b.webp'
-import ab3A from '../../assets/images/onboarding-selection/ab-3-a.webp'
-import ab3B from '../../assets/images/onboarding-selection/ab-3-b.webp'
-import ab4A from '../../assets/images/onboarding-selection/ab-4-a.webp'
-import ab4B from '../../assets/images/onboarding-selection/ab-4-b.webp'
-import ab5A from '../../assets/images/onboarding-selection/ab-5-a.webp'
-import ab5B from '../../assets/images/onboarding-selection/ab-5-b.webp'
-import mood101 from '../../assets/images/onboarding-selection/mood-1-01.webp'
-import mood102 from '../../assets/images/onboarding-selection/mood-1-02.webp'
-import mood103 from '../../assets/images/onboarding-selection/mood-1-03.webp'
-import mood104 from '../../assets/images/onboarding-selection/mood-1-04.webp'
-import mood105 from '../../assets/images/onboarding-selection/mood-1-05.webp'
-import mood106 from '../../assets/images/onboarding-selection/mood-1-06.webp'
-import mood107 from '../../assets/images/onboarding-selection/mood-1-07.webp'
-import mood108 from '../../assets/images/onboarding-selection/mood-1-08.webp'
-import mood109 from '../../assets/images/onboarding-selection/mood-1-09.webp'
-import mood201 from '../../assets/images/onboarding-selection/mood-2-01.webp'
-import mood202 from '../../assets/images/onboarding-selection/mood-2-02.webp'
-import mood203 from '../../assets/images/onboarding-selection/mood-2-03.webp'
-import mood204 from '../../assets/images/onboarding-selection/mood-2-04.webp'
-import mood205 from '../../assets/images/onboarding-selection/mood-2-05.webp'
-import mood206 from '../../assets/images/onboarding-selection/mood-2-06.webp'
-import mood207 from '../../assets/images/onboarding-selection/mood-2-07.webp'
-import mood208 from '../../assets/images/onboarding-selection/mood-2-08.webp'
-import mood209 from '../../assets/images/onboarding-selection/mood-2-09.webp'
+const originalPhotoSources = import.meta.glob(
+  '../../assets/images/onboarding-selection/originals/**/*.webp',
+  {
+    eager: true,
+    import: 'default',
+    query: '?url',
+  },
+)
 
-// TODO: 백엔드에 선택용 사진이 seed되면 실제 photo_id로 교체한다.
-export const AB_PHOTO_ROUNDS = [
-  { roundNo: 1, axisCode: 'brightness', sources: [ab1A, ab1B] },
-  { roundNo: 2, axisCode: 'vividness', sources: [ab2A, ab2B] },
-  { roundNo: 3, axisCode: 'tone', sources: [ab3A, ab3B] },
-  { roundNo: 4, axisCode: 'density', sources: [ab4A, ab4B] },
-  { roundNo: 5, axisCode: 'photo_type', sources: [ab5A, ab5B] },
-].map(({ roundNo, axisCode, sources }) => ({
-  roundNo,
-  axisCode,
-  photos: sources.map((src, index) => ({
-    photoId: 2000 + (roundNo - 1) * 2 + index + 1,
-    label: index === 0 ? 'A' : 'B',
-    src,
-    alt: `${roundNo}번째 A/B 취향 비교 사진 ${index === 0 ? 'A' : 'B'}`,
-  })),
-}))
+const SOURCE_ENTRIES = Object.entries(originalPhotoSources)
+const SET_FILE_PATTERN = /_set(\d+)_(\d+)\.webp$/i
 
-const moodBoardSources = [
-  [
-    mood101,
-    mood102,
-    mood103,
-    mood104,
-    mood105,
-    mood106,
-    mood107,
-    mood108,
-    mood109,
-  ],
-  [
-    mood201,
-    mood202,
-    mood203,
-    mood204,
-    mood205,
-    mood206,
-    mood207,
-    mood208,
-    mood209,
-  ],
+const AB_STAGE_CONFIGS = [
+  { roundNo: 1, axisCode: 'brightness', folderName: 'AB1밝기' },
+  { roundNo: 2, axisCode: 'vividness', folderName: 'AB2채도' },
+  { roundNo: 3, axisCode: 'tone', folderName: 'AB3색온도' },
+  { roundNo: 4, axisCode: 'density', folderName: 'AB4구도-밀도' },
+  { roundNo: 5, axisCode: 'photo_type', folderName: 'AB5사진 종류' },
 ]
 
-export const MOODBOARD_PHOTO_ROUNDS = moodBoardSources.map(
-  (sources, roundIndex) => ({
-    roundNo: roundIndex + 6,
-    photos: sources.map((src, photoIndex) => ({
-      photoId: 2100 + roundIndex * 100 + photoIndex + 1,
-      src,
-      alt: `무드보드 ${roundIndex + 1}라운드 사진 ${photoIndex + 1}`,
-    })),
+const MOODBOARD_STAGE_CONFIGS = [
+  { roundNo: 6, folderName: '무드보드1' },
+  { roundNo: 7, folderName: '무드보드2' },
+]
+
+const createPhotoSets = ({ roundNo, folderName, isAbRound }) => {
+  const groupedPhotos = new Map()
+
+  SOURCE_ENTRIES.filter(([path]) =>
+    path.includes(`/originals/${folderName}/`),
+  ).forEach(([path, src]) => {
+    const filename = path.split('/').at(-1)
+    const match = filename.match(SET_FILE_PATTERN)
+
+    if (!match) return
+
+    const setNo = Number(match[1])
+    const order = Number(match[2])
+    const photos = groupedPhotos.get(setNo) ?? []
+
+    photos.push({ src, order })
+    groupedPhotos.set(setNo, photos)
+  })
+
+  if (groupedPhotos.size === 0) {
+    throw new Error(`${folderName} 폴더에서 선택용 사진을 찾지 못했습니다.`)
+  }
+
+  return [...groupedPhotos.entries()]
+    .sort(([leftSetNo], [rightSetNo]) => leftSetNo - rightSetNo)
+    .map(([setNo, photos]) => ({
+      setNo,
+      photos: photos
+        .sort((left, right) => left.order - right.order)
+        .map(({ src, order }, photoIndex) => ({
+          photoId: 200000 + roundNo * 1000 + setNo * 100 + order,
+          ...(isAbRound && { label: photoIndex === 0 ? 'A' : 'B' }),
+          src,
+          alt: isAbRound
+            ? `${roundNo}번째 A/B 취향 비교 사진 ${
+                photoIndex === 0 ? 'A' : 'B'
+              }`
+            : `무드보드 ${roundNo - 5}라운드 사진 ${photoIndex + 1}`,
+        })),
+    }))
+}
+
+export const AB_PHOTO_ROUNDS = AB_STAGE_CONFIGS.map((stage) => ({
+  ...stage,
+  photoSets: createPhotoSets({ ...stage, isAbRound: true }),
+}))
+
+export const MOODBOARD_PHOTO_ROUNDS = MOODBOARD_STAGE_CONFIGS.map(
+  (stage) => ({
+    ...stage,
+    photoSets: createPhotoSets({ ...stage, isAbRound: false }),
   }),
 )
+
+/** 각 단계가 다른 set을 고를 수 있도록 라운드별로 독립 추첨한다. */
+export const selectRandomPhotoSets = (rounds, random = Math.random) =>
+  rounds.map(({ photoSets, ...round }) => {
+    const selectedSet = photoSets[Math.floor(random() * photoSets.length)]
+
+    return {
+      ...round,
+      setNo: selectedSet.setNo,
+      photos: selectedSet.photos,
+    }
+  })
