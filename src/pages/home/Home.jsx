@@ -1012,6 +1012,8 @@ const PassportStage = styled.div`
   aspect-ratio: 376 / 261;
   /* 가로 제스처는 면 넘기기로 쓰고 세로 스크롤은 그대로 둔다. */
   touch-action: pan-y;
+  /* 표지 크기를 이 폭 기준으로 잡는다. */
+  container-type: inline-size;
 `
 
 /*
@@ -1021,7 +1023,8 @@ const PassportStage = styled.div`
  */
 const PassportCover = styled.button`
   width: 100%;
-  height: 100%;
+  /* 무대와 같은 비율. 퍼센트 높이는 부모 높이가 auto 라 풀린다. */
+  aspect-ratio: 376 / 261;
   padding: 0;
   display: flex;
   align-items: center;
@@ -1031,10 +1034,16 @@ const PassportCover = styled.button`
   cursor: pointer;
 `
 
+/*
+ * 표지는 폭으로 크기를 정하고 높이는 비율에서 나온다. 화면이 넓어지면 같이
+ * 커지고, 173 × 249 비율은 그대로다. (45.6% 는 펼친 면 높이의 94.6% 에 해당)
+ */
 const PassportCoverImage = styled.img`
-  width: auto;
-  height: 100%;
-  object-fit: contain;
+  width: 45.6%;
+  height: auto;
+  flex: none;
+  aspect-ratio: 173 / 249;
+  display: block;
 `
 
 /* 시안 376 × 261. 안쪽 cqw 값의 기준점이라 자신에게는 cqw 를 쓰지 못한다.
