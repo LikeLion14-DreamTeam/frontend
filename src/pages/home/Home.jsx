@@ -4,6 +4,12 @@ import journeyCardImage from '../../assets/home/journey-card.png'
 import passportOpenImage from '../../assets/home/passport-open.png'
 
 /**
+ * 진행 중인 여정 블록의 시안 값(폭 362px 기준)을 컨테이너 단위로 바꾼다.
+ * 띠·카드·글자·버튼이 화면 폭을 따라 같은 비율로 커지고 줄어든다.
+ */
+const journeyScale = (px) => `${((px / 362) * 100).toFixed(4)}cqw`
+
+/**
  * 3 홈 화면
  *
  * TODO: 아직 시안 값을 그대로 넣어둔 상태다. 진행 중인 여정은 3.1 GET /trips/current,
@@ -70,7 +76,10 @@ const Home = () => {
           </ResultCard>
         </PassportHead>
 
-        {/* TODO: 스탬프(assets/stamps)를 펼친 면 위에 얹는다. */}
+        {/* TODO: 스탬프(assets/stamps)를 이 안에 얹는다. PassportSpread 가
+            컨테이너라 journeyScale 처럼 시안 폭 376 기준 cqw 헬퍼를 만들어
+            쓰면 면 크기를 따라간다. 시안 안쪽 여백은 위 40 · 좌 19 · 우 20 ·
+            아래 52, 좌우 면 사이 간격은 17 이다. */}
         <PassportSpread>
           <PassportImage src={passportOpenImage} alt="" aria-hidden="true" />
         </PassportSpread>
@@ -152,34 +161,44 @@ const LabelTick = styled.span`
 /* 시안에서 카드(좌 20)가 띠(좌 26)보다 넓어 본문 패딩 밖으로 4px 넘어간다. */
 const JourneyBlock = styled.section`
   position: relative;
-  margin: 23px -4px 0;
+  margin: 15px -4px 0;
+  /* 안쪽 cqw 값의 기준점 */
+  container-type: inline-size;
 `
 
+/* 띠는 카드 뒤에 깔린다. 시안 350 × 77 비율을 폭이 달라져도 유지한다. */
 const JourneyBand = styled.p`
-  height: 77px;
-  margin: 15px 6px 0;
-  padding: 10px 0 0 17px;
-  border-radius: 16px;
+  position: absolute;
+  top: 0;
+  right: ${journeyScale(6)};
+  left: ${journeyScale(6)};
+  aspect-ratio: 350 / 77;
+  padding: ${journeyScale(10)} 0 0 ${journeyScale(17)};
+  border-radius: ${journeyScale(16)};
   background: linear-gradient(
     167.07deg,
     rgb(69 50 36) 0%,
     rgb(49 35 26) 39.007%,
     rgb(34 24 16) 70.922%
   );
-  box-shadow: 0 8px 20px 0 rgb(36 26 18 / 30%);
+  box-shadow: 0 ${journeyScale(8)} ${journeyScale(20)} 0 rgb(36 26 18 / 30%);
   color: var(--Accent-Gold);
-  font: 600 9px/normal var(--font-serif);
-  letter-spacing: 1.8px;
+  font: 600 ${journeyScale(9)}/normal var(--font-serif);
+  letter-spacing: ${journeyScale(1.8)};
 `
 
-/* 띠 위로 50px 올라타 위쪽 27px 만 JOURNEY IN PROGRESS 로 남는다. */
+/* 시안 362 × 203. 위쪽 27px 만큼 띠가 드러나고 나머지는 카드가 덮는다. */
 const JourneyCard = styled.div`
   position: relative;
-  height: 203px;
-  margin-top: -50px;
-  border-radius: 13px;
+  aspect-ratio: 362 / 203;
+  margin-top: ${journeyScale(27)};
+  /* 카드 안쪽 값도 카드 폭을 따라가게 한다. */
+  container-type: inline-size;
+  border-radius: ${journeyScale(13)};
   /* 카드 이미지가 사각형이 아니라 filter 로 그림자를 준다. */
-  filter: drop-shadow(0 4px 7px rgb(48 38 28 / 11%));
+  filter: drop-shadow(
+    0 ${journeyScale(4)} ${journeyScale(7)} rgb(48 38 28 / 11%)
+  );
 `
 
 const JourneyImage = styled.img`
@@ -189,81 +208,84 @@ const JourneyImage = styled.img`
   width: 103.23%;
   height: 123.12%;
   max-width: none;
+  /* 화면이 402 보다 넓어져도 늘어나지 않고 잘리게 한다. */
+  object-fit: cover;
 `
 
 const JourneyBody = styled.div`
   position: relative;
   height: 100%;
-  padding: 27px 40px 16px 27px;
+  padding: ${journeyScale(27)} ${journeyScale(40)} ${journeyScale(16)}
+    ${journeyScale(27)};
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: ${journeyScale(18)};
   align-items: flex-start;
 `
 
 const JourneyInfo = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: ${journeyScale(3)};
   align-items: flex-start;
 `
 
 const CityName = styled.p`
   color: var(--Text-Primary);
-  font: 600 35px/40px var(--font-serif);
-  letter-spacing: 1.05px;
+  font: 600 ${journeyScale(35)}/${journeyScale(40)} var(--font-serif);
+  letter-spacing: ${journeyScale(1.05)};
 `
 
 const JourneyDetails = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: ${journeyScale(5)};
   align-items: flex-start;
 `
 
 const CountryName = styled.p`
   color: var(--Text-Secondary);
-  font: 400 12px/18px var(--font-sans);
+  font: 400 ${journeyScale(12)}/${journeyScale(18)} var(--font-sans);
 `
 
 const JourneyMeta = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: ${journeyScale(3)};
 `
 
 const MetaLine = styled.p`
   color: var(--Text-Secondary);
-  font: 400 12px/18px var(--font-sans);
+  font: 400 ${journeyScale(12)}/${journeyScale(18)} var(--font-sans);
 `
 
 const JourneyActions = styled.div`
-  width: 295px;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 5px;
+  gap: ${journeyScale(5)};
 `
 
 const EndJourneyButton = styled.button`
-  width: 91px;
-  height: 33px;
+  width: ${journeyScale(91)};
+  height: ${journeyScale(33)};
   border: 0;
   background: none;
   color: var(--State-Disabled-Text);
-  font: var(--text-ui-nav);
+  font: 500 ${journeyScale(11)}/${journeyScale(16)} var(--font-sans);
   cursor: pointer;
 `
 
 const ContinueJourneyButton = styled.button`
-  width: 105px;
-  height: 33px;
+  width: ${journeyScale(105)};
+  height: ${journeyScale(33)};
   border: 0;
-  border-radius: 6px;
+  border-radius: ${journeyScale(6)};
   background: var(--Primary-Cognac);
   box-shadow: var(--Effect-Chip);
   color: var(--Text-Inverse);
-  font: var(--text-ui-nav);
+  font: 500 ${journeyScale(11)}/${journeyScale(16)} var(--font-sans);
   cursor: pointer;
 `
 
@@ -276,9 +298,9 @@ const PassportBlock = styled.section`
   gap: 6px;
 `
 
+/* 여권 면이 본문보다 11px 씩 넓어, 머리말은 그만큼 도로 좁혀 본문에 맞춘다. */
 const PassportHead = styled.div`
-  width: 354px;
-  max-width: 100%;
+  width: calc(100% - 22px);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -305,12 +327,13 @@ const ResultDescription = styled.p`
   font: 400 11px/normal var(--font-sans);
 `
 
+/* 시안 376 × 261. 스탬프는 이 안에 passportScale 로 얹는다. */
 const PassportSpread = styled.div`
   position: relative;
-  width: 376px;
-  max-width: 100%;
-  height: 261px;
+  width: 100%;
+  aspect-ratio: 376 / 261;
   overflow: hidden;
+  container-type: inline-size;
 `
 
 const PassportImage = styled.img`
@@ -319,6 +342,7 @@ const PassportImage = styled.img`
   left: -4.32%;
   width: 108.65%;
   height: 104.28%;
+  object-fit: cover;
   max-width: none;
 `
 
