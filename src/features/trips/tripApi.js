@@ -134,7 +134,10 @@ export const getTripPins = async (
     if (!mockTripStore.trips[segmentId]) throw mockNotFound()
 
     return {
-      pins: mockTripStore.pins[segmentId] ?? [],
+      pins: (mockTripStore.pins[segmentId] ?? []).map((pin) => ({
+        ...pin,
+        photo_count: getMockPhotoCount(pin.pin_id),
+      })),
       next_cursor: null,
     }
   }

@@ -193,12 +193,10 @@ const TripManagement = () => {
                           <PinTitle>
                             {pin.place_name || '이름 없는 장소'}
                           </PinTitle>
-                          {/* TODO: 핀별 사진 수(`사진 8장`) 표시 대기.
-                              GET /trips/{segmentId}/pins 응답에 photo_count 가 없어
-                              프론트에서 셀 방법이 없다. 백엔드에 추가 요청해둔 상태이며,
-                              필드가 오면 아래 줄에 ` · 사진 {pin.photo_count}장` 을 붙인다. */}
                           <PinMeta>
                             {formatPinTime(pin.tagged_at)}
+                            {pin.photo_count != null &&
+                              ` · 사진 ${pin.photo_count}장`}
                             {!hasCoordinates && ' · 위치 정보 없음'}
                           </PinMeta>
                         </PinText>
