@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import styled from 'styled-components'
 import NavBar from '../../components/layout/NavBar'
 import journeyCardImage from '../../assets/home/journey-card.png'
@@ -9,13 +10,45 @@ import passportOpenImage from '../../assets/home/passport-open.png'
  */
 const journeyScale = (px) => `${((px / 362) * 100).toFixed(4)}cqw`
 
+/** 여권 면(시안 폭 376px)용. 위에 얹는 스탬프도 같은 단위로 배치한다. */
+const passportScale = (px) => `${((px / 376) * 100).toFixed(4)}cqw`
+
+/** 파일명이 곧 나라 이름이다. 정적으로 58개를 나열하지 않고 폴더에서 모은다. */
+const stampModules = import.meta.glob('../../assets/stamps/*.webp', {
+  eager: true,
+  import: 'default',
+})
+
+const stampByCountry = Object.fromEntries(
+  Object.entries(stampModules).map(([path, url]) => [
+    path.slice(path.lastIndexOf('/') + 1, -'.webp'.length),
+    url,
+  ]),
+)
+
+/** 빈 칸은 Empty, 스탬프가 없는 나라는 Country 로 대체한다. */
+const getStampSrc = (country) => {
+  if (!country) return stampByCountry.Empty
+
+  return stampByCountry[country] ?? stampByCountry.Country
+}
+
+/**
+ * 한 면에 4개씩, 왼쪽 면부터 채운다.
+ * TODO: 방문한 나라 목록으로 채운다. 지금은 시안 값이다.
+ */
+const SAMPLE_STAMPS = [
+  ['Portugal', 'Croatia', 'Italy', 'Spain'],
+  ['France', 'Austria', null, null],
+]
+
 /**
  * 3 홈 화면
  *
  * TODO: 아직 시안 값을 그대로 넣어둔 상태다. 진행 중인 여정은 3.1 GET /trips/current,
  * 여권 요약은 마이페이지 통계 API 로 채운다.
  * TODO: 여권은 펼쳐진 상태만 구현했다. 덮인 상태(passport-closed.png)에서 펼쳐지는
- * 애니메이션과 스탬프(assets/stamps) 배치는 다음 작업이다.
+ * 애니메이션은 다음 작업이다.
  */
 const Home = () => {
   return (
@@ -53,9 +86,9 @@ const Home = () => {
 
             <JourneyActions>
               <EndJourneyButton type="button">여정 종료하기</EndJourneyButton>
-              <ContinueJourneyButton type="button">
+              <ContinueJourneyLink to="/record/multi-capture">
                 여정 계속하기
-              </ContinueJourneyButton>
+              </ContinueJourneyLink>
             </JourneyActions>
           </JourneyBody>
         </JourneyCard>
@@ -76,12 +109,25 @@ const Home = () => {
           </ResultCard>
         </PassportHead>
 
-        {/* TODO: 스탬프(assets/stamps)를 이 안에 얹는다. PassportSpread 가
-            컨테이너라 journeyScale 처럼 시안 폭 376 기준 cqw 헬퍼를 만들어
-            쓰면 면 크기를 따라간다. 시안 안쪽 여백은 위 40 · 좌 19 · 우 20 ·
-            아래 52, 좌우 면 사이 간격은 17 이다. */}
         <PassportSpread>
           <PassportImage src={passportOpenImage} alt="" aria-hidden="true" />
+
+          <StampPages>
+            {SAMPLE_STAMPS.map((page, pageIndex) => (
+              <StampGrid
+                key={pageIndex}
+                $side={pageIndex === 0 ? 'left' : 'right'}
+              >
+                {page.map((country, slotIndex) => (
+                  <Stamp
+                    key={slotIndex}
+                    src={getStampSrc(country)}
+                    alt={country ?? ''}
+                  />
+                ))}
+              </StampGrid>
+            ))}
+          </StampPages>
         </PassportSpread>
 
         <PageDots aria-hidden="true">
@@ -277,16 +323,20 @@ const EndJourneyButton = styled.button`
   cursor: pointer;
 `
 
-const ContinueJourneyButton = styled.button`
+/* 누르면 촬영 화면으로 이동한다. */
+const ContinueJourneyLink = styled(Link)`
   width: ${journeyScale(105)};
   height: ${journeyScale(33)};
-  border: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: ${journeyScale(6)};
   background: var(--Primary-Cognac);
   box-shadow: var(--Effect-Chip);
   color: var(--Text-Inverse);
   font: 500 ${journeyScale(11)}/${journeyScale(16)} var(--font-sans);
-  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
 `
 
 /* 여권 면은 본문 폭(354)보다 넓은 376 이라 양쪽으로 11px 씩 넘어간다. */
@@ -327,7 +377,8 @@ const ResultDescription = styled.p`
   font: 400 11px/normal var(--font-sans);
 `
 
-/* 시안 376 × 261. 스탬프는 이 안에 passportScale 로 얹는다. */
+/* 시안 376 × 261. 안쪽 cqw 값의 기준점이라 자신에게는 cqw 를 쓰지 못한다.
+   (컨테이너 단위는 조상 컨테이너를 기준으로 해 여기선 뷰포트로 잡힌다) */
 const PassportSpread = styled.div`
   position: relative;
   width: 100%;
@@ -344,6 +395,34 @@ const PassportImage = styled.img`
   height: 104.28%;
   object-fit: cover;
   max-width: none;
+`
+
+/* 지면 여백은 위 40 · 좌 19 · 우 20 · 아래 52.
+   왼쪽 면 162, 오른쪽 면 158, 사이 17 로 합이 지면 폭 337 이다. */
+const StampPages = styled.div`
+  position: relative;
+  height: 100%;
+  padding: ${passportScale(40)} ${passportScale(20)} ${passportScale(52)}
+    ${passportScale(19)};
+  display: flex;
+  align-items: center;
+  gap: ${passportScale(17)};
+`
+
+/* 두 면은 시안에서 칸 간격이 서로 다르다. */
+const StampGrid = styled.div`
+  width: ${({ $side }) => passportScale($side === 'left' ? 162 : 158)};
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: ${({ $side }) => passportScale($side === 'left' ? 1 : 2)};
+  row-gap: ${({ $side }) => passportScale($side === 'left' ? 9 : 13)};
+`
+
+/* 빈 칸(Empty.webp)은 이미 흐린 톤이라 따로 opacity 를 주지 않는다. */
+const Stamp = styled.img`
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
 `
 
 const PageDots = styled.div`
