@@ -33,7 +33,7 @@ export const AB_PHOTO_ROUNDS = [
   { roundNo: 2, axisCode: 'vividness', sources: [ab2A, ab2B] },
   { roundNo: 3, axisCode: 'tone', sources: [ab3A, ab3B] },
   { roundNo: 4, axisCode: 'density', sources: [ab4A, ab4B] },
-  { roundNo: 5, axisCode: 'subject', sources: [ab5A, ab5B] },
+  { roundNo: 5, axisCode: 'photo_type', sources: [ab5A, ab5B] },
 ].map(({ roundNo, axisCode, sources }) => ({
   roundNo,
   axisCode,

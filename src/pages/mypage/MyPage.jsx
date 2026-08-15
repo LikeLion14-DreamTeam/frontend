@@ -32,12 +32,11 @@ const stats = [
 ]
 
 const TASTE_AXIS_PRESENTATION = [
-  { axisCode: 'brightness', left: '밝은', right: '어두운' },
-  { axisCode: 'vividness', left: '선명한', right: '차분한' },
-  { axisCode: 'tone', left: '웜', right: '쿨' },
-  { axisCode: 'density', left: '여백 많은', right: '꽉 찬' },
-  { axisCode: 'framing', left: '클로즈업', right: '넓게' },
-  { axisCode: 'angle', left: '정면', right: '뒷모습·옆모습' },
+  { axisCode: 'brightness', left: '어두운', right: '밝은' },
+  { axisCode: 'vividness', left: '차분한', right: '선명한' },
+  { axisCode: 'tone', left: '차가운', right: '따뜻한' },
+  { axisCode: 'density', left: '여백있는', right: '밀도있는' },
+  { axisCode: 'photo_type', left: '풍경', right: '인물' },
 ]
 
 const TASTE_AXIS_COMMIT_KEYS = new Set([
