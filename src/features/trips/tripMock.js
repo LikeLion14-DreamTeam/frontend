@@ -8,12 +8,14 @@
  * 응답 형태는 API 명세서 4.1 / 4.2 / 4.5 와 동일하게 맞춘다.
  */
 
+import { mockPinStore } from '../pins/pinMock'
+
 const createInitialState = () => ({
   trips: {
     12: {
       segment_id: 12,
       user_id: 1,
-      name: '파리 · 베르사유',
+      name: '파리, 베르사유',
       start_at: '2024-11-03T01:24:00.000000Z',
       end_at: '2024-11-10T09:12:00.000000Z',
       status: true,
@@ -98,31 +100,49 @@ const createInitialState = () => ({
 })
 
 /**
- * mock 내부 집계 전용 데이터.
+ * 구간 요약(4.2)의 사진·음성 개수는 핀 mock 의 실제 데이터에서 센다.
  *
- * 실제 API 응답에는 핀별 사진 수가 없다(백엔드 문의 중). 여기서는 구간 요약의
- * photo_count 를 계산하려고 따로 들고 있으며, 응답 객체에는 넣지 않는다.
- * 화면에서 이 값을 읽으면 안 된다.
+ * 따로 표를 두면 5.4 사진 목록과 숫자가 어긋나고, 5.7 로 사진을 지워도 구간
+ * 요약이 그대로여서 목업만으로 확인이 안 된다.
  */
-const PHOTO_COUNT_BY_PIN = {
-  101: 8,
-  102: 6,
-  103: 11,
-  104: 3,
-  105: 4,
-  201: 12,
-  202: 9,
+
+/**
+ * mock 내부 집계 전용 데이터. 핀별 도시·국가.
+ *
+ * 실제로는 핀을 만들 때(8.2) 프론트가 좌표를 역지오코딩해 보낸 값을 서버가
+ * 들고 있다가 3.1 의 `cities` 와 3.3 의 국가 도장으로 집계한다. mock 에서는
+ * 그 저장소를 대신하며, 어떤 API 응답에도 이 값을 그대로 넣지 않는다.
+ *
+ * 국가는 ISO 3166-1 alpha-2. 구글 역지오코딩 country 의 `short_name` 이라
+ * 응답 언어와 무관하게 같은 값이 온다. 도시명은 `language=ko` 기준이다.
+ * 좌표가 없는 핀(104)은 역지오코딩을 못 해 도시·국가가 비어 있다.
+ */
+const LOCATION_BY_PIN = {
+  101: { city: '파리', country_code: 'FR', country_name: '프랑스' },
+  102: { city: '파리', country_code: 'FR', country_name: '프랑스' },
+  103: { city: '파리', country_code: 'FR', country_name: '프랑스' },
+  104: null,
+  105: { city: '베르사유', country_code: 'FR', country_name: '프랑스' },
+  106: { city: '서울', country_code: 'KR', country_name: '대한민국' },
+  107: { city: '부산', country_code: 'KR', country_name: '대한민국' },
+  108: { city: '대구', country_code: 'KR', country_name: '대한민국' },
+  109: { city: '전주', country_code: 'KR', country_name: '대한민국' },
+  110: { city: '여수', country_code: 'KR', country_name: '대한민국' },
+  111: { city: '강릉', country_code: 'KR', country_name: '대한민국' },
+  201: { city: '도쿄', country_code: 'JP', country_name: '일본' },
+  202: { city: '요코하마', country_code: 'JP', country_name: '일본' },
 }
 
-const VOICE_MEMO_PIN_IDS = new Set([101, 104, 201])
+export const getMockPinLocation = (pinId) => LOCATION_BY_PIN[pinId] ?? null
 
 /** 세션 동안 유지되는 mock 상태. tripApi 의 mock 분기가 직접 읽고 쓴다. */
 export const mockTripStore = createInitialState()
 
-export const getMockPhotoCount = (pinId) => PHOTO_COUNT_BY_PIN[pinId] ?? 0
+export const getMockPhotoCount = (pinId) =>
+  mockPinStore.photos[pinId]?.length ?? 0
 
 export const getMockVoiceMemoCount = (pinId) =>
-  VOICE_MEMO_PIN_IDS.has(pinId) ? 1 : 0
+  mockPinStore.voiceMemos[pinId] ? 1 : 0
 
 /** 테스트나 초기화가 필요할 때 사용한다. */
 export const resetMockTripStore = () => {

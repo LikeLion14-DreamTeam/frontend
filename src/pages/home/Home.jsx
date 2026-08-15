@@ -1,7 +1,13 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
 import NavBar from '../../components/layout/NavBar'
+import {
+  getCountryStamps,
+  getCurrentTrip,
+} from '../../features/trips/tripApi'
 import journeyCardImage from '../../assets/home/journey-card.png'
+import noteEditIcon from '../../assets/map/note-edit.svg'
 import passportOpenImage from '../../assets/home/passport-open.png'
 
 /**
@@ -13,13 +19,17 @@ const journeyScale = (px) => `${((px / 362) * 100).toFixed(4)}cqw`
 /** 여권 면(시안 폭 376px)용. 위에 얹는 스탬프도 같은 단위로 배치한다. */
 const passportScale = (px) => `${((px / 376) * 100).toFixed(4)}cqw`
 
-/** 파일명이 곧 나라 이름이다. 정적으로 58개를 나열하지 않고 폴더에서 모은다. */
+/**
+ * 파일명이 곧 ISO 3166-1 alpha-2 국가 코드다. 구글 역지오코딩의
+ * `address_components` 중 country 의 `short_name` 이 이 값이라, 응답 언어와
+ * 무관하게 항상 같은 코드가 온다. 정적으로 58개를 나열하지 않고 폴더에서 모은다.
+ */
 const stampModules = import.meta.glob('../../assets/stamps/*.webp', {
   eager: true,
   import: 'default',
 })
 
-const stampByCountry = Object.fromEntries(
+const stampByCountryCode = Object.fromEntries(
   Object.entries(stampModules).map(([path, url]) => [
     path.slice(path.lastIndexOf('/') + 1, -'.webp'.length),
     url,
@@ -27,30 +37,111 @@ const stampByCountry = Object.fromEntries(
 )
 
 /** 빈 칸은 Empty, 스탬프가 없는 나라는 Country 로 대체한다. */
-const getStampSrc = (country) => {
-  if (!country) return stampByCountry.Empty
+const getStampSrc = (countryCode) => {
+  if (!countryCode) return stampByCountryCode.Empty
 
-  return stampByCountry[country] ?? stampByCountry.Country
+  return stampByCountryCode[countryCode] ?? stampByCountryCode.Country
 }
 
+const STAMPS_PER_SIDE = 4
+const STAMPS_PER_SPREAD = STAMPS_PER_SIDE * 2
+
 /**
- * 한 면에 4개씩, 왼쪽 면부터 채운다.
- * TODO: 방문한 나라 목록으로 채운다. 지금은 시안 값이다.
+ * 도장을 여권 펼침 단위로 나눈다. 한 펼침은 [왼쪽 면, 오른쪽 면] 이고
+ * 각 면은 4칸이다. 남는 칸은 null 로 채워 빈 도장이 찍힌다.
+ * 도장이 하나도 없어도 빈 면 한 장은 보여준다.
  */
-const SAMPLE_STAMPS = [
-  ['Portugal', 'Croatia', 'Italy', 'Spain'],
-  ['France', 'Austria', null, null],
-]
+const toStampSpreads = (stamps) => {
+  const spreadCount = Math.max(1, Math.ceil(stamps.length / STAMPS_PER_SPREAD))
+
+  return Array.from({ length: spreadCount }, (_, spreadIndex) => {
+    const slots = Array.from(
+      { length: STAMPS_PER_SPREAD },
+      (_, slotIndex) => stamps[spreadIndex * STAMPS_PER_SPREAD + slotIndex] ?? null,
+    )
+
+    return [slots.slice(0, STAMPS_PER_SIDE), slots.slice(STAMPS_PER_SIDE)]
+  })
+}
+
+const pad2 = (value) => String(value).padStart(2, '0')
+
+const formatStartedAt = (startedAt) => {
+  if (!startedAt) return ''
+
+  const date = new Date(startedAt)
+
+  return `${date.getFullYear()}.${pad2(date.getMonth() + 1)}.${pad2(date.getDate())}`
+}
+
+const formatCounts = (trip) =>
+  [
+    `${trip.pin_count} PIN`,
+    `${trip.photo_count} PHOTO`,
+    `${trip.voice_memo_count} VOICE`,
+  ].join(' · ')
 
 /**
  * 3 홈 화면
  *
- * TODO: 아직 시안 값을 그대로 넣어둔 상태다. 진행 중인 여정은 3.1 GET /trips/current,
- * 여권 요약은 마이페이지 통계 API 로 채운다.
+ * TODO: 여권 요약과 스탬프는 아직 시안 값이다. 마이페이지 통계와
+ * 3.3 GET /users/me/country-stamps 로 채운다.
+ * TODO: 여정 이름 수정 버튼은 명세가 나오는 대로 카드에 추가한다.
  * TODO: 여권은 펼쳐진 상태만 구현했다. 덮인 상태(passport-closed.png)에서 펼쳐지는
  * 애니메이션은 다음 작업이다.
  */
 const Home = () => {
+  const [currentTrip, setCurrentTrip] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [tripError, setTripError] = useState('')
+  const [stamps, setStamps] = useState([])
+  const [spreadIndex, setSpreadIndex] = useState(0)
+
+  useEffect(() => {
+    let ignore = false
+
+    const load = async () => {
+      try {
+        const trip = await getCurrentTrip()
+        if (!ignore) setCurrentTrip(trip)
+      } catch (error) {
+        if (!ignore) setTripError(error.message)
+      } finally {
+        if (!ignore) setIsLoading(false)
+      }
+    }
+
+    load()
+
+    return () => {
+      ignore = true
+    }
+  }, [])
+
+  useEffect(() => {
+    let ignore = false
+
+    const load = async () => {
+      try {
+        const { stamps: visited } = await getCountryStamps()
+        if (!ignore) setStamps(visited)
+      } catch {
+        // 도장은 부가 정보라 실패해도 빈 여권으로 둔다.
+        if (!ignore) setStamps([])
+      }
+    }
+
+    load()
+
+    return () => {
+      ignore = true
+    }
+  }, [])
+
+  const hasPins = currentTrip?.has_pins === true
+  const stampSpreads = toStampSpreads(stamps)
+  const currentSpread = stampSpreads[spreadIndex] ?? stampSpreads[0]
+
   return (
     <Page>
       <Brand>
@@ -73,19 +164,45 @@ const Home = () => {
           <JourneyImage src={journeyCardImage} alt="" aria-hidden="true" />
 
           <JourneyBody>
-            <JourneyInfo>
-              <CityName>PARIS</CityName>
-              <JourneyDetails>
-                <CountryName>FRANCE</CountryName>
+            {isLoading && <JourneyStatus>불러오는 중...</JourneyStatus>}
+
+            {!isLoading && tripError && (
+              <JourneyStatus role="alert">{tripError}</JourneyStatus>
+            )}
+
+            {/* has_pins: false 는 아직 태깅을 한 번도 안 한 상태다. */}
+            {!isLoading && !tripError && !hasPins && (
+              <JourneyInfo>
+                <TripName>여정을 시작해보세요</TripName>
                 <JourneyMeta>
-                  <MetaLine>2024.09.12 — 진행중</MetaLine>
-                  <MetaLine>12 PIN ·138 PHOTO · 6 VOICE</MetaLine>
+                  <MetaLine>태그를 인식하면 첫 핀이 저장돼요</MetaLine>
                 </JourneyMeta>
-              </JourneyDetails>
-            </JourneyInfo>
+              </JourneyInfo>
+            )}
+
+            {!isLoading && !tripError && hasPins && (
+              <JourneyInfo>
+                <TripNameRow>
+                  <TripName>{currentTrip.name}</TripName>
+                  {/* TODO: 여정 이름 수정 API 명세가 나오면 연결한다. */}
+                  <EditNameButton type="button" aria-label="여정 이름 수정">
+                    <EditNameIcon src={noteEditIcon} alt="" aria-hidden="true" />
+                  </EditNameButton>
+                </TripNameRow>
+                <JourneyMeta>
+                  <MetaLine>
+                    {formatStartedAt(currentTrip.started_at)} — 진행중
+                  </MetaLine>
+                  <MetaLine>{formatCounts(currentTrip)}</MetaLine>
+                </JourneyMeta>
+              </JourneyInfo>
+            )}
 
             <JourneyActions>
-              <EndJourneyButton type="button">여정 종료하기</EndJourneyButton>
+              {/* 배정할 핀이 없으면 3.2 가 409 EMPTY_TRIP 이라 아예 감춘다. */}
+              {hasPins && (
+                <EndJourneyButton type="button">여정 종료하기</EndJourneyButton>
+              )}
               <ContinueJourneyLink to="/record/multi-capture">
                 여정 계속하기
               </ContinueJourneyLink>
@@ -113,16 +230,16 @@ const Home = () => {
           <PassportImage src={passportOpenImage} alt="" aria-hidden="true" />
 
           <StampPages>
-            {SAMPLE_STAMPS.map((page, pageIndex) => (
+            {currentSpread.map((side, sideIndex) => (
               <StampGrid
-                key={pageIndex}
-                $side={pageIndex === 0 ? 'left' : 'right'}
+                key={sideIndex}
+                $side={sideIndex === 0 ? 'left' : 'right'}
               >
-                {page.map((country, slotIndex) => (
+                {side.map((stamp, slotIndex) => (
                   <Stamp
                     key={slotIndex}
-                    src={getStampSrc(country)}
-                    alt={country ?? ''}
+                    src={getStampSrc(stamp?.country_code)}
+                    alt={stamp?.country_name ?? ''}
                   />
                 ))}
               </StampGrid>
@@ -130,10 +247,18 @@ const Home = () => {
           </StampPages>
         </PassportSpread>
 
-        <PageDots aria-hidden="true">
-          <Dot $active />
-          <Dot />
-          <Dot />
+        {/* TODO: 좌우 스와이프로도 넘길 수 있게 한다. */}
+        <PageDots>
+          {stampSpreads.map((_, index) => (
+            <Dot
+              key={index}
+              type="button"
+              $active={index === spreadIndex}
+              aria-label={`여권 ${index + 1}번째 면`}
+              aria-current={index === spreadIndex}
+              onClick={() => setSpreadIndex(index)}
+            />
+          ))}
         </PageDots>
       </PassportBlock>
 
@@ -265,33 +390,63 @@ const JourneyBody = styled.div`
     ${journeyScale(27)};
   display: flex;
   flex-direction: column;
-  gap: ${journeyScale(18)};
+  gap: ${journeyScale(32)};
   align-items: flex-start;
 `
 
-const JourneyInfo = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${journeyScale(3)};
-  align-items: flex-start;
-`
-
-const CityName = styled.p`
-  color: var(--Text-Primary);
-  font: 600 ${journeyScale(35)}/${journeyScale(40)} var(--font-serif);
-  letter-spacing: ${journeyScale(1.05)};
-`
-
-const JourneyDetails = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${journeyScale(5)};
-  align-items: flex-start;
-`
-
-const CountryName = styled.p`
+const JourneyStatus = styled.p`
   color: var(--Text-Secondary);
   font: 400 ${journeyScale(12)}/${journeyScale(18)} var(--font-sans);
+`
+
+/* 시안의 도시명 자리에 여정 이름이 들어간다. 나라 줄은 없다. */
+const JourneyInfo = styled.div`
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: ${journeyScale(12)};
+  align-items: flex-start;
+`
+
+/* 수정 버튼은 이름 바로 뒤에 붙는다. 이름 길이가 데이터마다 달라 시안의
+   고정 좌표 대신 인라인으로 둔다. */
+const TripNameRow = styled.div`
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  gap: ${journeyScale(8)};
+`
+
+/*
+ * 시안은 Cormorant Garamond 지만 여정 이름은 한글이라 본문과 같은 산세리프로
+ * 맞춘다. 세리프에는 한글 글리프가 없어 시스템 명조로 대체돼 버린다.
+ * 자간도 라틴 대문자용이라 한글에서는 빼고 크기만 시안대로 둔다.
+ *
+ * 서버가 도시명을 이어 붙여 이름을 짓기도 해서 길어질 수 있다.
+ */
+const TripName = styled.p`
+  min-width: 0;
+  overflow: hidden;
+  color: var(--Text-Primary);
+  font: 600 ${journeyScale(25)}/${journeyScale(40)} var(--font-sans);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`
+
+const EditNameButton = styled.button`
+  width: ${journeyScale(17)};
+  height: ${journeyScale(16)};
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+`
+
+const EditNameIcon = styled.img`
+  width: 100%;
+  height: 100%;
+  display: block;
 `
 
 const JourneyMeta = styled.div`
@@ -432,10 +587,13 @@ const PageDots = styled.div`
   gap: 6px;
 `
 
-const Dot = styled.span`
+const Dot = styled.button`
   width: ${({ $active }) => ($active ? '7px' : '5px')};
   height: ${({ $active }) => ($active ? '7px' : '5px')};
+  padding: 0;
+  border: 0;
   border-radius: 50%;
   background: ${({ $active }) =>
     $active ? 'var(--Primary-Cognac)' : 'rgb(181 161 140 / 45%)'};
+  cursor: pointer;
 `

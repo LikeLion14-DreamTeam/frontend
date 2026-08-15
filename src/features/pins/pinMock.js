@@ -116,6 +116,56 @@ const createInitialState = () => ({
       tagged_at: '2025-08-14T02:10:00.000000Z',
       text_note: '퇴근길에 잠깐 들렀다.',
     },
+    107: {
+      pin_id: 107,
+      segment_id: null,
+      latitude: 35.1587,
+      longitude: 129.1604,
+      address: '부산 해운대구 해운대해변로',
+      place_name: '해운대 해수욕장',
+      tagged_at: '2025-08-14T06:30:00.000000Z',
+      text_note: '해가 지는 걸 한참 봤다.',
+    },
+    108: {
+      pin_id: 108,
+      segment_id: null,
+      latitude: 35.8714,
+      longitude: 128.6014,
+      address: '대구 중구 국채보상로',
+      place_name: '',
+      tagged_at: '2025-08-15T01:15:00.000000Z',
+      text_note: '',
+    },
+    109: {
+      pin_id: 109,
+      segment_id: null,
+      latitude: 35.8151,
+      longitude: 127.153,
+      address: '전북 전주시 완산구 기린대로',
+      place_name: '전주 한옥마을',
+      tagged_at: '2025-08-15T05:40:00.000000Z',
+      text_note: '기와 지붕이 끝없이 이어졌다.',
+    },
+    110: {
+      pin_id: 110,
+      segment_id: null,
+      latitude: 34.7604,
+      longitude: 127.6622,
+      address: '전남 여수시 돌산읍 돌산로',
+      place_name: '돌산공원',
+      tagged_at: '2025-08-16T00:20:00.000000Z',
+      text_note: '',
+    },
+    111: {
+      pin_id: 111,
+      segment_id: null,
+      latitude: 37.7952,
+      longitude: 128.9059,
+      address: '강원 강릉시 창해로',
+      place_name: '경포해변',
+      tagged_at: '2025-08-16T08:05:00.000000Z',
+      text_note: '파도 소리만 한참 들었다.',
+    },
 
     // tripMock 의 구간 11(도쿄, 요코하마)
     201: {
@@ -262,6 +312,82 @@ const createInitialState = () => ({
         is_pin_cover: true,
       },
     ],
+    107: [
+      {
+        photo_id: 962,
+        captured_at: '2025-08-14T06:31:20.000000Z',
+        file_path: photoUrl('orte-962'),
+        is_pin_cover: true,
+      },
+      {
+        photo_id: 963,
+        captured_at: '2025-08-14T06:35:02.000000Z',
+        file_path: photoUrl('orte-963'),
+        is_pin_cover: true,
+      },
+      {
+        photo_id: 964,
+        captured_at: '2025-08-14T06:38:47.000000Z',
+        file_path: photoUrl('orte-964'),
+        is_pin_cover: false,
+      },
+    ],
+    108: [
+      {
+        photo_id: 965,
+        captured_at: '2025-08-15T01:16:05.000000Z',
+        file_path: photoUrl('orte-965'),
+        is_pin_cover: true,
+      },
+    ],
+    109: [
+      {
+        photo_id: 966,
+        captured_at: '2025-08-15T05:41:30.000000Z',
+        file_path: photoUrl('orte-966'),
+        is_pin_cover: true,
+      },
+      {
+        photo_id: 967,
+        captured_at: '2025-08-15T05:48:12.000000Z',
+        file_path: photoUrl('orte-967'),
+        is_pin_cover: true,
+      },
+    ],
+    110: [
+      {
+        photo_id: 968,
+        captured_at: '2025-08-16T00:21:44.000000Z',
+        file_path: photoUrl('orte-968'),
+        is_pin_cover: true,
+      },
+      {
+        photo_id: 969,
+        captured_at: '2025-08-16T00:26:19.000000Z',
+        file_path: photoUrl('orte-969'),
+        is_pin_cover: false,
+      },
+    ],
+    111: [
+      {
+        photo_id: 974,
+        captured_at: '2025-08-16T08:06:02.000000Z',
+        file_path: photoUrl('orte-974'),
+        is_pin_cover: true,
+      },
+      {
+        photo_id: 975,
+        captured_at: '2025-08-16T08:12:55.000000Z',
+        file_path: photoUrl('orte-975'),
+        is_pin_cover: true,
+      },
+      {
+        photo_id: 976,
+        captured_at: '2025-08-16T08:19:31.000000Z',
+        file_path: photoUrl('orte-976'),
+        is_pin_cover: false,
+      },
+    ],
     201: [
       {
         photo_id: 970,
@@ -322,6 +448,21 @@ const createInitialState = () => ({
     104: null,
     105: null,
     106: null,
+    107: {
+      voice_memo_id: 58,
+      audio_file: createMockAudioUrl(14),
+      duration_sec: 14,
+      saved_at: '2025-08-14T06:30:40.000000Z',
+    },
+    108: null,
+    109: null,
+    110: {
+      voice_memo_id: 59,
+      audio_file: createMockAudioUrl(21),
+      duration_sec: 21,
+      saved_at: '2025-08-16T00:20:35.000000Z',
+    },
+    111: null,
     201: {
       voice_memo_id: 57,
       audio_file: createMockAudioUrl(24),
