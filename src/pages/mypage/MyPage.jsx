@@ -23,6 +23,8 @@ import briefcaseIcon from '../../assets/icons/mypage/briefcase.svg'
 import chevronRightIcon from '../../assets/icons/mypage/chevron-right.svg'
 import closeIcon from '../../assets/icons/mypage/close.png'
 import keyIcon from '../../assets/icons/mypage/key.svg'
+import relearningCurrentIcon from '../../assets/icons/mypage/relearning-current.svg'
+import relearningWarningIcon from '../../assets/icons/mypage/relearning-warning.svg'
 import refreshIcon from '../../assets/icons/mypage/refresh.svg'
 import unlinkPreservedIcon from '../../assets/icons/mypage/unlink-preserved.svg'
 import unlinkWarningIcon from '../../assets/icons/mypage/unlink-warning.svg'
@@ -55,6 +57,12 @@ const TASTE_AXIS_COMMIT_KEYS = new Set([
 
 const RELEARNING_COMPLETED_MESSAGE =
   '취향 프로필이 갱신되었습니다. 기존 추천은 유지되며, 이후 생성하거나 재추천한 사진부터 새 기준이 적용됩니다.'
+
+// TODO: 취향 프로필 GET 응답에 학습일과 응답 개수가 추가되면 서버 값으로 교체한다.
+const RELEARNING_PROFILE_SUMMARY = {
+  learnedAt: '2025.06.12 학습',
+  responseCounts: '기본 질문 5 · 사진 비교 5 · 무드보드 3',
+}
 
 const getAxisValue = (value) => {
   if (value === null || value === undefined) return 50
@@ -120,6 +128,8 @@ const MyPage = () => {
   const [tasteAxesRequestKey, setTasteAxesRequestKey] = useState(0)
   const [savingTasteAxisCodes, setSavingTasteAxisCodes] = useState([])
   const [tasteAxisSaveError, setTasteAxisSaveError] = useState('')
+  const [isRelearningConfirmOpen, setIsRelearningConfirmOpen] =
+    useState(false)
   const [products, setProducts] = useState([])
   const [isProductsLoading, setIsProductsLoading] = useState(true)
   const [productsError, setProductsError] = useState('')
@@ -343,11 +353,7 @@ const MyPage = () => {
   }
 
   const handleStartRelearning = () => {
-    const shouldStartRelearning = window.confirm(
-      '재학습을 완료하면 기존 취향 프로필이 새 응답으로 교체됩니다. 완료 전까지는 기존 프로필이 유지됩니다. 재학습을 시작할까요?',
-    )
-
-    if (!shouldStartRelearning) return
+    setIsRelearningConfirmOpen(false)
 
     navigate(
       getOnboardingFlowPath('/onboarding/basic-question', true),
@@ -460,7 +466,10 @@ const MyPage = () => {
         <Panel>
           <SectionHeader>
             <SectionTitle>취향 프로필</SectionTitle>
-            <RelearnButton type="button" onClick={handleStartRelearning}>
+            <RelearnButton
+              type="button"
+              onClick={() => setIsRelearningConfirmOpen(true)}
+            >
               재학습
               <RefreshIcon src={refreshIcon} alt="" aria-hidden="true" />
             </RelearnButton>
@@ -656,6 +665,44 @@ const MyPage = () => {
       <NavigationBoundary>
         <NavBar />
       </NavigationBoundary>
+
+      <ConfirmationModal
+        open={isRelearningConfirmOpen}
+        title="취향 프로필을 다시 만들까요?"
+        confirmLabel="재학습 시작하기"
+        onConfirm={handleStartRelearning}
+        onCancel={() => setIsRelearningConfirmOpen(false)}
+        ariaDescribedBy="relearning-profile-warning"
+      >
+        <RelearningModalContent>
+          <CurrentTasteProfileCard>
+            <CurrentTasteProfileIcon
+              src={relearningCurrentIcon}
+              alt=""
+              aria-hidden="true"
+            />
+            <CurrentTasteProfileText>
+              <CurrentTasteProfileTitle>
+                지금 프로필 · {RELEARNING_PROFILE_SUMMARY.learnedAt}
+              </CurrentTasteProfileTitle>
+              <CurrentTasteProfileSummary>
+                {RELEARNING_PROFILE_SUMMARY.responseCounts}
+              </CurrentTasteProfileSummary>
+            </CurrentTasteProfileText>
+          </CurrentTasteProfileCard>
+          <RelearningModalWarning id="relearning-profile-warning">
+            <RelearningModalWarningIcon
+              src={relearningWarningIcon}
+              alt=""
+              aria-hidden="true"
+            />
+            <span>
+              재학습을 완료하면 기존 프로필이 새 응답으로 교체돼요. 완료
+              전까지는 지금 프로필이 그대로 유지됩니다.
+            </span>
+          </RelearningModalWarning>
+        </RelearningModalContent>
+      </ConfirmationModal>
 
       <ConfirmationModal
         open={productPendingUnlink !== null}
@@ -910,6 +957,69 @@ const RelearningNotice = styled.p`
   font: var(--text-ui-caption);
   line-height: 1.55;
   word-break: keep-all;
+`
+
+const RelearningModalContent = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+`
+
+const CurrentTasteProfileCard = styled.div`
+  min-height: 56px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 12px;
+  background: var(--Background-Base);
+`
+
+const CurrentTasteProfileIcon = styled.img`
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  display: block;
+`
+
+const CurrentTasteProfileText = styled.div`
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+`
+
+const CurrentTasteProfileTitle = styled.p`
+  color: var(--Text-Primary);
+  font: var(--text-ui-label);
+`
+
+const CurrentTasteProfileSummary = styled.p`
+  overflow: hidden;
+  color: var(--Text-Secondary);
+  font: 400 11px/18px var(--font-sans);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`
+
+const RelearningModalWarning = styled.p`
+  min-height: 66px;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  border-radius: 12px;
+  background: rgb(181 118 59 / 10%);
+  color: var(--Primary-Cognac);
+  font: 400 11px/18px var(--font-sans);
+  word-break: keep-all;
+`
+
+const RelearningModalWarningIcon = styled.img`
+  width: 18px;
+  height: 17px;
+  flex: 0 0 18px;
+  display: block;
 `
 
 const PreferenceFeedback = styled.p`
