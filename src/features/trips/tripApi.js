@@ -105,26 +105,6 @@ export const updateTrip = async (segmentId, { name, pinInclusions }) => {
   })
 }
 
-/**
- * 4.4 여행 구간 삭제
- *
- * 구간에 속한 핀·사진·음성메모와 포토북까지 함께 삭제된다(DB cascade).
- * 되돌릴 수 없으므로 호출 전에 반드시 사용자 확인을 받는다.
- * 204 No Content 라 반환값이 없다.
- */
-export const deleteTrip = async (segmentId) => {
-  if (USE_MOCK) {
-    if (!mockTripStore.trips[segmentId]) throw mockNotFound()
-
-    delete mockTripStore.trips[segmentId]
-    delete mockTripStore.pins[segmentId]
-
-    return null
-  }
-
-  return apiClient.delete(`/trips/${segmentId}`)
-}
-
 /** 4.5 구간 내 핀 목록 조회. 제외된 핀도 included_in_segment: false 로 함께 온다. */
 export const getTripPins = async (
   segmentId,

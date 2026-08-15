@@ -3,14 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom'
 import styled from 'styled-components'
 import Button from '../../components/common/Button'
 import Card from '../../components/common/Card'
-import ConfirmationModal from '../../components/common/ConfirmationModal'
 import Header from '../../components/layout/Header'
 import checkboxCheckedIcon from '../../assets/icons/trip-checkbox-checked.svg'
-import deleteWarningIcon from '../../assets/icons/trip-delete-warning.svg'
 import editBackIcon from '../../assets/icons/trip-edit-back.svg'
 import selectChevronIcon from '../../assets/icons/trip-select-chevron.svg'
 import {
-  deleteTrip,
   getTrip,
   getTripPins,
   updateTrip,
@@ -28,32 +25,6 @@ const formatDateValue = (isoString) => {
 
   return `${date.getFullYear()}.${pad2(date.getMonth() + 1)}.${pad2(date.getDate())}`
 }
-
-const formatDateRange = (startAt, endAt) => {
-  const start = formatDateValue(startAt)
-  const end = formatDateValue(endAt)
-
-  if (!start) return end
-  if (!end) return start
-
-  const compactEnd = start.slice(0, 4) === end.slice(0, 4)
-    ? end.slice(5)
-    : end
-
-  return `${start} – ${compactEnd}`
-}
-
-const getTripDeleteMeta = (trip) =>
-  [
-    formatDateRange(trip.start_at, trip.end_at),
-    typeof trip.pin_count === 'number' ? `핀 ${trip.pin_count}개` : '',
-    typeof trip.photo_count === 'number' ? `사진 ${trip.photo_count}장` : '',
-    typeof trip.voice_memo_count === 'number'
-      ? `음성 ${trip.voice_memo_count}개`
-      : '',
-  ]
-    .filter(Boolean)
-    .join(' · ')
 
 const pinTimeFormatter = new Intl.DateTimeFormat('ko-KR', {
   month: '2-digit',
@@ -76,8 +47,6 @@ const TripSegmentEdit = () => {
   const [includedIds, setIncludedIds] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
-  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
   useEffect(() => {
@@ -172,21 +141,6 @@ const TripSegmentEdit = () => {
       setErrorMessage(error.message)
     } finally {
       setIsSaving(false)
-    }
-  }
-
-  const handleDelete = async () => {
-    setIsDeleting(true)
-    setErrorMessage('')
-
-    try {
-      await deleteTrip(segmentId)
-      // 구간과 함께 포토북까지 사라지므로 목록으로 보내고 뒤로가기를 막는다.
-      navigate('/archive', { replace: true })
-    } catch (error) {
-      setErrorMessage(error.message)
-      setIsDeleting(false)
-      setIsConfirmingDelete(false)
     }
   }
 
@@ -402,55 +356,14 @@ const TripSegmentEdit = () => {
               <SaveButton
                 type="button"
                 onClick={handleSave}
-                disabled={isSaving || isDeleting}
+                disabled={isSaving}
               >
                 {isSaving ? '저장 중...' : '변경사항 저장'}
               </SaveButton>
-
-              <DeleteTrigger
-                type="button"
-                $variant="ghost"
-                onClick={() => setIsConfirmingDelete(true)}
-                disabled={isSaving || isDeleting}
-              >
-                구간 삭제하기
-              </DeleteTrigger>
             </Footer>
           </>
         )}
       </TripSegmentEditWrapper>
-
-      <ConfirmationModal
-        open={trip !== null && isConfirmingDelete}
-        title="이 구간을 삭제할까요?"
-        confirmLabel={isDeleting ? '구간 삭제 중...' : '구간 삭제하기'}
-        onConfirm={() => void handleDelete()}
-        onCancel={() => setIsConfirmingDelete(false)}
-        confirmDisabled={isDeleting}
-        cancelDisabled={isDeleting}
-        ariaDescribedBy="trip-delete-warning"
-      >
-        {trip && (
-          <TripDeleteModalContent>
-            <TripDeleteTargetCard>
-              <TripDeleteTargetName>{trip.name}</TripDeleteTargetName>
-              <TripDeleteTargetMeta>
-                {getTripDeleteMeta(trip)}
-              </TripDeleteTargetMeta>
-            </TripDeleteTargetCard>
-            <TripDeleteWarning id="trip-delete-warning">
-              <TripDeleteWarningIcon
-                src={deleteWarningIcon}
-                alt=""
-                aria-hidden="true"
-              />
-              <span>
-                구간에 담긴 핀과 사진, 음성 메모가 모두 함께 삭제돼요. 되돌릴 수 없습니다.
-              </span>
-            </TripDeleteWarning>
-          </TripDeleteModalContent>
-        )}
-      </ConfirmationModal>
     </PageSurface>
   )
 }
@@ -473,69 +386,9 @@ const SaveError = styled.p`
   word-break: keep-all;
 `
 
-const DeleteTrigger = styled(Button)`
-  width: 100%;
-  height: 52px;
-  flex: none;
-  font: var(--text-ui-button);
 
-  &:disabled {
-    cursor: not-allowed;
-  }
-`
 
-const TripDeleteModalContent = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-`
 
-const TripDeleteTargetCard = styled.div`
-  height: 74px;
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  overflow: hidden;
-  border-radius: 12px;
-  background: var(--Background-Base);
-`
-
-const TripDeleteTargetName = styled.p`
-  overflow: hidden;
-  color: var(--Text-Primary);
-  font: var(--text-ui-label);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`
-
-const TripDeleteTargetMeta = styled.p`
-  overflow: hidden;
-  color: var(--Text-Secondary);
-  font: var(--text-ui-nav);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`
-
-const TripDeleteWarning = styled.p`
-  min-height: 66px;
-  padding: 12px 20px;
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  border-radius: 12px;
-  background: rgb(181 118 59 / 10%);
-  color: var(--Primary-Cognac);
-  font: 400 11px/18px var(--font-sans);
-  word-break: keep-all;
-`
-
-const TripDeleteWarningIcon = styled.img`
-  width: 18px;
-  height: 17px;
-  flex: 0 0 18px;
-  display: block;
-`
 
 const PageSurface = styled.div`
   width: 100%;
