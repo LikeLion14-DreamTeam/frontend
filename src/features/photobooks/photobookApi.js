@@ -3,6 +3,7 @@ import { fetchAllPages } from '../../api/pagination'
 import {
   getMockPhotobook,
   getMockPhotobooks,
+  refreshMockPhotobookCover,
   updateMockPhotobookName,
 } from './photobookMock'
 
@@ -44,5 +45,16 @@ export const updatePhotobookName = async (photobookId, name) => {
   return apiClient.patch(
     `${PHOTOBOOKS_ENDPOINT}/${encodeURIComponent(photobookId)}`,
     { name },
+  )
+}
+
+/** API 명세 6.4: 최신 취향 프로파일 기준으로 커버를 다시 선정한다. */
+export const refreshPhotobookCover = async (photobookId) => {
+  if (USE_MOCK) {
+    return refreshMockPhotobookCover(photobookId)
+  }
+
+  return apiClient.post(
+    `${PHOTOBOOKS_ENDPOINT}/${encodeURIComponent(photobookId)}/cover/refresh`,
   )
 }

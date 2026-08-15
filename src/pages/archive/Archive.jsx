@@ -4,7 +4,10 @@ import styled from 'styled-components'
 import Header from '../../components/layout/Header'
 import NavBar from '../../components/layout/NavBar'
 import { PhotobookListItem } from '../../features/photobooks/components'
-import { getPhotobooks } from '../../features/photobooks/photobookApi'
+import {
+  getPhotobooks,
+  refreshPhotobookCover,
+} from '../../features/photobooks/photobookApi'
 
 const SORT = {
   latest: 'latest',
@@ -61,6 +64,7 @@ const Archive = () => {
   const [photobooks, setPhotobooks] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
+  const [refreshErrorMessage, setRefreshErrorMessage] = useState('')
 
   useEffect(() => {
     let ignore = false
@@ -110,15 +114,34 @@ const Archive = () => {
     )
   }, [photobooks, sortBy])
 
-  // 실제 커버 변경은 API 명세 6.4 연결 단계에서 교체한다.
-  const handleRefreshCover = (photobookId) => {
-    setRefreshingId(photobookId)
+  const handleRefreshCover = async (photobookId) => {
+    if (refreshingId !== null) return
 
-    window.setTimeout(() => {
-      setRefreshingId((currentId) =>
-        currentId === photobookId ? null : currentId,
+    setRefreshingId(photobookId)
+    setRefreshErrorMessage('')
+
+    try {
+      const updated = await refreshPhotobookCover(photobookId)
+      const nextCoverUrl = updated.cover_photo_url
+
+      if (!nextCoverUrl) {
+        throw new Error('새 커버 사진을 받지 못했습니다.')
+      }
+
+      setPhotobooks((current) =>
+        current.map((photobook) =>
+          photobook.photobook_id === photobookId
+            ? { ...photobook, cover_photo_url: nextCoverUrl }
+            : photobook,
+        ),
       )
-    }, 650)
+    } catch (error) {
+      setRefreshErrorMessage(
+        error.message ?? '포토북 커버를 새로고침하지 못했습니다.',
+      )
+    } finally {
+      setRefreshingId(null)
+    }
   }
 
   return (
@@ -168,6 +191,10 @@ const Archive = () => {
         <PhotobookList aria-label="완성된 포토북 목록">
           {isLoading ? <StateMessage>불러오는 중...</StateMessage> : null}
 
+          {refreshErrorMessage ? (
+            <RefreshError role="alert">{refreshErrorMessage}</RefreshError>
+          ) : null}
+
           {!isLoading && errorMessage ? (
             <StateMessage role="alert">{errorMessage}</StateMessage>
           ) : null}
@@ -184,6 +211,7 @@ const Archive = () => {
                     onOpen={() => navigate(`/archive/trip/${photobook.id}`)}
                     onRefresh={() => handleRefreshCover(photobook.id)}
                     isRefreshing={refreshingId === photobook.id}
+                    refreshDisabled={refreshingId !== null}
                   />
                   {index < sortedPhotobooks.length - 1 ? (
                     <ItemDivider />
@@ -313,6 +341,18 @@ const StateMessage = styled.p`
   padding: 40px 0;
   color: var(--Text-Secondary);
   font: var(--text-ui-body-m);
+  text-align: center;
+  word-break: keep-all;
+`
+
+const RefreshError = styled.p`
+  width: 100%;
+  margin-bottom: -8px;
+  color: #b8564f;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
   text-align: center;
   word-break: keep-all;
 `

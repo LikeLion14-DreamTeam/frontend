@@ -333,3 +333,45 @@ export const updateMockPhotobookName = (photobookId, name) => {
     name: nextName,
   }
 }
+
+/** API 명세 6.4: 포토북 수록 사진 중 새 커버를 선택한다. */
+export const refreshMockPhotobookCover = (photobookId) => {
+  const id = Number(photobookId)
+  const summary = MOCK_PHOTOBOOKS.find(
+    (photobook) => photobook.photobook_id === id,
+  )
+  const detail = MOCK_PHOTOBOOK_DETAILS[id]
+
+  if (!summary || !detail) {
+    throw new ApiError({
+      status: 404,
+      code: 'NOT_FOUND',
+      message: '포토북을 찾을 수 없습니다.',
+    })
+  }
+
+  // mock에서는 배열 순서를 취향 점수 순위로 보고 상위 10장만 사용한다.
+  const topPhotos = detail.cities
+    .flatMap((city) => city.pins)
+    .flatMap((pin) => pin.photos)
+    .slice(0, 10)
+    .map((item) => item.file_path)
+    .filter(Boolean)
+  const nextCandidates = topPhotos.filter(
+    (photoUrl) => photoUrl !== summary.cover_photo_url,
+  )
+  const candidates = nextCandidates.length ? nextCandidates : topPhotos
+
+  if (!candidates.length) {
+    throw new ApiError({
+      status: 409,
+      code: 'NO_COVER_CANDIDATE',
+      message: '커버로 사용할 사진이 없습니다.',
+    })
+  }
+
+  const nextCover = candidates[Math.floor(Math.random() * candidates.length)]
+  summary.cover_photo_url = nextCover
+
+  return { cover_photo_url: nextCover }
+}
