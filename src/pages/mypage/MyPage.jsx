@@ -14,7 +14,10 @@ import {
   updateTasteProfileAxis,
 } from '../../features/onboarding/tasteProfileApi'
 import { getOnboardingFlowPath } from '../../features/onboarding/onboardingFlow'
-import { getProducts } from '../../features/products/productApi'
+import {
+  getProducts,
+  unlinkProduct,
+} from '../../features/products/productApi'
 import briefcaseIcon from '../../assets/icons/mypage/briefcase.svg'
 import chevronRightIcon from '../../assets/icons/mypage/chevron-right.svg'
 import closeIcon from '../../assets/icons/mypage/close.png'
@@ -111,6 +114,8 @@ const MyPage = () => {
   const [isProductsLoading, setIsProductsLoading] = useState(true)
   const [productsError, setProductsError] = useState('')
   const [productsRequestKey, setProductsRequestKey] = useState(0)
+  const [unlinkingProductTagId, setUnlinkingProductTagId] = useState(null)
+  const [productUnlinkError, setProductUnlinkError] = useState('')
   const savedTasteAxisValuesRef = useRef(new Map())
   const savingTasteAxisCodesRef = useRef(new Set())
   const [relearningNotice] = useState(() =>
@@ -216,6 +221,7 @@ const MyPage = () => {
     const loadProducts = async () => {
       setIsProductsLoading(true)
       setProductsError('')
+      setProductUnlinkError('')
 
       try {
         const productList = await getProducts()
@@ -335,6 +341,44 @@ const MyPage = () => {
     navigate(
       getOnboardingFlowPath('/onboarding/basic-question', true),
     )
+  }
+
+  const handleUnlinkProduct = async (product) => {
+    if (unlinkingProductTagId !== null) return
+
+    const productName = getProductName(product)
+    const shouldUnlink = window.confirm(
+      `${productName}의 연결을 해제할까요?\n\n기존 핀·사진·포토북은 삭제되지 않으며, 이 태그는 다시 자동 등록되지 않습니다.`,
+    )
+
+    if (!shouldUnlink) return
+
+    setUnlinkingProductTagId(product.tag_id)
+    setProductUnlinkError('')
+
+    try {
+      const unlinkedProduct = await unlinkProduct(product.tag_id)
+
+      setProducts((currentProducts) =>
+        currentProducts.filter(
+          (currentProduct) =>
+            currentProduct.tag_id !== unlinkedProduct.tag_id,
+        ),
+      )
+    } catch (error) {
+      if (error.code === 'UNAUTHENTICATED') {
+        clearSessionToken()
+        clearUser()
+        navigate('/login', { replace: true })
+        return
+      }
+
+      setProductUnlinkError(
+        error.message ?? '제품 연결을 해제하지 못했습니다.',
+      )
+    } finally {
+      setUnlinkingProductTagId(null)
+    }
   }
 
   const handleLogout = () => {
@@ -542,7 +586,13 @@ const MyPage = () => {
                         </ProductCount>
                         <RemoveButton
                           type="button"
-                          aria-label={`${productName} 연결 해제`}
+                          aria-label={`${productName} ${
+                            unlinkingProductTagId === product.tag_id
+                              ? '연결 해제 중'
+                              : '연결 해제'
+                          }`}
+                          disabled={unlinkingProductTagId !== null}
+                          onClick={() => void handleUnlinkProduct(product)}
                         >
                           <RemoveIcon
                             src={closeIcon}
@@ -555,6 +605,11 @@ const MyPage = () => {
                   )
                 })}
               </ProductList>
+              {productUnlinkError && (
+                <ProductActionFeedback role="alert">
+                  {productUnlinkError}
+                </ProductActionFeedback>
+              )}
               <ProductRegistrationGuide>
                 제품에 태깅하면 자동으로 등록됩니다.
               </ProductRegistrationGuide>
@@ -924,6 +979,12 @@ const ProductRegistrationGuide = styled.p`
   text-align: center;
 `
 
+const ProductActionFeedback = styled.p`
+  color: #b42318;
+  font: var(--text-ui-caption);
+  text-align: center;
+`
+
 const ProductItem = styled.article`
   width: 100%;
   min-height: 38px;
@@ -982,6 +1043,11 @@ const RemoveButton = styled.button`
   border: 0;
   background: transparent;
   cursor: pointer;
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
 
   &:focus-visible {
     outline: 2px solid var(--Primary-Cognac);
