@@ -79,8 +79,12 @@ const GoogleMap = ({
         {...viewProps}
         {...mapOptions}
       >
-        {markers.map(({ name, lat, lng }) => (
-          <AdvancedMarker key={name} position={{ lat, lng }} title={name}>
+        {markers.map(({ id, name, lat, lng }, index) => (
+          <AdvancedMarker
+            key={id ?? `${name}-${lat}-${lng}-${index}`}
+            position={{ lat, lng }}
+            title={name}
+          >
             <Pin background="#111827" borderColor="#111827" glyphColor="#fff" />
           </AdvancedMarker>
         ))}

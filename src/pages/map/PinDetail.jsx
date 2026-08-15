@@ -5,13 +5,12 @@ import { Marker } from '@vis.gl/react-google-maps'
 import Button from '../../components/common/Button'
 import ConfirmationModal from '../../components/common/ConfirmationModal'
 import GoogleMap from '../../components/common/GoogleMap'
+import VoiceMemoBar from '../../components/common/VoiceMemoBar'
 import activePinIcon from '../../assets/map/map-pin-active.svg'
 import deleteWarningIcon from '../../assets/icons/delete-warning.svg'
 import backIcon from '../../assets/map/detail-back.svg'
 import openMapIcon from '../../assets/map/open-map.svg'
 import refreshIcon from '../../assets/map/refresh.svg'
-import voicePlayIcon from '../../assets/map/voice-play.svg'
-import voicePauseIcon from '../../assets/map/voice-pause.png'
 import photoAddIcon from '../../assets/map/photo-add-round.svg'
 import noteEditIcon from '../../assets/map/note-edit.svg'
 import { MAP_STYLES } from './mapStyles'
@@ -61,22 +60,6 @@ const formatDeleteMeta = (pin, photoCount) => {
     .filter(Boolean)
     .join(' · ')
 }
-
-const formatDuration = (seconds) => {
-  if (seconds == null) return ''
-
-  const minutes = Math.floor(seconds / 60)
-  const rest = seconds % 60
-
-  return `${String(minutes).padStart(2, '0')}:${String(rest).padStart(2, '0')}`
-}
-
-const waveHeights = [
-  5, 9, 14, 7, 17, 11, 6, 15, 19, 9, 5, 12, 17, 8, 11, 5, 10, 15,
-  7, 13, 9, 6, 11, 16, 8, 12, 6, 14, 9, 5, 11, 17, 7, 10, 15, 8,
-  13, 6, 12, 18, 9, 7, 14, 11, 5, 16, 8, 12, 10, 6, 15, 9, 7, 13,
-  11, 6,
-]
 
 const PinDetail = () => {
   const navigate = useNavigate()
@@ -435,34 +418,13 @@ const PinDetail = () => {
 
                 {pin.voice_memo && (
                   <>
-                    <VoiceBar>
-                      <PlayButton
-                        type="button"
-                        aria-label={isPlaying ? '음성 일시정지' : '음성 재생'}
-                        aria-pressed={isPlaying}
-                        onClick={handleTogglePlay}
-                        disabled={!audioSrc}
-                      >
-                        <img
-                          src={isPlaying ? voicePauseIcon : voicePlayIcon}
-                          alt=""
-                        />
-                      </PlayButton>
-                      <Waveform aria-hidden="true">
-                        {waveHeights.map((height, index) => (
-                          <Wave
-                            key={`${height}-${index}`}
-                            $height={height}
-                            $played={
-                              index < waveHeights.length * playedRatio
-                            }
-                          />
-                        ))}
-                      </Waveform>
-                      <Duration>
-                        {formatDuration(pin.voice_memo.duration_sec)}
-                      </Duration>
-                    </VoiceBar>
+                    <VoiceMemoBar
+                      duration={pin.voice_memo.duration_sec}
+                      isPlaying={isPlaying}
+                      progress={playedRatio}
+                      onToggle={handleTogglePlay}
+                      disabled={!audioSrc}
+                    />
 
                     <audio
                       ref={audioRef}
@@ -1009,67 +971,10 @@ const NoteSave = styled.button`
   }
 `
 
-const VoiceBar = styled.div`
-  width: 100%;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-`
-
-const PlayButton = styled.button`
-  width: 22px;
-  height: 22px;
-  flex: 0 0 auto;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  cursor: pointer;
-
-  img {
-    width: 22px;
-    height: 22px;
-    display: block;
-  }
-
-  &:disabled {
-    cursor: default;
-    opacity: 0.4;
-  }
-`
-
 const VoiceError = styled.p`
   color: var(--Text-Secondary);
   font: var(--text-ui-caption);
   word-break: keep-all;
-`
-
-const Waveform = styled.span`
-  min-width: 0;
-  height: 24px;
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  overflow: hidden;
-`
-
-const Wave = styled.span`
-  width: 2px;
-  height: ${({ $height }) => `${$height}px`};
-  flex: 0 0 2px;
-  border-radius: 1px;
-  background: ${({ $played }) =>
-    $played ? 'var(--Primary-Cognac)' : 'rgb(181 161 140 / 45%)'};
-`
-
-const Duration = styled.span`
-  flex: 0 0 auto;
-  color: var(--Text-Secondary);
-  font-family: var(--font-sans);
-  font-size: 10px;
-  line-height: 18px;
 `
 
 const PhotosSection = styled.section`
