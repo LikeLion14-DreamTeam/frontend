@@ -7,6 +7,7 @@ import PinDetail from "./pages/map/PinDetail"
 import AllPhotos from "./pages/map/AllPhotos"
 import Archive from "./pages/archive/Archive"
 import TripArchive from "./pages/archive/TripArchive"
+import PinStoryShare from "./pages/archive/PinStoryShare"
 import MyPage from "./pages/mypage/MyPage"
 import TripManagement from "./pages/trip-management/TripManagement"
 import TripSegmentEdit from "./pages/trip-management/TripSegmentEdit"
@@ -45,6 +46,7 @@ function App() {
         <Route path="/map/pin/:pinID/photos" element={<AllPhotos />} />
         <Route path="/archive" element={<Archive />} />
         <Route path="/archive/trip/:tripID" element={<TripArchive />} />
+        <Route path="/archive/trip/:tripID/pin/:pinID/share" element={<PinStoryShare />} />
         <Route path="/mypage" element={<MyPage />} />
         <Route path="/trip-management" element={<TripManagement />} />
         <Route path="/trip-management/:segmentId" element={<TripManagement />} />
