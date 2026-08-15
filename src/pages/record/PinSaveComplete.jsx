@@ -156,7 +156,7 @@ const PinSaveComplete = () => {
       ) {
         uploadedAudioRef.current = {
           sourceFile: voiceFile,
-          fileId: await uploadAudio(voiceFile),
+          url: await uploadAudio(voiceFile),
         }
       }
 
@@ -170,7 +170,7 @@ const PinSaveComplete = () => {
           countryName,
           placeName,
           textNote: memo,
-          audioFile: uploadedAudioRef.current?.fileId,
+          audioFile: uploadedAudioRef.current?.url,
         })
 
         createdPinIdRef.current = createdPin.pin_id

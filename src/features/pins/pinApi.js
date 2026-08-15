@@ -99,8 +99,8 @@ const createMockPin = (pinPayload) => {
  * API 명세 8.2: NFC 태깅 또는 수동 촬영 결과를 새 핀으로 저장한다.
  *
  * 여행 구간은 요청에서 지정하지 않으며 서버가 항상 segment_id = null 로 만든다.
- * `nfcTagId` 와 `audioFile` 은 선택 값이다. 촬영 사진은 핀 생성 후 5.5 API로
- * 별도 등록한다.
+ * `audioFile` 은 업로드된 음성 파일의 공개 URL이다. 촬영 사진은 핀 생성 후
+ * 5.5 API로 별도 등록한다.
  */
 export const createPin = async ({
   nfcTagId,
@@ -114,6 +114,7 @@ export const createPin = async ({
   audioFile,
 }) => {
   const pinPayload = {
+    nfc_tag_id: nfcTagId ?? null,
     latitude,
     longitude,
     address,
@@ -121,10 +122,8 @@ export const createPin = async ({
     country_name: countryName,
     place_name: placeName,
     text_note: textNote,
+    audio_file: audioFile ?? null,
   }
-
-  if (nfcTagId) pinPayload.nfc_tag_id = nfcTagId
-  if (audioFile) pinPayload.audio_file = audioFile
 
   if (USE_MOCK) {
     return createMockPin(pinPayload)
