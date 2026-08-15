@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
 import NavBar from '../../components/layout/NavBar'
@@ -45,6 +45,9 @@ const getStampSrc = (countryCode) => {
 
 const STAMPS_PER_SIDE = 4
 const STAMPS_PER_SPREAD = STAMPS_PER_SIDE * 2
+
+/** 이만큼 가로로 움직여야 면을 넘긴 것으로 본다. */
+const SWIPE_THRESHOLD = 40
 
 /**
  * 도장을 여권 펼침 단위로 나눈다. 한 펼침은 [왼쪽 면, 오른쪽 면] 이고
@@ -96,6 +99,7 @@ const Home = () => {
   const [tripError, setTripError] = useState('')
   const [stamps, setStamps] = useState([])
   const [spreadIndex, setSpreadIndex] = useState(0)
+  const swipeStart = useRef(null)
 
   useEffect(() => {
     let ignore = false
@@ -141,6 +145,32 @@ const Home = () => {
   const hasPins = currentTrip?.has_pins === true
   const stampSpreads = toStampSpreads(stamps)
   const currentSpread = stampSpreads[spreadIndex] ?? stampSpreads[0]
+
+  const moveSpread = (step) =>
+    setSpreadIndex((current) =>
+      Math.min(Math.max(current + step, 0), stampSpreads.length - 1),
+    )
+
+  const handleTouchStart = (event) => {
+    const [touch] = event.touches
+    swipeStart.current = { x: touch.clientX, y: touch.clientY }
+  }
+
+  const handleTouchEnd = (event) => {
+    const start = swipeStart.current
+    if (!start) return
+    swipeStart.current = null
+
+    const [touch] = event.changedTouches
+    const movedX = touch.clientX - start.x
+    const movedY = touch.clientY - start.y
+
+    // 세로로 더 많이 움직였으면 페이지를 스크롤한 것이지 넘긴 게 아니다.
+    if (Math.abs(movedX) < SWIPE_THRESHOLD) return
+    if (Math.abs(movedX) <= Math.abs(movedY)) return
+
+    moveSpread(movedX < 0 ? 1 : -1)
+  }
 
   return (
     <Page>
@@ -226,7 +256,13 @@ const Home = () => {
           </ResultCard>
         </PassportHead>
 
-        <PassportSpread>
+        <PassportSpread
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={() => {
+            swipeStart.current = null
+          }}
+        >
           <PassportImage src={passportOpenImage} alt="" aria-hidden="true" />
 
           <StampPages>
@@ -247,7 +283,6 @@ const Home = () => {
           </StampPages>
         </PassportSpread>
 
-        {/* TODO: 좌우 스와이프로도 넘길 수 있게 한다. */}
         <PageDots>
           {stampSpreads.map((_, index) => (
             <Dot
@@ -539,6 +574,8 @@ const PassportSpread = styled.div`
   width: 100%;
   aspect-ratio: 376 / 261;
   overflow: hidden;
+  /* 가로 제스처는 면 넘기기로 쓰고 세로 스크롤은 그대로 둔다. */
+  touch-action: pan-y;
   container-type: inline-size;
 `
 

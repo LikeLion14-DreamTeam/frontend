@@ -31,6 +31,25 @@ const createInitialState = () => ({
       status: true,
       countries: [{ country_name: '일본', cities: ['도쿄', '요코하마'] }],
     },
+    // 여러 나라를 도는 여정. 국가 도장이 한 면(8개)을 넘겨야 여권 넘김을
+    // 확인할 수 있어 넣어둔 테스트용 구간이다.
+    10: {
+      segment_id: 10,
+      user_id: 1,
+      name: '유럽 일주',
+      start_at: '2024-05-02T08:00:00.000000Z',
+      end_at: '2024-05-15T14:20:00.000000Z',
+      status: true,
+      countries: [
+        { country_name: '이탈리아', cities: ['로마'] },
+        { country_name: '스페인', cities: ['바르셀로나'] },
+        { country_name: '포르투갈', cities: ['리스본'] },
+        { country_name: '스위스', cities: ['취리히'] },
+        { country_name: '체코', cities: ['프라하'] },
+        { country_name: '오스트리아', cities: ['빈'] },
+        { country_name: '네덜란드', cities: ['암스테르담'] },
+      ],
+    },
   },
 
   pins: {
@@ -96,6 +115,65 @@ const createInitialState = () => ({
         included_in_segment: true,
       },
     ],
+
+    10: [
+      {
+        pin_id: 301,
+        place_name: '콜로세움',
+        latitude: 41.8902,
+        longitude: 12.4922,
+        tagged_at: '2024-05-02T08:00:00.000000Z',
+        included_in_segment: true,
+      },
+      {
+        pin_id: 302,
+        place_name: '사그라다 파밀리아',
+        latitude: 41.4036,
+        longitude: 2.1744,
+        tagged_at: '2024-05-04T10:30:00.000000Z',
+        included_in_segment: true,
+      },
+      {
+        pin_id: 303,
+        place_name: '벨렝 탑',
+        latitude: 38.6916,
+        longitude: -9.216,
+        tagged_at: '2024-05-06T13:05:00.000000Z',
+        included_in_segment: true,
+      },
+      {
+        pin_id: 304,
+        place_name: '취리히 호수',
+        latitude: 47.3564,
+        longitude: 8.5417,
+        tagged_at: '2024-05-09T07:45:00.000000Z',
+        included_in_segment: true,
+      },
+      {
+        pin_id: 305,
+        place_name: '카를교',
+        latitude: 50.0865,
+        longitude: 14.4114,
+        tagged_at: '2024-05-11T16:10:00.000000Z',
+        included_in_segment: true,
+      },
+      {
+        pin_id: 306,
+        place_name: '쇤브룬 궁전',
+        latitude: 48.1849,
+        longitude: 16.3122,
+        tagged_at: '2024-05-13T09:25:00.000000Z',
+        included_in_segment: true,
+      },
+      {
+        pin_id: 307,
+        place_name: '암스테르담 운하',
+        latitude: 52.3676,
+        longitude: 4.9041,
+        tagged_at: '2024-05-15T14:20:00.000000Z',
+        included_in_segment: true,
+      },
+    ],
   },
 })
 
@@ -131,6 +209,13 @@ const LOCATION_BY_PIN = {
   111: { city: '강릉', country_code: 'KR', country_name: '대한민국' },
   201: { city: '도쿄', country_code: 'JP', country_name: '일본' },
   202: { city: '요코하마', country_code: 'JP', country_name: '일본' },
+  301: { city: '로마', country_code: 'IT', country_name: '이탈리아' },
+  302: { city: '바르셀로나', country_code: 'ES', country_name: '스페인' },
+  303: { city: '리스본', country_code: 'PT', country_name: '포르투갈' },
+  304: { city: '취리히', country_code: 'CH', country_name: '스위스' },
+  305: { city: '프라하', country_code: 'CZ', country_name: '체코' },
+  306: { city: '빈', country_code: 'AT', country_name: '오스트리아' },
+  307: { city: '암스테르담', country_code: 'NL', country_name: '네덜란드' },
 }
 
 export const getMockPinLocation = (pinId) => LOCATION_BY_PIN[pinId] ?? null
