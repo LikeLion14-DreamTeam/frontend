@@ -1,17 +1,56 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import styled from 'styled-components'
 import { Marker } from '@vis.gl/react-google-maps'
 import GoogleMap from '../../components/common/GoogleMap'
 import activePinIcon from '../../assets/map/map-pin-active.svg'
 import backIcon from '../../assets/map/detail-back.svg'
 import openMapIcon from '../../assets/map/open-map.svg'
-import photoAddIcon from '../../assets/map/photo-add.svg'
 import refreshIcon from '../../assets/map/refresh.svg'
 import voicePlayIcon from '../../assets/map/voice-play.svg'
+import voicePauseIcon from '../../assets/map/voice-pause.png'
+import photoAddIcon from '../../assets/map/photo-add-round.svg'
+import noteEditIcon from '../../assets/map/note-edit.svg'
 import { MAP_STYLES } from './mapStyles'
+import {
+  deletePin,
+  getPin,
+  getPinPhotos,
+  getPinVoiceMemos,
+  refreshRepresentativePhotos,
+  updatePin,
+} from '../../features/pins/pinApi'
+import {
+  addNearbyPhotos,
+  describeRejected,
+} from '../../features/pins/nearbyPhotos'
+import { getTrip, getTripPins } from '../../features/trips/tripApi'
 
-const PIN_POSITION = { lat: 37.576, lng: 126.9769 }
+// 지도에서 넘어오는 경로가 아직 없어 pinID 가 비면 이 값을 쓴다.
+const FALLBACK_PIN_ID = 101
+
+const detailDateFormatter = new Intl.DateTimeFormat('ko-KR', {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true,
+})
+
+const formatTaggedAt = (taggedAt) =>
+  taggedAt
+    ? detailDateFormatter.format(new Date(taggedAt)).replace(/\. /g, '.')
+    : ''
+
+const formatDuration = (seconds) => {
+  if (seconds == null) return ''
+
+  const minutes = Math.floor(seconds / 60)
+  const rest = seconds % 60
+
+  return `${String(minutes).padStart(2, '0')}:${String(rest).padStart(2, '0')}`
+}
 
 const waveHeights = [
   5, 9, 14, 7, 17, 11, 6, 15, 19, 9, 5, 12, 17, 8, 11, 5, 10, 15,
@@ -22,36 +61,302 @@ const waveHeights = [
 
 const PinDetail = () => {
   const navigate = useNavigate()
+  const { pinID = FALLBACK_PIN_ID } = useParams()
+
+  const audioRef = useRef(null)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [audioSrc, setAudioSrc] = useState(null)
+  const [playedRatio, setPlayedRatio] = useState(0)
+  const [voiceError, setVoiceError] = useState('')
+  const [pin, setPin] = useState(null)
+  const [photos, setPhotos] = useState([])
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [journey, setJourney] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [errorMessage, setErrorMessage] = useState('')
+
+  const [isEditingNote, setIsEditingNote] = useState(false)
+  const [noteDraft, setNoteDraft] = useState('')
+  const [isSavingNote, setIsSavingNote] = useState(false)
+  const [noteError, setNoteError] = useState('')
+
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+
+  const fileInputRef = useRef(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const [addMessage, setAddMessage] = useState('')
+
+  useEffect(() => {
+    let ignore = false
+
+    const load = async () => {
+      setIsLoading(true)
+      setErrorMessage('')
+
+      try {
+        // PHOTOS 그리드에 쓸 사진 목록은 5.1 응답에 없어 5.4 로 따로 받는다.
+        const [data, photoList] = await Promise.all([
+          getPin(pinID),
+          getPinPhotos(pinID),
+        ])
+
+        if (!ignore) {
+          setPin(data)
+          setPhotos(photoList.photos)
+        }
+      } catch (error) {
+        if (!ignore) setErrorMessage(error.message)
+      } finally {
+        if (!ignore) setIsLoading(false)
+      }
+    }
+
+    load()
+
+    return () => {
+      ignore = true
+    }
+  }, [pinID])
+
+  /**
+   * 5.8. 5.1 은 음성 메모의 길이만 주고 재생할 파일 주소는 주지 않는다.
+   * 메모가 있는 핀에서만 한 번 더 받아 재생 버튼에 물린다.
+   */
+  useEffect(() => {
+    const voiceMemoId = pin?.voice_memo?.voice_memo_id
+
+    if (!voiceMemoId) {
+      setAudioSrc(null)
+      return undefined
+    }
+
+    let ignore = false
+
+    const loadVoiceMemo = async () => {
+      try {
+        const { voice_memo: memo } = await getPinVoiceMemos(pinID)
+
+        if (!ignore) setAudioSrc(memo?.audio_file ?? null)
+      } catch {
+        if (!ignore) setVoiceError('음성 메모를 불러오지 못했어요.')
+      }
+    }
+
+    loadVoiceMemo()
+
+    return () => {
+      ignore = true
+    }
+  }, [pinID, pin?.voice_memo?.voice_memo_id])
+
+  /**
+   * 여정 칩(`n개 핀 중 m번째`)에 필요한 값은 5.1 응답에 없어서 4번 API로 따로 받는다.
+   * segment_id 가 없으면(진행 중인 여정) 칩을 그리지 않는다.
+   */
+  useEffect(() => {
+    const segmentId = pin?.segment_id
+
+    if (!segmentId) {
+      setJourney(null)
+      return undefined
+    }
+
+    let ignore = false
+
+    const loadJourney = async () => {
+      try {
+        const [trip, pinList] = await Promise.all([
+          getTrip(segmentId),
+          getTripPins(segmentId),
+        ])
+
+        if (ignore) return
+
+        const order =
+          pinList.pins.findIndex((item) => item.pin_id === pin.pin_id) + 1
+
+        setJourney(
+          order > 0
+            ? { name: trip.name, total: pinList.pins.length, order }
+            : null,
+        )
+      } catch {
+        // 칩은 부가 정보라 실패해도 화면을 막지 않는다.
+        if (!ignore) setJourney(null)
+      }
+    }
+
+    loadJourney()
+
+    return () => {
+      ignore = true
+    }
+  }, [pin])
+
+  if (isLoading || !pin) {
+    return (
+      <Page>
+        <StateMessage role={errorMessage ? 'alert' : undefined}>
+          {errorMessage || '불러오는 중...'}
+        </StateMessage>
+      </Page>
+    )
+  }
+
+  const startEditingNote = () => {
+    setNoteDraft(pin.text_note ?? '')
+    setNoteError('')
+    setIsEditingNote(true)
+  }
+
+  const saveNote = async () => {
+    setIsSavingNote(true)
+    setNoteError('')
+
+    try {
+      // 5.2 는 장소명과 텍스트 기록을 함께 받는다. 장소명은 편집 UI 가 없어 그대로 보낸다.
+      const updated = await updatePin(pinID, {
+        placeName: pin.place_name,
+        textNote: noteDraft,
+      })
+
+      setPin((prev) => ({ ...prev, text_note: updated.text_note }))
+      setIsEditingNote(false)
+    } catch (error) {
+      setNoteError(error.message)
+    } finally {
+      setIsSavingNote(false)
+    }
+  }
+
+  const handleTogglePlay = async () => {
+    const audio = audioRef.current
+    if (!audio) return
+
+    if (isPlaying) {
+      audio.pause()
+      return
+    }
+
+    try {
+      setVoiceError('')
+      await audio.play()
+    } catch {
+      setVoiceError('음성을 재생할 수 없어요.')
+    }
+  }
+
+  /** 5.5. 전체 사진 보기의 `주변 사진 추가` 와 같은 흐름이다. */
+  const handleFilesSelected = async (event) => {
+    const files = Array.from(event.target.files ?? [])
+    event.target.value = ''
+
+    if (files.length === 0) return
+
+    setIsUploading(true)
+    setAddMessage('')
+
+    try {
+      const { added, rejected } = await addNearbyPhotos(pinID, files)
+
+      const lines = []
+      if (added.length > 0) lines.push(`사진 ${added.length}장을 추가했어요.`)
+      if (rejected.length > 0) {
+        lines.push(
+          `${rejected.length}장은 추가하지 못했어요 · ${describeRejected(rejected)}`,
+        )
+      }
+      setAddMessage(lines.join(' '))
+
+      const photoList = await getPinPhotos(pinID)
+      setPhotos(photoList.photos)
+    } catch (error) {
+      setAddMessage(error.message)
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  const handleRefreshSuggested = async () => {
+    setIsRefreshing(true)
+
+    try {
+      const result = await refreshRepresentativePhotos(pinID)
+      setPin((prev) => ({
+        ...prev,
+        representative_photos: result.representative_photos,
+      }))
+    } catch (error) {
+      setErrorMessage(error.message)
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    setIsDeleting(true)
+    setDeleteError('')
+
+    try {
+      await deletePin(pinID)
+      navigate('/map', { replace: true })
+    } catch (error) {
+      setDeleteError(error.message)
+      setIsDeleting(false)
+      setIsConfirmingDelete(false)
+    }
+  }
+
+  // 위치 권한을 거부한 상태로 저장된 핀은 좌표가 없다. 지도를 그리지 않는다.
+  const hasCoordinates = pin.latitude !== null && pin.longitude !== null
+  const position = hasCoordinates
+    ? { lat: pin.latitude, lng: pin.longitude }
+    : null
+  const title = pin.place_name || pin.address || '이름 없는 장소'
+  const representativePhotos = pin.representative_photos ?? []
+  const previewPhotos = photos.slice(0, 3)
+  // 미리보기 세 칸에 안 들어간 나머지 장수
+  const hiddenPhotoCount = Math.max(photos.length - previewPhotos.length, 0)
+  // 5.3: 여정에 배정되기 전(진행 중)인 핀만 삭제할 수 있다.
+  const isDeletable = pin.segment_id === null
 
   return (
     <Page>
       <MapHero>
-        <GoogleMap
-          center={PIN_POSITION}
-          zoom={15.5}
-          height="100%"
-          styles={MAP_STYLES}
-          borderRadius="0"
-          bordered={false}
-          mapOptions={{ clickableIcons: false, keyboardShortcuts: false }}
-        >
-          <Marker
-            position={PIN_POSITION}
-            icon={activePinIcon}
-            title="경복궁 광화문 앞"
-          />
-        </GoogleMap>
+        {hasCoordinates ? (
+          <GoogleMap
+            center={position}
+            zoom={15.5}
+            height="100%"
+            styles={MAP_STYLES}
+            borderRadius="0"
+            bordered={false}
+            mapOptions={{ clickableIcons: false, keyboardShortcuts: false }}
+          >
+            <Marker position={position} icon={activePinIcon} title={title} />
+          </GoogleMap>
+        ) : (
+          <NoLocation>위치 정보 없음</NoLocation>
+        )}
 
         <BackButton type="button" aria-label="뒤로 가기" onClick={() => navigate(-1)}>
           <img src={backIcon} alt="" />
         </BackButton>
 
-        <JourneyChip>서울 여정 · 12개 핀 중 3번째</JourneyChip>
-        <OpenMapButton type="button" onClick={() => navigate('/map')}>
-          <img src={openMapIcon} alt="" />
-          지도에서 보기
-        </OpenMapButton>
+        {journey && (
+          <JourneyChip>
+            {journey.name} · {journey.total}개 핀 중 {journey.order}번째
+          </JourneyChip>
+        )}
+
+        {hasCoordinates && (
+          <OpenMapButton type="button" onClick={() => navigate('/map')}>
+            <img src={openMapIcon} alt="" />
+            지도에서 보기
+          </OpenMapButton>
+        )}
       </MapHero>
 
       <DetailSheet>
@@ -60,38 +365,123 @@ const PinDetail = () => {
         <DetailContent>
           <PinIntro>
             <HeadingGroup>
-              <PinTitle>경복궁 광화문 앞</PinTitle>
-              <PinMeta>서울 종로구 세종로&nbsp;&nbsp;·&nbsp;&nbsp;2025.06.14 오전 10:32</PinMeta>
+              <PinTitle>{title}</PinTitle>
+              <PinMeta>
+                {pin.address}
+                {pin.address && pin.tagged_at && (
+                  <>&nbsp;&nbsp;·&nbsp;&nbsp;</>
+                )}
+                {formatTaggedAt(pin.tagged_at)}
+              </PinMeta>
             </HeadingGroup>
 
+            {/* 기록이 없어도 형식은 그대로 두고, 수정 버튼으로 새로 남길 수 있게 한다. */}
             <Memo>
               <MemoRule />
               <MemoBody>
-                <MemoText>
-                  오래된 돌담을 따라 걷다가, 해가 드는 순간에 멈춰 섰다.
-                  다음엔 이른 아침에 다시 오기로.
-                </MemoText>
-                <VoiceBar>
-                  <PlayButton
-                    type="button"
-                    aria-label={isPlaying ? '음성 일시정지' : '음성 재생'}
-                    aria-pressed={isPlaying}
-                    onClick={() => setIsPlaying((playing) => !playing)}
-                  >
-                    <img src={voicePlayIcon} alt="" />
-                  </PlayButton>
-                  <Waveform aria-hidden="true">
-                    {waveHeights.map((height, index) => (
-                      <Wave
-                        key={`${height}-${index}`}
-                        $height={height}
-                        $played={index < (isPlaying ? 32 : 18)}
-                      />
-                    ))}
-                  </Waveform>
-                  <Duration>00:18</Duration>
-                </VoiceBar>
+                {isEditingNote ? (
+                  <NoteEditor>
+                    <NoteInput
+                      value={noteDraft}
+                      onChange={(event) => setNoteDraft(event.target.value)}
+                      aria-label="텍스트 기록"
+                      placeholder="이 순간을 기록해보세요"
+                      rows={3}
+                    />
+                    {noteError && <NoteError role="alert">{noteError}</NoteError>}
+                    <NoteActions>
+                      <NoteCancel
+                        type="button"
+                        onClick={() => setIsEditingNote(false)}
+                        disabled={isSavingNote}
+                      >
+                        취소
+                      </NoteCancel>
+                      <NoteSave
+                        type="button"
+                        onClick={saveNote}
+                        disabled={isSavingNote}
+                      >
+                        {isSavingNote ? '저장 중...' : '저장'}
+                      </NoteSave>
+                    </NoteActions>
+                  </NoteEditor>
+                ) : pin.text_note ? (
+                  <MemoText>{pin.text_note}</MemoText>
+                ) : (
+                  !pin.voice_memo && (
+                    <MemoEmpty>남긴 기록이 없습니다.</MemoEmpty>
+                  )
+                )}
+
+                {pin.voice_memo && (
+                  <>
+                    <VoiceBar>
+                      <PlayButton
+                        type="button"
+                        aria-label={isPlaying ? '음성 일시정지' : '음성 재생'}
+                        aria-pressed={isPlaying}
+                        onClick={handleTogglePlay}
+                        disabled={!audioSrc}
+                      >
+                        <img
+                          src={isPlaying ? voicePauseIcon : voicePlayIcon}
+                          alt=""
+                        />
+                      </PlayButton>
+                      <Waveform aria-hidden="true">
+                        {waveHeights.map((height, index) => (
+                          <Wave
+                            key={`${height}-${index}`}
+                            $height={height}
+                            $played={
+                              index < waveHeights.length * playedRatio
+                            }
+                          />
+                        ))}
+                      </Waveform>
+                      <Duration>
+                        {formatDuration(pin.voice_memo.duration_sec)}
+                      </Duration>
+                    </VoiceBar>
+
+                    <audio
+                      ref={audioRef}
+                      src={audioSrc ?? undefined}
+                      preload="none"
+                      onPlay={() => setIsPlaying(true)}
+                      onPause={() => setIsPlaying(false)}
+                      onTimeUpdate={(event) => {
+                        const { currentTime, duration } = event.currentTarget
+                        setPlayedRatio(
+                          duration ? currentTime / duration : 0,
+                        )
+                      }}
+                      onEnded={() => {
+                        setIsPlaying(false)
+                        setPlayedRatio(0)
+                      }}
+                      onError={() =>
+                        setVoiceError('음성을 재생할 수 없어요.')
+                      }
+                    />
+
+                    {voiceError && (
+                      <VoiceError role="alert">{voiceError}</VoiceError>
+                    )}
+                  </>
+                )}
               </MemoBody>
+
+              {!isEditingNote && (
+                <EditNoteButton
+                  type="button"
+                  aria-label="텍스트 기록 수정"
+                  onClick={startEditingNote}
+                >
+                  <img src={noteEditIcon} alt="" />
+                </EditNoteButton>
+              )}
             </Memo>
           </PinIntro>
 
@@ -108,27 +498,66 @@ const PinDetail = () => {
             </SectionHeading>
 
             <PhotoGrid>
-              <Photo $tone="main" />
+              <Photo $tone="main">
+                {previewPhotos[0] && (
+                  <PhotoImage src={previewPhotos[0].file_path} alt="" />
+                )}
+              </Photo>
               <PhotoStack>
-                <Photo $tone="light" />
+                <Photo $tone="light">
+                  {previewPhotos[1] && (
+                    <PhotoImage src={previewPhotos[1].file_path} alt="" />
+                  )}
+                </Photo>
                 <Photo $tone="dark">
-                  <PhotoOverlay />
-                  <PhotoCount>+5</PhotoCount>
+                  {previewPhotos[2] && (
+                    <PhotoImage src={previewPhotos[2].file_path} alt="" />
+                  )}
+                  {hiddenPhotoCount > 0 && (
+                    <>
+                      <PhotoOverlay />
+                      <PhotoCount>+{hiddenPhotoCount}</PhotoCount>
+                    </>
+                  )}
                 </Photo>
               </PhotoStack>
+
+              <HiddenFileInput
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleFilesSelected}
+              />
+
+              <AddPhotoButton
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                aria-label="주변 사진 추가"
+              >
+                <img src={photoAddIcon} alt="" />
+              </AddPhotoButton>
             </PhotoGrid>
+
+            {(isUploading || addMessage) && (
+              <AddMessage role="status">
+                {isUploading ? '사진을 추가하는 중...' : addMessage}
+              </AddMessage>
+            )}
           </PhotosSection>
 
           <SuggestedSection>
             <SuggestedHeading>
-              <SuggestedTitle>
-                <EditorialTitle>SUGGESTED</EditorialTitle>
-                <SuggestedCount>3</SuggestedCount>
-              </SuggestedTitle>
+              <EditorialTitle>SUGGESTED</EditorialTitle>
               <HeadingLine />
-              <RefreshButton type="button">
+              <RefreshButton
+                type="button"
+                onClick={handleRefreshSuggested}
+                disabled={isRefreshing || photos.length === 0}
+              >
                 <img src={refreshIcon} alt="" />
-                재추천
+                {isRefreshing ? '고르는 중...' : '재추천'}
               </RefreshButton>
             </SuggestedHeading>
             <SuggestedDescription>
@@ -136,15 +565,54 @@ const PinDetail = () => {
             </SuggestedDescription>
 
             <SuggestedGrid>
-              {['soft', 'warm', 'main'].map((tone) => (
-                <SuggestedPhoto key={tone} $tone={tone}>
-                  <AddButton type="button" aria-label="추천 사진 추가">
-                    <img src={photoAddIcon} alt="" />
-                  </AddButton>
+              {representativePhotos.map((photo, index) => (
+                <SuggestedPhoto
+                  key={photo.photo_id}
+                  $tone={['soft', 'warm', 'main'][index] ?? 'main'}
+                >
+                  <PhotoImage src={photo.url} alt="" />
                 </SuggestedPhoto>
               ))}
             </SuggestedGrid>
           </SuggestedSection>
+
+          {/* TODO: 임시 UI. 시안에 핀 삭제가 없어 위치·문구·색상을 임의로 정했다. */}
+          {isDeletable && (
+            <DeleteSection>
+              {deleteError && <DeleteError role="alert">{deleteError}</DeleteError>}
+
+              {isConfirmingDelete ? (
+                <DeleteConfirm>
+                  <DeleteWarning>
+                    이 핀의 사진과 음성 메모가 함께 삭제됩니다. 되돌릴 수 없습니다.
+                  </DeleteWarning>
+                  <DeleteActions>
+                    <DeleteCancelButton
+                      type="button"
+                      onClick={() => setIsConfirmingDelete(false)}
+                      disabled={isDeleting}
+                    >
+                      취소
+                    </DeleteCancelButton>
+                    <DeleteConfirmButton
+                      type="button"
+                      onClick={handleDelete}
+                      disabled={isDeleting}
+                    >
+                      {isDeleting ? '삭제 중...' : '삭제할게요'}
+                    </DeleteConfirmButton>
+                  </DeleteActions>
+                </DeleteConfirm>
+              ) : (
+                <DeleteTrigger
+                  type="button"
+                  onClick={() => setIsConfirmingDelete(true)}
+                >
+                  이 핀 삭제
+                </DeleteTrigger>
+              )}
+            </DeleteSection>
+          )}
         </DetailContent>
       </DetailSheet>
     </Page>
@@ -166,6 +634,104 @@ const Page = styled.main`
   &::-webkit-scrollbar {
     display: none;
   }
+`
+
+/* 아래 삭제 관련 스타일은 디자인 회신 전까지 쓰는 임시 스타일이다. */
+const DeleteSection = styled.section`
+  display: flex;
+  flex-direction: column;
+`
+
+const DeleteTrigger = styled.button`
+  width: 100%;
+  min-height: 44px;
+  border: 0;
+  background: none;
+  color: var(--Text-Secondary);
+  font: var(--text-ui-button);
+  text-decoration: underline;
+  cursor: pointer;
+`
+
+const DeleteConfirm = styled.div`
+  border: 1px solid var(--Primary-Cognac);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgb(181 118 59 / 9%);
+`
+
+const DeleteWarning = styled.p`
+  color: var(--Text-Primary);
+  font: var(--text-ui-caption);
+  text-align: center;
+  word-break: keep-all;
+`
+
+const DeleteActions = styled.div`
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+`
+
+const DeleteCancelButton = styled.button`
+  min-height: 44px;
+  border: 1px solid var(--Border-Default);
+  border-radius: 22px;
+  background: var(--Surface-Base);
+  color: var(--Text-Secondary);
+  font: var(--text-ui-button);
+  cursor: pointer;
+
+  &:disabled {
+    color: var(--State-Disabled-Text);
+    cursor: not-allowed;
+  }
+`
+
+const DeleteConfirmButton = styled.button`
+  min-height: 44px;
+  border: 0;
+  border-radius: 22px;
+  background: var(--Primary-Cognac);
+  color: var(--Text-Inverse);
+  font: var(--text-ui-button);
+  cursor: pointer;
+
+  &:disabled {
+    background: var(--State-Disabled-Fill);
+    color: var(--State-Disabled-Text);
+    cursor: not-allowed;
+  }
+`
+
+const DeleteError = styled.p`
+  margin-bottom: 10px;
+  color: var(--Primary-Cognac);
+  font: var(--text-ui-caption);
+  text-align: center;
+  word-break: keep-all;
+`
+
+const NoLocation = styled.p`
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--Map-Base);
+  color: var(--Text-Secondary);
+  font: var(--text-ui-body-m);
+`
+
+const StateMessage = styled.p`
+  padding: 120px 24px;
+  color: var(--Text-Secondary);
+  font: var(--text-ui-body-m);
+  text-align: center;
+  word-break: keep-all;
 `
 
 const MapHero = styled.section`
@@ -262,9 +828,10 @@ const DetailContent = styled.div`
   gap: 38px;
 `
 
+/* PHOTOS·SUGGESTED 와 같이 본문 폭을 꽉 채운다. 여기만 354 로 묶어두면
+   화면이 402 보다 넓을 때 수정 버튼이 오른쪽 여백만큼 안쪽으로 밀린다. */
 const PinIntro = styled.section`
   width: 100%;
-  max-width: 354px;
   display: flex;
   flex-direction: column;
   gap: 22px;
@@ -288,15 +855,17 @@ const PinMeta = styled.p`
   white-space: nowrap;
 `
 
+/* 2(줄) + 16 + 본문 + 2 + 17(수정). 수정 버튼은 오른쪽 끝에 붙고 본문이 남는 폭을 쓴다.
+   gap 을 쓰면 본문과 수정 버튼 사이에도 16 이 끼어 본문이 좁아진다. */
 const Memo = styled.div`
   display: flex;
   align-items: stretch;
-  gap: 16px;
 `
 
+/* Memo 가 align-items: stretch 라 본문 높이를 그대로 따라간다.
+   기록 줄 수와 음성 메모 유무에 따라 길이가 달라진다. */
 const MemoRule = styled.div`
   width: 2px;
-  min-height: 72px;
   flex: 0 0 auto;
   background: var(--Accent-Gold);
 `
@@ -304,6 +873,7 @@ const MemoRule = styled.div`
 const MemoBody = styled.div`
   min-width: 0;
   flex: 1;
+  margin-left: 16px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -312,6 +882,106 @@ const MemoBody = styled.div`
 const MemoText = styled.p`
   color: var(--Text-Primary);
   font: var(--text-ui-body-m);
+`
+
+/* 기록이 없을 때 자리를 지키는 문구. 실제 기록과 구분되게 흐린 색을 쓴다. */
+const MemoEmpty = styled.p`
+  color: var(--Text-Secondary);
+  font: var(--text-ui-body-m);
+`
+
+/* 기록 길이와 상관없이 메모 블록 오른쪽 위에 고정된다(시안 기준 위에서 5). */
+const EditNoteButton = styled.button`
+  position: relative;
+  flex: 0 0 auto;
+  align-self: flex-start;
+  width: 17px;
+  height: 16px;
+  margin: 5px 12px 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+
+  img {
+    width: 18.5px;
+    height: 17.5px;
+    display: block;
+  }
+
+  /* 아이콘이 작아 탭 영역만 넓힌다. 자리는 그대로다. */
+  &::after {
+    content: '';
+    position: absolute;
+    inset: -10px;
+  }
+`
+
+const NoteEditor = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`
+
+const NoteInput = styled.textarea`
+  width: 100%;
+  border: 1px solid var(--Border-Default);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: var(--Text-Primary);
+  background: var(--Surface-Base);
+  font: var(--text-ui-body-m);
+  resize: none;
+  outline: none;
+
+  &:focus {
+    border-color: var(--Primary-Cognac);
+  }
+`
+
+const NoteError = styled.p`
+  color: var(--Primary-Cognac);
+  font: var(--text-ui-caption);
+  word-break: keep-all;
+`
+
+const NoteActions = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+`
+
+const NoteCancel = styled.button`
+  min-height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--Border-Default);
+  border-radius: 16px;
+  background: var(--Surface-Base);
+  color: var(--Text-Secondary);
+  font: var(--text-ui-caption);
+  cursor: pointer;
+
+  &:disabled {
+    color: var(--State-Disabled-Text);
+    cursor: not-allowed;
+  }
+`
+
+const NoteSave = styled.button`
+  min-height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--Primary-Cognac);
+  color: var(--Text-Inverse);
+  font: var(--text-ui-caption);
+  cursor: pointer;
+
+  &:disabled {
+    background: var(--State-Disabled-Fill);
+    color: var(--State-Disabled-Text);
+    cursor: not-allowed;
+  }
 `
 
 const VoiceBar = styled.div`
@@ -337,6 +1007,17 @@ const PlayButton = styled.button`
     height: 22px;
     display: block;
   }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.4;
+  }
+`
+
+const VoiceError = styled.p`
+  color: var(--Text-Secondary);
+  font: var(--text-ui-caption);
+  word-break: keep-all;
 `
 
 const Waveform = styled.span`
@@ -404,10 +1085,13 @@ const TextAction = styled.button`
 `
 
 const PhotoGrid = styled.div`
+  position: relative;
   width: 100%;
   height: 164px;
   display: grid;
   grid-template-columns: minmax(0, 1.85fr) minmax(0, 1fr);
+  /* 행 높이를 고정하지 않으면 사진 원본 크기가 그리드를 밀어낸다. */
+  grid-template-rows: minmax(0, 1fr);
   gap: 6px;
 `
 
@@ -423,13 +1107,65 @@ const Photo = styled.div`
   position: relative;
   width: 100%;
   height: 100%;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
   border-radius: 12px;
   background: ${({ $tone }) => toneBackgrounds[$tone]};
 `
 
+const PhotoImage = styled.img`
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+`
+
+const HiddenFileInput = styled.input`
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+`
+
+/* 시안에서 그리드 오른쪽 아래 모서리에 걸쳐 있다. 원은 28 이지만 내려받은
+   아이콘은 그림자 여백까지 38 이라, 원 위치를 기준으로 잡고 이미지를 밀어 넣는다. */
+const AddPhotoButton = styled.button`
+  position: absolute;
+  right: -11px;
+  bottom: -8px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+
+  img {
+    position: absolute;
+    top: -3px;
+    left: -5px;
+    width: 38px;
+    height: 38px;
+    display: block;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+  }
+`
+
+const AddMessage = styled.p`
+  color: var(--Text-Secondary);
+  font: var(--text-ui-caption);
+  word-break: keep-all;
+`
+
 const PhotoStack = styled.div`
   min-width: 0;
+  min-height: 0;
   display: grid;
   grid-template-rows: repeat(2, minmax(0, 1fr));
   gap: 6px;
@@ -462,18 +1198,6 @@ const SuggestedHeading = styled.div`
   display: flex;
   align-items: center;
   gap: 11px;
-`
-
-const SuggestedTitle = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 11px;
-`
-
-const SuggestedCount = styled.span`
-  color: var(--Accent-Gold);
-  font: var(--text-editorial-brand);
-  letter-spacing: 0.24px;
 `
 
 const RefreshButton = styled.button`
@@ -516,20 +1240,3 @@ const SuggestedPhoto = styled.div`
   background: ${({ $tone }) => toneBackgrounds[$tone]};
 `
 
-const AddButton = styled.button`
-  position: absolute;
-  right: 1px;
-  bottom: -1px;
-  width: 38px;
-  height: 38px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-
-  img {
-    width: 38px;
-    height: 38px;
-    display: block;
-  }
-`

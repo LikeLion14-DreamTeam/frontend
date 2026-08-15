@@ -1,11 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
-import { Marker, Polyline } from '@vis.gl/react-google-maps'
+import { Marker, Polyline, useApiIsLoaded } from '@vis.gl/react-google-maps'
 import Button from '../../components/common/Button'
 import GoogleMap from '../../components/common/GoogleMap'
 import NavBar from '../../components/layout/NavBar'
-import currentPositionIcon from '../../assets/map/current-position.svg'
+import currentPositionSvg from '../../assets/map/current-position.svg?raw'
 import dropdownCheckIcon from '../../assets/map/dropdown-check.svg'
 import activePinIcon from '../../assets/map/map-pin-active.svg'
 import pinIcon from '../../assets/map/map-pin.svg'
@@ -13,101 +13,391 @@ import myLocationIcon from '../../assets/map/my-location.svg'
 import recordPlusIcon from '../../assets/map/record-plus.png'
 import tripAvatar from '../../assets/map/trip-avatar.svg'
 import tripSelectChevron from '../../assets/icons/trip-select-chevron.svg'
+import {
+  getOngoingPins,
+  getPin,
+  getPinPhotos,
+} from '../../features/pins/pinApi'
+import { getTrip, getTripPins, getTrips } from '../../features/trips/tripApi'
 import { MAP_STYLES } from './mapStyles'
 
-const PARIS_CENTER = { lat: 48.8569, lng: 2.3376 }
+// 여정을 아직 못 받았을 때 잠깐 보여줄 위치.
+const DEFAULT_CENTER = { lat: 48.8569, lng: 2.3376 }
 
-const pins = [
-  {
-    id: 'montmartre',
-    name: '몽마르트르 언덕',
-    lat: 48.8867,
-    lng: 2.3431,
-  },
-  {
-    id: 'opera',
-    name: '오페라 가르니에',
-    lat: 48.8719,
-    lng: 2.3316,
-  },
-  {
-    id: 'louvre',
-    name: '루브르 박물관',
-    lat: 48.8606,
-    lng: 2.3376,
-  },
-  {
-    id: 'gyeongbokgung',
-    name: '경복궁 광화문 앞',
-    lat: 48.853,
-    lng: 2.3499,
-  },
-  {
-    id: 'luxembourg',
-    name: '뤽상부르 공원',
-    lat: 48.8462,
-    lng: 2.3372,
-  },
-]
+/* 진행 중인 여행은 TRAVEL_SEGMENT 가 없어 segment_id 로 못 고른다.
+   목록에서 구분하려고 쓰는 프론트 전용 값이다. */
+const ONGOING_TRIP_ID = 'ongoing'
 
-const routePath = pins.map(({ lat, lng }) => ({ lat, lng }))
+// 아이콘 파일의 원본 크기. 정중앙을 좌표에 맞추는 데 쓴다.
+const PIN_SIZE = { width: 38, height: 38 }
+const ACTIVE_PIN_SIZE = { width: 48, height: 48 }
 
-const tripGroups = [
-  {
-    country: 'FRANCE',
-    countryKo: '프랑스',
-    cities: [
-      { id: 'paris', name: '파리', stats: '핀 12 · 사진 138' },
-      { id: 'versailles', name: '베르사유', stats: '핀 3 · 사진 24' },
-    ],
-  },
-  {
-    country: 'CZECHIA',
-    countryKo: '체코',
-    cities: [
-      { id: 'prague', name: '프라하', stats: '핀 9 · 사진 94' },
-      {
-        id: 'cesky-krumlov',
-        name: '체스키크룸로프',
-        stats: '핀 4 · 사진 31',
-      },
-    ],
-  },
-  {
-    country: 'JAPAN',
-    countryKo: '일본',
-    cities: [{ id: 'kyoto', name: '교토', stats: '핀 7 · 사진 62' }],
-  },
-]
+/* 현재 위치 아이콘은 점(17, 28)에서 오른쪽으로 원뿔이 뻗은 모양이다.
+   그 점을 축으로 돌리면 원뿔이 원래 68x56 박스를 벗어나 잘리므로,
+   점에서 원뿔 끝까지(38.25)를 반지름으로 하는 정사각형으로 다시 잡는다. */
+const CURRENT_POSITION_ORIGIN = { x: 17, y: 28 }
+const CURRENT_POSITION_RADIUS = 38.25
+const CURRENT_POSITION_BOX = CURRENT_POSITION_RADIUS * 2
+
+/**
+ * 진행 방향만큼 돌린 현재 위치 아이콘을 만든다.
+ * 원본 SVG 를 그대로 쓰고 바깥 그룹에 회전만 얹는다.
+ */
+const buildCurrentPositionIcon = (heading) => {
+  const { x, y } = CURRENT_POSITION_ORIGIN
+  const viewBox = `${x - CURRENT_POSITION_RADIUS} ${y - CURRENT_POSITION_RADIUS} ${CURRENT_POSITION_BOX} ${CURRENT_POSITION_BOX}`
+
+  const svg = currentPositionSvg
+    .replace(
+      /width="[^"]*" height="[^"]*" viewBox="[^"]*"/,
+      `width="${CURRENT_POSITION_BOX}" height="${CURRENT_POSITION_BOX}" viewBox="${viewBox}"`,
+    )
+    // 아이콘이 기본으로 동쪽을 보고 있어 90도를 뺀다(heading 은 북쪽이 0).
+    .replace(
+      '<g id="Group 3">',
+      `<g id="Group 3" transform="rotate(${heading - 90} ${x} ${y})">`,
+    )
+
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+}
+
+/** 여정 목록 부제. 아직 못 받은 값은 빼고 잇는다. */
+const formatCounts = ({ pin_count, photo_count }) =>
+  [
+    pin_count == null ? null : `핀 ${pin_count}`,
+    photo_count == null ? null : `사진 ${photo_count}`,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
+const sheetDateFormatter = new Intl.DateTimeFormat('ko-KR', {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true,
+})
+
+const formatTaggedAt = (taggedAt) =>
+  taggedAt
+    ? sheetDateFormatter.format(new Date(taggedAt)).replace(/\. /g, '.')
+    : ''
 
 const MapPage = () => {
   const navigate = useNavigate()
+  const apiLoaded = useApiIsLoaded()
+
+  /**
+   * 구글 지도는 아이콘의 아래 가운데를 좌표에 맞춘다. 그래서 핀 그림이 좌표보다
+   * 위(북쪽)에 떠 보인다. 아이콘 정중앙을 좌표에 맞춘다.
+   */
+  const centeredIcon = (url, { width, height }) => {
+    if (!apiLoaded || !window.google?.maps) return url
+
+    const { Size, Point } = window.google.maps
+
+    return {
+      url,
+      scaledSize: new Size(width, height),
+      anchor: new Point(width / 2, height / 2),
+    }
+  }
   const [selectedPinId, setSelectedPinId] = useState(null)
   const [dropdownOpen, setDropdownOpen] = useState(false)
-  const [selectedTrip, setSelectedTrip] = useState({
-    id: 'paris',
-    city: '파리',
-    country: '프랑스',
-  })
-  const [mapCenter, setMapCenter] = useState(PARIS_CENTER)
+  const [mapCenter, setMapCenter] = useState(DEFAULT_CENTER)
   const [mapKey, setMapKey] = useState(0)
 
-  const selectedPin = useMemo(
-    () => pins.find(({ id }) => id === selectedPinId),
-    [selectedPinId],
+  const [currentPosition, setCurrentPosition] = useState(null)
+  const [heading, setHeading] = useState(0)
+  const compassStartedRef = useRef(false)
+
+  /**
+   * 나침반 값. iOS 는 `webkitCompassHeading`(북쪽 기준 시계방향)을 그대로 주고,
+   * 그 밖에는 절대 방위일 때의 `alpha`(반시계방향)를 뒤집어 쓴다.
+   */
+  const handleOrientation = useCallback((event) => {
+    const compass =
+      typeof event.webkitCompassHeading === 'number'
+        ? event.webkitCompassHeading
+        : event.absolute && typeof event.alpha === 'number'
+          ? 360 - event.alpha
+          : null
+
+    if (compass != null && !Number.isNaN(compass)) setHeading(compass)
+  }, [])
+
+  const startCompass = useCallback(() => {
+    if (compassStartedRef.current) return
+
+    compassStartedRef.current = true
+    window.addEventListener('deviceorientationabsolute', handleOrientation)
+    window.addEventListener('deviceorientation', handleOrientation)
+  }, [handleOrientation])
+
+  useEffect(() => {
+    // iOS 는 사용자 탭에서 권한을 받아야 해서 여기서 바로 붙이지 않는다.
+    if (typeof window.DeviceOrientationEvent?.requestPermission !== 'function') {
+      startCompass()
+    }
+
+    return () => {
+      window.removeEventListener('deviceorientationabsolute', handleOrientation)
+      window.removeEventListener('deviceorientation', handleOrientation)
+    }
+  }, [handleOrientation, startCompass])
+  const [trips, setTrips] = useState([])
+  const [selectedTripId, setSelectedTripId] = useState(null)
+  const [tripPins, setTripPins] = useState([])
+  const [tripError, setTripError] = useState('')
+
+  /**
+   * 현재 위치 마커. 걸어 다니며 쓰는 화면이라 한 번만 받지 않고 계속 따라간다.
+   * 권한을 거부하면 마커를 그리지 않는다.
+   */
+  useEffect(() => {
+    if (!navigator.geolocation) return undefined
+
+    const watchId = navigator.geolocation.watchPosition(
+      ({ coords }) => {
+        setCurrentPosition({ lat: coords.latitude, lng: coords.longitude })
+
+        // 나침반이 붙어 있으면 그쪽이 더 정확하다. 없을 때만 이동 방향을 쓴다.
+        // heading 은 움직일 때만 들어오므로 멈춰 있으면 마지막 방향을 유지한다.
+        if (
+          !compassStartedRef.current &&
+          coords.heading != null &&
+          !Number.isNaN(coords.heading)
+        ) {
+          setHeading(coords.heading)
+        }
+      },
+      () => setCurrentPosition(null),
+    )
+
+    return () => navigator.geolocation.clearWatch(watchId)
+  }, [])
+
+  /**
+   * 4.1 로 종료된 여정을 받고, 진행 중인 여행이 있으면 목록 맨 앞에 얹는다.
+   * 진행 중인 여행이 있으면 그쪽을, 없으면 가장 최근 여정을 기본으로 고른다.
+   */
+  useEffect(() => {
+    let ignore = false
+
+    const load = async () => {
+      try {
+        const [{ trips: list }, ongoing] = await Promise.all([
+          getTrips(),
+          getOngoingPins(),
+        ])
+
+        if (ignore) return
+
+        // TODO: 4.1 에 pin_count · photo_count 가 없어 여정마다 4.2 를 더 부른다.
+        // 목록 응답에 개수가 들어오면 이 호출을 지운다.
+        const summaries = await Promise.all(
+          list.map((trip) =>
+            getTrip(trip.segment_id).catch(() => null),
+          ),
+        )
+
+        if (ignore) return
+
+        const ended = list.map((trip, index) => ({
+          ...trip,
+          pin_count: summaries[index]?.pin_count,
+          photo_count: summaries[index]?.photo_count,
+        }))
+
+        const options =
+          ongoing.pins.length > 0
+            ? [
+                {
+                  segment_id: ONGOING_TRIP_ID,
+                  name: '진행 중인 여행',
+                  pin_count: ongoing.pins.length,
+                },
+                ...ended,
+              ]
+            : ended
+
+        setTrips(options)
+        setSelectedTripId(
+          (current) => current ?? options[0]?.segment_id ?? null,
+        )
+      } catch (error) {
+        if (!ignore) setTripError(error.message)
+      }
+    }
+
+    load()
+
+    return () => {
+      ignore = true
+    }
+  }, [])
+
+  /** 고른 여정의 핀만 받아 지도에 올린다(종료된 여정은 4.5). */
+  useEffect(() => {
+    if (!selectedTripId) return undefined
+
+    let ignore = false
+    setTripError('')
+
+    const load = async () => {
+      try {
+        const { pins } =
+          selectedTripId === ONGOING_TRIP_ID
+            ? await getOngoingPins()
+            : await getTripPins(selectedTripId)
+
+        if (ignore) return
+
+        setTripPins(pins)
+        setSelectedPinId(null)
+      } catch (error) {
+        if (ignore) return
+
+        setTripPins([])
+        setTripError(error.message)
+      }
+    }
+
+    load()
+
+    return () => {
+      ignore = true
+    }
+  }, [selectedTripId])
+
+  /**
+   * 구간에서 제외한 핀은 지도에 올리지 않는다. 좌표가 없는 핀도 그릴 수 없다.
+   * 방문한 순서대로 정렬해 마커 순번과 동선이 어긋나지 않게 한다.
+   */
+  const mapPins = useMemo(
+    () =>
+      tripPins
+        .filter(
+          ({ latitude, longitude, included_in_segment }) =>
+            included_in_segment && latitude != null && longitude != null,
+        )
+        .sort((a, b) => a.tagged_at.localeCompare(b.tagged_at)),
+    [tripPins],
   )
 
+  const routePath = useMemo(
+    () =>
+      mapPins.map(({ latitude, longitude }) => ({
+        lat: latitude,
+        lng: longitude,
+      })),
+    [mapPins],
+  )
+
+  // 여정을 바꾸면 그 여정의 첫 핀으로 지도를 옮긴다.
+  useEffect(() => {
+    const [first] = mapPins
+    if (!first) return
+
+    setMapCenter({ lat: first.latitude, lng: first.longitude })
+    setMapKey((current) => current + 1)
+  }, [mapPins])
+
+  const selectedTrip = trips.find(
+    ({ segment_id }) => segment_id === selectedTripId,
+  )
+  const selectedPin = mapPins.find(({ pin_id }) => pin_id === selectedPinId)
+
+  const currentPositionIcon = useMemo(
+    () => buildCurrentPositionIcon(heading),
+    [heading],
+  )
+
+  const [pinDetail, setPinDetail] = useState(null)
+  const [pinPhotos, setPinPhotos] = useState([])
+  const [sheetError, setSheetError] = useState('')
+
+  /** 핀을 고르면 시트에 채울 값을 5.1 · 5.4 로 받는다. */
+  useEffect(() => {
+    if (!selectedPinId) {
+      setPinDetail(null)
+      setPinPhotos([])
+      setSheetError('')
+      return undefined
+    }
+
+    let ignore = false
+    setSheetError('')
+
+    const load = async () => {
+      try {
+        const [detail, photoList] = await Promise.all([
+          getPin(selectedPinId),
+          getPinPhotos(selectedPinId),
+        ])
+
+        if (ignore) return
+
+        setPinDetail(detail)
+        setPinPhotos(photoList.photos)
+      } catch (error) {
+        if (ignore) return
+
+        setPinDetail(null)
+        setPinPhotos([])
+        setSheetError(error.message)
+      }
+    }
+
+    load()
+
+    return () => {
+      ignore = true
+    }
+  }, [selectedPinId])
+
+  const selectedIndex = mapPins.findIndex(
+    ({ pin_id }) => pin_id === selectedPinId,
+  )
+  const coverPhoto =
+    pinPhotos.find((photo) => photo.is_pin_cover) ?? pinPhotos[0]
+
+  /** iOS 는 사용자 제스처 안에서만 나침반 권한을 물을 수 있다. */
+  const requestCompass = async () => {
+    const { DeviceOrientationEvent } = window
+    if (typeof DeviceOrientationEvent?.requestPermission !== 'function') return
+
+    try {
+      const permission = await DeviceOrientationEvent.requestPermission()
+      if (permission === 'granted') startCompass()
+    } catch {
+      // 거부하면 이동 방향(coords.heading)으로만 돌아간다.
+    }
+  }
+
   const handleLocate = () => {
+    requestCompass()
+
+    if (currentPosition) {
+      setMapCenter(currentPosition)
+      setMapKey((current) => current + 1)
+      return
+    }
+
     if (!navigator.geolocation) return
 
     navigator.geolocation.getCurrentPosition(({ coords }) => {
-      setMapCenter({ lat: coords.latitude, lng: coords.longitude })
+      const position = { lat: coords.latitude, lng: coords.longitude }
+
+      setCurrentPosition(position)
+      setMapCenter(position)
       setMapKey((current) => current + 1)
     })
   }
 
-  const selectTrip = (city, country) => {
-    setSelectedTrip({ id: city.id, city: city.name, country })
+  const selectTrip = (segmentId) => {
+    setSelectedTripId(segmentId)
     setDropdownOpen(false)
   }
 
@@ -135,27 +425,36 @@ const MapPage = () => {
             strokeWeight={3}
           />
 
-          {pins.map((pin) => {
-            const isSelected = pin.id === selectedPinId
+          {mapPins.map((pin) => {
+            const isSelected = pin.pin_id === selectedPinId
 
             return (
               <Marker
-                key={pin.id}
-                position={{ lat: pin.lat, lng: pin.lng }}
-                icon={isSelected ? activePinIcon : pinIcon}
-                title={pin.name}
+                key={pin.pin_id}
+                position={{ lat: pin.latitude, lng: pin.longitude }}
+                icon={
+                  isSelected
+                    ? centeredIcon(activePinIcon, ACTIVE_PIN_SIZE)
+                    : centeredIcon(pinIcon, PIN_SIZE)
+                }
+                title={pin.place_name || '이름 없는 장소'}
                 zIndex={isSelected ? 3 : 2}
-                onClick={() => setSelectedPinId(pin.id)}
+                onClick={() => setSelectedPinId(pin.pin_id)}
               />
             )
           })}
 
-          <Marker
-            position={{ lat: 48.8589, lng: 2.3462 }}
-            icon={currentPositionIcon}
-            title="현재 위치"
-            zIndex={4}
-          />
+          {currentPosition && (
+            <Marker
+              position={currentPosition}
+              icon={centeredIcon(currentPositionIcon, {
+                width: CURRENT_POSITION_BOX,
+                height: CURRENT_POSITION_BOX,
+              })}
+              title="현재 위치"
+              zIndex={4}
+            />
+          )}
         </GoogleMap>
       </MapLayer>
 
@@ -177,11 +476,16 @@ const MapPage = () => {
         }}
       >
         <TripAvatar src={tripAvatar} alt="" />
-        <TripName>{`${selectedTrip.city} · ${selectedTrip.country}`}</TripName>
+        <TripName>{selectedTrip?.name ?? '여정 선택'}</TripName>
         <Chevron src={tripSelectChevron} alt="" />
       </TripSelector>
 
-      <LocationButton type="button" aria-label="내 위치로 이동" onClick={handleLocate}>
+      <LocationButton
+        type="button"
+        aria-label="내 위치로 이동"
+        $raised={Boolean(selectedPin)}
+        onClick={handleLocate}
+      >
         <img src={myLocationIcon} alt="" />
       </LocationButton>
 
@@ -201,44 +505,56 @@ const MapPage = () => {
           aria-label={selectedPin ? '핀 정보 접기' : '핀 정보 펼치기'}
           onClick={() => {
             if (selectedPin) setSelectedPinId(null)
-            else setSelectedPinId(pins[2].id)
+            else if (mapPins[0]) setSelectedPinId(mapPins[0].pin_id)
           }}
         >
           <span />
         </SheetHandle>
 
         <SheetContent $visible={Boolean(selectedPin)}>
-          <PinSummary>
-            <PinPhoto aria-hidden="true" />
-            <PinText>
-              <PinTitle>상세 주소</PinTitle>
-              <PinMeta>자동 입력 주소</PinMeta>
-              <PinMeta>2025.06.14 오전 10:32</PinMeta>
-              <TagList>
-                <Tag>사진 8</Tag>
-                <Tag>음성 1</Tag>
-              </TagList>
-            </PinText>
-          </PinSummary>
+          {sheetError ? (
+            <SheetMessage role="alert">{sheetError}</SheetMessage>
+          ) : !pinDetail ? (
+            <SheetMessage>불러오는 중...</SheetMessage>
+          ) : (
+            <>
+              <PinSummary>
+                <PinPhoto>
+                  {coverPhoto && <PinPhotoImage src={coverPhoto.file_path} alt="" />}
+                </PinPhoto>
+                <PinText>
+                  <PinTitle>
+                    {pinDetail.place_name ||
+                      pinDetail.address ||
+                      '이름 없는 장소'}
+                  </PinTitle>
+                  {pinDetail.address && <PinMeta>{pinDetail.address}</PinMeta>}
+                  <PinMeta>{formatTaggedAt(pinDetail.tagged_at)}</PinMeta>
+                  <TagList>
+                    <Tag>사진 {pinPhotos.length}</Tag>
+                    {pinDetail.voice_memo && <Tag>음성 1</Tag>}
+                  </TagList>
+                </PinText>
+              </PinSummary>
 
-          <PinDescription>
-            오래된 돌담을 따라 걷다가, 해가 드는 순간에…
-          </PinDescription>
+              <PinDescription>
+                {pinDetail.text_note || '남긴 기록이 없습니다.'}
+              </PinDescription>
 
-          <DetailButton
-            type="button"
-            onClick={() => navigate('/map/pin/gyeongbokgung')}
-          >
-            이 핀 기록 자세히 보기
-          </DetailButton>
+              <DetailButton
+                type="button"
+                onClick={() => navigate(`/map/pin/${selectedPinId}`)}
+              >
+                이 핀 기록 자세히 보기
+              </DetailButton>
 
-          <Pagination aria-label="3 / 5">
-            <Dot />
-            <Dot />
-            <Dot $active />
-            <Dot />
-            <Dot />
-          </Pagination>
+              <Pagination aria-label={`${selectedIndex + 1} / ${mapPins.length}`}>
+                {mapPins.map((pin, index) => (
+                  <Dot key={pin.pin_id} $active={index === selectedIndex} />
+                ))}
+              </Pagination>
+            </>
+          )}
         </SheetContent>
       </PinSheet>
 
@@ -246,34 +562,35 @@ const MapPage = () => {
 
       {dropdownOpen && (
         <TripDropdown id="trip-dropdown">
-          {tripGroups.map((group) => (
-            <TripGroup key={group.country}>
-              <CountryHeading>
-                <CountryName>{group.country}</CountryName>
-                <CountryNameKo>{group.countryKo}</CountryNameKo>
-              </CountryHeading>
+          <TripGroup>
+            {trips.length === 0 && (
+              <DropdownMessage>
+                {tripError || '여정이 없습니다.'}
+              </DropdownMessage>
+            )}
 
-              {group.cities.map((city) => {
-                const isSelected = city.id === selectedTrip.id
+            {trips.map((trip) => {
+              const isSelected = trip.segment_id === selectedTripId
 
-                return (
-                  <CityButton
-                    key={city.id}
-                    type="button"
-                    $selected={isSelected}
-                    aria-pressed={isSelected}
-                    onClick={() => selectTrip(city, group.countryKo)}
-                  >
-                    <CityText>
-                      <CityName $selected={isSelected}>{city.name}</CityName>
-                      <CityStats>{city.stats}</CityStats>
-                    </CityText>
-                    {isSelected && <CheckIcon src={dropdownCheckIcon} alt="" />}
-                  </CityButton>
-                )
-              })}
-            </TripGroup>
-          ))}
+              return (
+                <CityButton
+                  key={trip.segment_id}
+                  type="button"
+                  $selected={isSelected}
+                  aria-pressed={isSelected}
+                  onClick={() => selectTrip(trip.segment_id)}
+                >
+                  <CityText>
+                    <CityName $selected={isSelected}>{trip.name}</CityName>
+                    <CityStats>
+                      {formatCounts(trip)}
+                    </CityStats>
+                  </CityText>
+                  {isSelected && <CheckIcon src={dropdownCheckIcon} alt="" />}
+                </CityButton>
+              )
+            })}
+          </TripGroup>
         </TripDropdown>
       )}
     </Page>
@@ -339,17 +656,20 @@ const Chevron = styled.img`
   margin-left: -5px;
 `
 
+/* 핀 시트가 올라오면 그 위로 함께 올라간다. 시트 위 여백(29)은 접힌 상태와 같다.
+   접힘: 시트 윗변 100 + 29 = 129 / 펼침: 시트 윗변 356 + 29 = 385 */
 const LocationButton = styled.button`
   position: absolute;
   z-index: 9;
   right: 13px;
-  bottom: 129px;
+  bottom: ${({ $raised }) => ($raised ? '385px' : '129px')};
   width: 76px;
   height: 76px;
   padding: 0;
   border: 0;
   background: transparent;
   cursor: pointer;
+  transition: bottom 220ms ease;
 
   img {
     width: 76px;
@@ -442,8 +762,23 @@ const PinPhoto = styled.div`
   width: 106px;
   height: 106px;
   flex: 0 0 auto;
+  overflow: hidden;
   border-radius: 12px;
   background: var(--Map-Land);
+`
+
+const PinPhotoImage = styled.img`
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+`
+
+const SheetMessage = styled.p`
+  padding-top: 20px;
+  color: var(--Text-Secondary);
+  font: var(--text-ui-body-m);
+  text-align: center;
 `
 
 const PinText = styled.div`
@@ -542,31 +877,6 @@ const TripGroup = styled.div`
   flex-direction: column;
 `
 
-const CountryHeading = styled.div`
-  padding: 14px 12px 6px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-
-  ${TripGroup}:first-child & {
-    padding-top: 8px;
-  }
-`
-
-const CountryName = styled.span`
-  color: var(--Accent-Gold);
-  font-family: var(--font-serif);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 1.82px;
-  line-height: 18px;
-`
-
-const CountryNameKo = styled.span`
-  color: var(--Text-Secondary);
-  font: var(--text-ui-nav);
-`
-
 const CityButton = styled.button`
   width: 100%;
   min-height: 58px;
@@ -580,6 +890,12 @@ const CityButton = styled.button`
     $selected ? 'rgb(181 118 59 / 10%)' : 'transparent'};
   text-align: left;
   cursor: pointer;
+`
+
+const DropdownMessage = styled.p`
+  padding: 14px 15px;
+  color: var(--Text-Secondary);
+  font: var(--text-ui-body-m);
 `
 
 const CityText = styled.span`

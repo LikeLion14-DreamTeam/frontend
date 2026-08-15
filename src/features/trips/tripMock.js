@@ -17,6 +17,8 @@ const createInitialState = () => ({
       start_at: '2024-11-03T01:24:00.000000Z',
       end_at: '2024-11-10T09:12:00.000000Z',
       status: true,
+      // 4.1 은 나라별로 도시를 묶어 준다.
+      countries: [{ country_name: '프랑스', cities: ['파리', '베르사유'] }],
     },
     11: {
       segment_id: 11,
@@ -25,6 +27,7 @@ const createInitialState = () => ({
       start_at: '2024-08-01T00:00:00.000000Z',
       end_at: '2024-08-03T15:00:00.000000Z',
       status: true,
+      countries: [{ country_name: '일본', cities: ['도쿄', '요코하마'] }],
     },
   },
 
