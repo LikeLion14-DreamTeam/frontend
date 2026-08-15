@@ -320,8 +320,6 @@ const PinDetail = () => {
   const hiddenPhotoCount = Math.max(photos.length - previewPhotos.length, 0)
   // 5.3: 여정에 배정되기 전(진행 중)인 핀만 삭제할 수 있다.
   const isDeletable = pin.segment_id === null
-  // 5.5: 이미 종료된 여행의 핀에는 사진을 추가할 수 없다.
-  const canAddPhotos = pin.segment_id === null
   const hasMemo =
     Boolean(pin.text_note) || Boolean(pin.voice_memo) || isEditingNote
 
@@ -534,12 +532,8 @@ const PinDetail = () => {
               <AddPhotoButton
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={!canAddPhotos || isUploading}
-                aria-label={
-                  canAddPhotos
-                    ? '주변 사진 추가'
-                    : '종료된 여행의 핀에는 사진을 추가할 수 없습니다'
-                }
+                disabled={isUploading}
+                aria-label="주변 사진 추가"
               >
                 <img src={photoAddIcon} alt="" />
               </AddPhotoButton>

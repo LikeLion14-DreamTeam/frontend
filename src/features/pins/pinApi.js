@@ -123,7 +123,9 @@ const PHOTO_RADIUS_METERS = 1000
  *
  * 핀 반경 1km 이내에서 촬영된 사진만 등록한다. 반경 밖이거나 좌표가 없는 사진은
  * 그것만 제외하고 나머지는 정상 등록한다(요청 전체를 거부하지 않음).
- * 다만 핀이 이미 종료된 여행에 속해 있으면 요청 전체를 409 로 거부한다.
+ *
+ * API 명세는 종료된 여행의 핀을 409 로 막지만, 팀 논의로 허용하기로 정해
+ * 여행 종료 여부는 보지 않는다.
  *
  * `photos` 는 `[{ file_id, captured_at, latitude, longitude }]` 형태이며,
  * file_id 는 `api/uploads` 의 2단계 업로드로 먼저 받아둔다.
@@ -132,14 +134,6 @@ export const addPinPhotos = async (pinId, photos) => {
   if (USE_MOCK) {
     const pin = mockPinStore.pins[pinId]
     if (!pin) throw mockNotFound()
-
-    if (pin.segment_id !== null) {
-      throw new ApiError({
-        status: 409,
-        code: 'CONFLICT',
-        message: '이미 종료된 여행에는 사진을 추가할 수 없습니다.',
-      })
-    }
 
     const added = []
     const rejected = []

@@ -85,8 +85,6 @@ const AllPhotos = () => {
   }, [pinID])
 
   const title = pin?.place_name || pin?.address || '이름 없는 장소'
-  // 5.5: 이미 종료된 여행의 핀에는 사진을 추가할 수 없다.
-  const canAddPhotos = pin?.segment_id === null
 
   const exitSelectMode = () => {
     setIsSelectMode(false)
@@ -183,12 +181,7 @@ const AllPhotos = () => {
               <AddNearbyButton
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={!canAddPhotos || isUploading}
-                aria-label={
-                  canAddPhotos
-                    ? '주변 사진 추가'
-                    : '종료된 여행의 핀에는 사진을 추가할 수 없습니다'
-                }
+                disabled={isUploading}
               >
                 {isUploading ? '추가 중...' : '주변 사진 추가'}
               </AddNearbyButton>
