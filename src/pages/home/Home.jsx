@@ -303,7 +303,7 @@ const PassportHead = styled.div`
   width: calc(100% - 22px);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 15px;
 `
 
 const ResultCard = styled.div`
