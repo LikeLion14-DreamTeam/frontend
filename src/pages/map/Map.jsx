@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { Marker, Polyline } from '@vis.gl/react-google-maps'
@@ -13,9 +13,24 @@ import myLocationIcon from '../../assets/map/my-location.svg'
 import recordPlusIcon from '../../assets/map/record-plus.png'
 import tripAvatar from '../../assets/map/trip-avatar.svg'
 import tripSelectChevron from '../../assets/icons/trip-select-chevron.svg'
+import { getPin, getPinPhotos } from '../../features/pins/pinApi'
 import { MAP_STYLES } from './mapStyles'
 
 const PARIS_CENTER = { lat: 48.8569, lng: 2.3376 }
+
+const sheetDateFormatter = new Intl.DateTimeFormat('ko-KR', {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true,
+})
+
+const formatTaggedAt = (taggedAt) =>
+  taggedAt
+    ? sheetDateFormatter.format(new Date(taggedAt)).replace(/\. /g, '.')
+    : ''
 
 // TODO: 지도 뷰 API 연동 대기. GET /trips/{segmentId}/pins(4.5)로 교체해야 한다.
 // 그때까지는 핀 상세로 이동만 되도록 id 를 mock 의 pin_id 와 맞춰둔다.
@@ -105,6 +120,53 @@ const MapPage = () => {
     () => pins.find(({ id }) => id === selectedPinId),
     [selectedPinId],
   )
+
+  const [pinDetail, setPinDetail] = useState(null)
+  const [pinPhotos, setPinPhotos] = useState([])
+  const [sheetError, setSheetError] = useState('')
+
+  /** 핀을 고르면 시트에 채울 값을 5.1 · 5.4 로 받는다. */
+  useEffect(() => {
+    if (!selectedPinId) {
+      setPinDetail(null)
+      setPinPhotos([])
+      setSheetError('')
+      return undefined
+    }
+
+    let ignore = false
+    setSheetError('')
+
+    const load = async () => {
+      try {
+        const [detail, photoList] = await Promise.all([
+          getPin(selectedPinId),
+          getPinPhotos(selectedPinId),
+        ])
+
+        if (ignore) return
+
+        setPinDetail(detail)
+        setPinPhotos(photoList.photos)
+      } catch (error) {
+        if (ignore) return
+
+        setPinDetail(null)
+        setPinPhotos([])
+        setSheetError(error.message)
+      }
+    }
+
+    load()
+
+    return () => {
+      ignore = true
+    }
+  }, [selectedPinId])
+
+  const selectedIndex = pins.findIndex(({ id }) => id === selectedPinId)
+  const coverPhoto =
+    pinPhotos.find((photo) => photo.is_pin_cover) ?? pinPhotos[0]
 
   const handleLocate = () => {
     if (!navigator.geolocation) return
@@ -217,37 +279,49 @@ const MapPage = () => {
         </SheetHandle>
 
         <SheetContent $visible={Boolean(selectedPin)}>
-          <PinSummary>
-            <PinPhoto aria-hidden="true" />
-            <PinText>
-              <PinTitle>상세 주소</PinTitle>
-              <PinMeta>자동 입력 주소</PinMeta>
-              <PinMeta>2025.06.14 오전 10:32</PinMeta>
-              <TagList>
-                <Tag>사진 8</Tag>
-                <Tag>음성 1</Tag>
-              </TagList>
-            </PinText>
-          </PinSummary>
+          {sheetError ? (
+            <SheetMessage role="alert">{sheetError}</SheetMessage>
+          ) : !pinDetail ? (
+            <SheetMessage>불러오는 중...</SheetMessage>
+          ) : (
+            <>
+              <PinSummary>
+                <PinPhoto>
+                  {coverPhoto && <PinPhotoImage src={coverPhoto.file_path} alt="" />}
+                </PinPhoto>
+                <PinText>
+                  <PinTitle>
+                    {pinDetail.place_name ||
+                      pinDetail.address ||
+                      '이름 없는 장소'}
+                  </PinTitle>
+                  {pinDetail.address && <PinMeta>{pinDetail.address}</PinMeta>}
+                  <PinMeta>{formatTaggedAt(pinDetail.tagged_at)}</PinMeta>
+                  <TagList>
+                    <Tag>사진 {pinPhotos.length}</Tag>
+                    {pinDetail.voice_memo && <Tag>음성 1</Tag>}
+                  </TagList>
+                </PinText>
+              </PinSummary>
 
-          <PinDescription>
-            오래된 돌담을 따라 걷다가, 해가 드는 순간에…
-          </PinDescription>
+              <PinDescription>
+                {pinDetail.text_note || '남긴 기록이 없습니다.'}
+              </PinDescription>
 
-          <DetailButton
-            type="button"
-            onClick={() => navigate(`/map/pin/${selectedPin?.id}`)}
-          >
-            이 핀 기록 자세히 보기
-          </DetailButton>
+              <DetailButton
+                type="button"
+                onClick={() => navigate(`/map/pin/${selectedPinId}`)}
+              >
+                이 핀 기록 자세히 보기
+              </DetailButton>
 
-          <Pagination aria-label="3 / 5">
-            <Dot />
-            <Dot />
-            <Dot $active />
-            <Dot />
-            <Dot />
-          </Pagination>
+              <Pagination aria-label={`${selectedIndex + 1} / ${pins.length}`}>
+                {pins.map((pin, index) => (
+                  <Dot key={pin.id} $active={index === selectedIndex} />
+                ))}
+              </Pagination>
+            </>
+          )}
         </SheetContent>
       </PinSheet>
 
@@ -451,8 +525,23 @@ const PinPhoto = styled.div`
   width: 106px;
   height: 106px;
   flex: 0 0 auto;
+  overflow: hidden;
   border-radius: 12px;
   background: var(--Map-Land);
+`
+
+const PinPhotoImage = styled.img`
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+`
+
+const SheetMessage = styled.p`
+  padding-top: 20px;
+  color: var(--Text-Secondary);
+  font: var(--text-ui-body-m);
+  text-align: center;
 `
 
 const PinText = styled.div`

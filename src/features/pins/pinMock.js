@@ -63,6 +63,27 @@ const createInitialState = () => ({
       text_note:
         '오래된 돌담을 따라 걷다가, 해가 드는 순간에 멈춰 섰다. 다음엔 이른 아침에 다시 오기로.',
     },
+    102: {
+      pin_id: 102,
+      segment_id: 12,
+      latitude: 48.8606,
+      longitude: 2.3376,
+      address: '프랑스 파리 리볼리가',
+      place_name: '루브르 박물관 앞',
+      tagged_at: '2024-11-04T05:11:00.000000Z',
+      text_note: '유리 피라미드에 구름이 통째로 비쳤다.',
+    },
+    103: {
+      // 구간에서 제외된 핀(tripMock 의 included_in_segment=false)
+      pin_id: 103,
+      segment_id: 12,
+      latitude: 48.8867,
+      longitude: 2.3431,
+      address: '프랑스 파리 몽마르트르',
+      place_name: '몽마르트르 언덕',
+      tagged_at: '2024-11-05T02:05:00.000000Z',
+      text_note: '',
+    },
     104: {
       // 위치 권한을 거부한 상태에서 저장된 핀. 장소명·기록·음성이 모두 없다.
       pin_id: 104,
@@ -73,6 +94,16 @@ const createInitialState = () => ({
       place_name: '',
       tagged_at: '2024-11-06T07:40:00.000000Z',
       text_note: '',
+    },
+    105: {
+      pin_id: 105,
+      segment_id: 12,
+      latitude: 48.8049,
+      longitude: 2.1204,
+      address: '프랑스 베르사유 궁전 광장',
+      place_name: '베르사유 궁전 정원',
+      tagged_at: '2024-11-08T00:30:00.000000Z',
+      text_note: '분수까지 걸어가는 길이 생각보다 길었다.',
     },
     106: {
       // 진행 중인 여정의 핀. segment_id 가 null 이라 5.3 삭제가 가능하다.
@@ -139,6 +170,54 @@ const createInitialState = () => ({
         is_pin_cover: false,
       },
     ],
+    102: [
+      {
+        photo_id: 920,
+        captured_at: '2024-11-04T05:11:30.000000Z',
+        file_path: photoUrl('orte-920'),
+        is_pin_cover: true,
+      },
+      {
+        photo_id: 921,
+        captured_at: '2024-11-04T05:12:44.000000Z',
+        file_path: photoUrl('orte-921'),
+        is_pin_cover: true,
+      },
+      {
+        photo_id: 922,
+        captured_at: '2024-11-04T05:14:02.000000Z',
+        file_path: photoUrl('orte-922'),
+        is_pin_cover: false,
+      },
+    ],
+    103: [
+      {
+        photo_id: 930,
+        captured_at: '2024-11-05T02:05:18.000000Z',
+        file_path: photoUrl('orte-930'),
+        is_pin_cover: true,
+      },
+      {
+        photo_id: 931,
+        captured_at: '2024-11-05T02:07:51.000000Z',
+        file_path: photoUrl('orte-931'),
+        is_pin_cover: false,
+      },
+    ],
+    105: [
+      {
+        photo_id: 940,
+        captured_at: '2024-11-08T00:30:25.000000Z',
+        file_path: photoUrl('orte-940'),
+        is_pin_cover: true,
+      },
+      {
+        photo_id: 941,
+        captured_at: '2024-11-08T00:33:09.000000Z',
+        file_path: photoUrl('orte-941'),
+        is_pin_cover: true,
+      },
+    ],
     104: [
       {
         photo_id: 950,
@@ -171,7 +250,15 @@ const createInitialState = () => ({
       duration_sec: 18,
       saved_at: '2024-11-03T01:24:30.000000Z',
     },
+    102: null,
+    103: {
+      voice_memo_id: 56,
+      audio_file: createMockAudioUrl(9),
+      duration_sec: 9,
+      saved_at: '2024-11-05T02:06:10.000000Z',
+    },
     104: null,
+    105: null,
     106: null,
   },
 })
