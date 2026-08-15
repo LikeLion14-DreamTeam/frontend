@@ -4,6 +4,7 @@ import styled from 'styled-components'
 import ConfirmationModal from '../../components/common/ConfirmationModal'
 import NavBar from '../../components/layout/NavBar'
 import {
+  endCurrentTrip,
   getCountryStamps,
   getCurrentTrip,
   updateCurrentTripName,
@@ -148,6 +149,9 @@ const Home = () => {
   const [isSavingName, setIsSavingName] = useState(false)
   const [nameError, setNameError] = useState('')
   const [journeyIndex, setJourneyIndex] = useState(0)
+  const [isEndingTrip, setIsEndingTrip] = useState(false)
+  const [isConfirmingEnd, setIsConfirmingEnd] = useState(false)
+  const [endError, setEndError] = useState('')
   const passportSwipeStart = useRef(null)
   const journeySwipeStart = useRef(null)
 
@@ -214,6 +218,32 @@ const Home = () => {
     journeySwipeStart,
     moveWithin(setJourneyIndex, journeyCards.length),
   )
+
+  const handleEndTrip = async () => {
+    setIsEndingTrip(true)
+    setEndError('')
+
+    try {
+      // 이름·종료일은 보내지 않는다. 서버가 3.4 로 지어둔 이름과
+      // 마지막 핀 시각으로 채운다.
+      await endCurrentTrip()
+
+      // 여정이 끝나면 진행 중인 핀이 사라지고 나라 도장이 하나 늘 수 있다.
+      const [trip, { stamps: visited }] = await Promise.all([
+        getCurrentTrip(),
+        getCountryStamps(),
+      ])
+
+      setCurrentTrip(trip)
+      setStamps(visited)
+      setJourneyIndex(0)
+      setIsConfirmingEnd(false)
+    } catch (error) {
+      setEndError(error.message)
+    } finally {
+      setIsEndingTrip(false)
+    }
+  }
 
   const openNameEditor = () => {
     setNameDraft(currentTrip?.name ?? '')
@@ -293,7 +323,15 @@ const Home = () => {
                     </JourneyInfo>
 
                     <JourneyActions>
-                      <EndJourneyButton type="button">여정 종료하기</EndJourneyButton>
+                      <EndJourneyButton
+                        type="button"
+                        onClick={() => {
+                          setEndError('')
+                          setIsConfirmingEnd(true)
+                        }}
+                      >
+                        여정 종료하기
+                      </EndJourneyButton>
                       <ContinueJourneyLink to="/record/multi-capture">
                         여정 계속하기
                       </ContinueJourneyLink>
@@ -401,6 +439,34 @@ const Home = () => {
           ))}
         </PageDots>
       </PassportBlock>
+
+      {/* TODO: 종료 확인 시안이 없어 공통 확인 모달로 만들었다. */}
+      <ConfirmationModal
+        open={hasPins && isConfirmingEnd}
+        title="여정을 종료할까요?"
+        confirmLabel={isEndingTrip ? '종료하는 중...' : '여정 종료하기'}
+        onConfirm={() => void handleEndTrip()}
+        onCancel={() => setIsConfirmingEnd(false)}
+        confirmDisabled={isEndingTrip}
+        cancelDisabled={isEndingTrip}
+        ariaDescribedBy="trip-end-notice"
+      >
+        {hasPins && (
+          <EndTripContent>
+            <EndTripCard>
+              <EndTripName>{currentTrip.name}</EndTripName>
+              <EndTripMeta>
+                {formatStartedAt(currentTrip.started_at)} ·{' '}
+                {formatCounts(currentTrip)}
+              </EndTripMeta>
+            </EndTripCard>
+            <EndTripNotice id="trip-end-notice">
+              지금까지 남긴 핀이 하나의 여정으로 묶이고 포토북이 만들어져요.
+            </EndTripNotice>
+            {endError && <EndTripError role="alert">{endError}</EndTripError>}
+          </EndTripContent>
+        )}
+      </ConfirmationModal>
 
       {/* TODO: 이름 수정 시안이 없어 공통 확인 모달에 입력란을 얹어 만들었다. */}
       <ConfirmationModal
@@ -748,6 +814,47 @@ const EditNameIcon = styled.img`
   width: 100%;
   height: 100%;
   display: block;
+`
+
+const EndTripContent = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+`
+
+const EndTripCard = styled.div`
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--Background-Base);
+`
+
+const EndTripName = styled.p`
+  overflow: hidden;
+  color: var(--Text-Primary);
+  font: var(--text-ui-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`
+
+const EndTripMeta = styled.p`
+  color: var(--Text-Secondary);
+  font: var(--text-ui-nav);
+`
+
+const EndTripNotice = styled.p`
+  color: var(--Text-Secondary);
+  font: var(--text-ui-caption);
+  word-break: keep-all;
+`
+
+const EndTripError = styled.p`
+  color: var(--Primary-Cognac);
+  font: var(--text-ui-caption);
+  word-break: keep-all;
 `
 
 const NameEditor = styled.div`

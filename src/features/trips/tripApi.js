@@ -122,6 +122,108 @@ export const updateCurrentTripName = async (name) => {
 }
 
 /**
+ * 3.2 여행 종료(여정 생성)
+ *
+ * `segment_id` 가 null 인 핀 전체를 모아 새 구간을 만들고 배정한다.
+ * `name` 과 `endAt` 은 둘 다 생략할 수 있고, 그때는 서버가 각각 3.4 로 지정한
+ * 이름(없으면 도시명 나열)과 마지막 핀 시각으로 채운다.
+ */
+export const endCurrentTrip = async ({ name, endAt } = {}) => {
+  if (USE_MOCK) {
+    const pins = getMockOngoingPins()
+
+    if (pins.length === 0) {
+      throw new ApiError({
+        status: 409,
+        code: 'EMPTY_TRIP',
+        message: '아직 저장된 핀이 없어 여정을 만들 수 없습니다.',
+      })
+    }
+
+    const startAt = pins[0].tagged_at
+    const resolvedEndAt = endAt ?? pins.at(-1).tagged_at
+
+    // end_at 을 직접 준 경우 그 이후 태깅된 핀은 이 여정에서 자동 제외한다.
+    const isIncluded = (pin) =>
+      new Date(pin.tagged_at) <= new Date(resolvedEndAt)
+
+    if (!pins.some(isIncluded)) {
+      throw new ApiError({
+        status: 409,
+        code: 'EMPTY_TRIP',
+        message: '종료일이 너무 일러 포함되는 핀이 없습니다.',
+      })
+    }
+
+    const segmentId =
+      Math.max(...Object.keys(mockTripStore.trips).map(Number), 0) + 1
+
+    const locations = pins
+      .filter(isIncluded)
+      .map((pin) => getMockPinLocation(pin.pin_id))
+      .filter(Boolean)
+
+    const cities = [...new Set(locations.map((place) => place.city))]
+
+    // 4.1 은 나라별로 도시를 묶어 준다.
+    const countries = [
+      ...new Map(
+        locations.map((place) => [place.country_code, place.country_name]),
+      ),
+    ].map(([countryCode, countryName]) => ({
+      country_name: countryName,
+      cities: [
+        ...new Set(
+          locations
+            .filter((place) => place.country_code === countryCode)
+            .map((place) => place.city),
+        ),
+      ],
+    }))
+
+    mockTripStore.trips[segmentId] = {
+      segment_id: segmentId,
+      user_id: 1,
+      name: name || mockTripStore.currentTripName || cities.join(', '),
+      start_at: startAt,
+      end_at: resolvedEndAt,
+      status: true,
+      countries,
+    }
+
+    mockTripStore.pins[segmentId] = pins.map((pin) => ({
+      pin_id: pin.pin_id,
+      place_name: pin.place_name,
+      latitude: pin.latitude,
+      longitude: pin.longitude,
+      tagged_at: pin.tagged_at,
+      included_in_segment: isIncluded(pin),
+    }))
+
+    // 핀 쪽 상태도 같이 옮겨야 5.3 삭제 제한과 지도 필터가 맞는다.
+    pins.forEach((pin) => {
+      pin.segment_id = segmentId
+    })
+
+    // 진행 중인 여행이 사라졌으니 3.4 로 지어둔 이름도 비운다.
+    mockTripStore.currentTripName = null
+
+    return {
+      segment_id: segmentId,
+      user_id: 1,
+      name: mockTripStore.trips[segmentId].name,
+      start_at: startAt,
+      end_at: resolvedEndAt,
+      status: true,
+      pin_count: pins.filter(isIncluded).length,
+      photobook_id: 30 + segmentId,
+    }
+  }
+
+  return apiClient.post('/trips', { name, end_at: endAt })
+}
+
+/**
  * 3.3 국가별 방문 도장 목록
  *
  * `country_code` 는 ISO 3166-1 alpha-2 문자열로 가정한다. 명세에는 아직 숫자(82)
