@@ -2,8 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import styled from 'styled-components'
 import { Marker } from '@vis.gl/react-google-maps'
+import Button from '../../components/common/Button'
+import ConfirmationModal from '../../components/common/ConfirmationModal'
 import GoogleMap from '../../components/common/GoogleMap'
 import activePinIcon from '../../assets/map/map-pin-active.svg'
+import deleteWarningIcon from '../../assets/icons/delete-warning.svg'
 import backIcon from '../../assets/map/detail-back.svg'
 import openMapIcon from '../../assets/map/open-map.svg'
 import refreshIcon from '../../assets/map/refresh.svg'
@@ -42,6 +45,22 @@ const formatTaggedAt = (taggedAt) =>
   taggedAt
     ? detailDateFormatter.format(new Date(taggedAt)).replace(/\. /g, '.')
     : ''
+
+/** 삭제 확인 모달의 대상 카드에 쓸 요약. 예) 2024.11.03 · 사진 138장 · 음성 */
+const formatDeleteMeta = (pin, photoCount) => {
+  const taggedAt = pin.tagged_at ? new Date(pin.tagged_at) : null
+  const pad2 = (value) => String(value).padStart(2, '0')
+
+  return [
+    taggedAt
+      ? `${taggedAt.getFullYear()}.${pad2(taggedAt.getMonth() + 1)}.${pad2(taggedAt.getDate())}`
+      : '',
+    `사진 ${photoCount}장`,
+    pin.voice_memo ? '음성' : '',
+  ]
+    .filter(Boolean)
+    .join(' · ')
+}
 
 const formatDuration = (seconds) => {
   if (seconds == null) return ''
@@ -576,45 +595,52 @@ const PinDetail = () => {
             </SuggestedGrid>
           </SuggestedSection>
 
-          {/* TODO: 임시 UI. 시안에 핀 삭제가 없어 위치·문구·색상을 임의로 정했다. */}
           {isDeletable && (
             <DeleteSection>
-              {deleteError && <DeleteError role="alert">{deleteError}</DeleteError>}
-
-              {isConfirmingDelete ? (
-                <DeleteConfirm>
-                  <DeleteWarning>
-                    이 핀의 사진과 음성 메모가 함께 삭제됩니다. 되돌릴 수 없습니다.
-                  </DeleteWarning>
-                  <DeleteActions>
-                    <DeleteCancelButton
-                      type="button"
-                      onClick={() => setIsConfirmingDelete(false)}
-                      disabled={isDeleting}
-                    >
-                      취소
-                    </DeleteCancelButton>
-                    <DeleteConfirmButton
-                      type="button"
-                      onClick={handleDelete}
-                      disabled={isDeleting}
-                    >
-                      {isDeleting ? '삭제 중...' : '삭제할게요'}
-                    </DeleteConfirmButton>
-                  </DeleteActions>
-                </DeleteConfirm>
-              ) : (
-                <DeleteTrigger
-                  type="button"
-                  onClick={() => setIsConfirmingDelete(true)}
-                >
-                  이 핀 삭제
-                </DeleteTrigger>
+              {deleteError && (
+                <DeleteError role="alert">{deleteError}</DeleteError>
               )}
+
+              <DeleteTrigger
+                type="button"
+                $variant="ghost"
+                onClick={() => setIsConfirmingDelete(true)}
+                disabled={isDeleting}
+              >
+                핀 삭제하기
+              </DeleteTrigger>
             </DeleteSection>
           )}
         </DetailContent>
       </DetailSheet>
+
+      <ConfirmationModal
+        open={isDeletable && isConfirmingDelete}
+        title="이 핀을 삭제할까요?"
+        confirmLabel={isDeleting ? '핀 삭제 중...' : '핀 삭제하기'}
+        onConfirm={() => void handleDelete()}
+        onCancel={() => setIsConfirmingDelete(false)}
+        confirmDisabled={isDeleting}
+        cancelDisabled={isDeleting}
+        ariaDescribedBy="pin-delete-warning"
+      >
+        <PinDeleteModalContent>
+          <PinDeleteTargetCard>
+            <PinDeleteTargetName>{title}</PinDeleteTargetName>
+            <PinDeleteTargetMeta>
+              {formatDeleteMeta(pin, photos.length)}
+            </PinDeleteTargetMeta>
+          </PinDeleteTargetCard>
+          <PinDeleteWarning id="pin-delete-warning">
+            <PinDeleteWarningIcon
+              src={deleteWarningIcon}
+              alt=""
+              aria-hidden="true"
+            />
+            핀에 담긴 사진, 음성 메모가 모두 함께 삭제돼요. 되돌릴 수 없습니다.
+          </PinDeleteWarning>
+        </PinDeleteModalContent>
+      </ConfirmationModal>
     </Page>
   )
 }
@@ -642,69 +668,68 @@ const DeleteSection = styled.section`
   flex-direction: column;
 `
 
-const DeleteTrigger = styled.button`
+const DeleteTrigger = styled(Button)`
   width: 100%;
-  min-height: 44px;
-  border: 0;
-  background: none;
-  color: var(--Text-Secondary);
+  height: 52px;
+  flex: none;
   font: var(--text-ui-button);
-  text-decoration: underline;
-  cursor: pointer;
+
+  &:disabled {
+    cursor: not-allowed;
+  }
 `
 
-const DeleteConfirm = styled.div`
-  border: 1px solid var(--Primary-Cognac);
-  border-radius: 12px;
-  padding: 14px;
+const PinDeleteModalContent = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  background: rgb(181 118 59 / 9%);
+  gap: 16px;
 `
 
-const DeleteWarning = styled.p`
+const PinDeleteTargetCard = styled.div`
+  height: 74px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--Background-Base);
+`
+
+const PinDeleteTargetName = styled.p`
+  overflow: hidden;
   color: var(--Text-Primary);
-  font: var(--text-ui-caption);
-  text-align: center;
+  font: var(--text-ui-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`
+
+const PinDeleteTargetMeta = styled.p`
+  overflow: hidden;
+  color: var(--Text-Secondary);
+  font: var(--text-ui-nav);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`
+
+const PinDeleteWarning = styled.p`
+  min-height: 66px;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  border-radius: 12px;
+  background: rgb(181 118 59 / 10%);
+  color: var(--Primary-Cognac);
+  font: 400 11px/18px var(--font-sans);
   word-break: keep-all;
 `
 
-const DeleteActions = styled.div`
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-`
-
-const DeleteCancelButton = styled.button`
-  min-height: 44px;
-  border: 1px solid var(--Border-Default);
-  border-radius: 22px;
-  background: var(--Surface-Base);
-  color: var(--Text-Secondary);
-  font: var(--text-ui-button);
-  cursor: pointer;
-
-  &:disabled {
-    color: var(--State-Disabled-Text);
-    cursor: not-allowed;
-  }
-`
-
-const DeleteConfirmButton = styled.button`
-  min-height: 44px;
-  border: 0;
-  border-radius: 22px;
-  background: var(--Primary-Cognac);
-  color: var(--Text-Inverse);
-  font: var(--text-ui-button);
-  cursor: pointer;
-
-  &:disabled {
-    background: var(--State-Disabled-Fill);
-    color: var(--State-Disabled-Text);
-    cursor: not-allowed;
-  }
+const PinDeleteWarningIcon = styled.img`
+  width: 18px;
+  height: 17px;
+  flex: 0 0 18px;
+  display: block;
 `
 
 const DeleteError = styled.p`
