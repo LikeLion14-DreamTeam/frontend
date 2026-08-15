@@ -75,20 +75,22 @@ export const getTrip = async (segmentId) => {
 }
 
 /**
- * 4.3 여행 구간 수정 (이름, 포함 핀 제외/재포함)
+ * 4.3 여행 구간 수정 (이름, 기간, 포함 핀 제외/재포함)
  *
  * `pinInclusions` 는 `[{ pin_id, included_in_segment }]` 형태로, 제외(false)와
  * 재포함(true) 양쪽 다 보낼 수 있다.
- *
- * TODO: 기능명세 4.2 의 기간(시작일·종료일) 수정은 이 API 로 보낼 수 없다.
- * Body 에 start_at / end_at 이 없어 백엔드에 추가 요청이 필요하다.
  */
-export const updateTrip = async (segmentId, { name, pinInclusions }) => {
+export const updateTrip = async (
+  segmentId,
+  { name, startAt, endAt, pinInclusions },
+) => {
   if (USE_MOCK) {
     const trip = mockTripStore.trips[segmentId]
     if (!trip) throw mockNotFound()
 
     trip.name = name
+    if (startAt) trip.start_at = startAt
+    if (endAt) trip.end_at = endAt
 
     const pins = mockTripStore.pins[segmentId] ?? []
     pinInclusions.forEach(({ pin_id, included_in_segment }) => {
@@ -101,6 +103,8 @@ export const updateTrip = async (segmentId, { name, pinInclusions }) => {
 
   return apiClient.patch(`/trips/${segmentId}`, {
     name,
+    start_at: startAt,
+    end_at: endAt,
     pin_exclusions: pinInclusions,
   })
 }

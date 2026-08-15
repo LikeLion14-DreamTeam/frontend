@@ -18,12 +18,28 @@ const FALLBACK_SEGMENT_ID = 12
 
 const pad2 = (value) => String(value).padStart(2, '0')
 
-const formatDateValue = (isoString) => {
+/** <input type="date"> 가 요구하는 형식. 로컬 날짜 기준으로 만든다. */
+const toDateInputValue = (isoString) => {
   if (!isoString) return ''
 
   const date = new Date(isoString)
 
-  return `${date.getFullYear()}.${pad2(date.getMonth() + 1)}.${pad2(date.getDate())}`
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`
+}
+
+/**
+ * 입력한 날짜에 원래 시각을 그대로 얹는다.
+ * 날짜만 고쳤는데 시각이 자정으로 밀려 구간 범위가 달라지는 걸 막는다.
+ */
+const toIsoWithOriginalTime = (dateValue, originalIso) => {
+  if (!dateValue) return undefined
+
+  const [year, month, day] = dateValue.split('-').map(Number)
+  const next = originalIso ? new Date(originalIso) : new Date()
+
+  next.setFullYear(year, month - 1, day)
+
+  return next.toISOString()
 }
 
 const pinTimeFormatter = new Intl.DateTimeFormat('ko-KR', {
@@ -44,6 +60,8 @@ const TripSegmentEdit = () => {
   const [trip, setTrip] = useState(null)
   const [pins, setPins] = useState([])
   const [name, setName] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   const [includedIds, setIncludedIds] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -67,6 +85,8 @@ const TripSegmentEdit = () => {
         setTrip(tripData)
         setPins(pinData.pins)
         setName(tripData.name)
+        setStartDate(toDateInputValue(tripData.start_at))
+        setEndDate(toDateInputValue(tripData.end_at))
         setIncludedIds(
           pinData.pins
             .filter((pin) => pin.included_in_segment)
@@ -110,19 +130,54 @@ const TripSegmentEdit = () => {
   const firstIncludedIndex = includedIndexes[0] ?? 0
   const lastIncludedIndex = includedIndexes.at(-1) ?? pins.length - 1
 
+  const pinDate = (pin) => toDateInputValue(pin.tagged_at)
+
+  /** 선택이 바뀌면 기간을 첫 핀 · 마지막 핀 날짜로 맞춘다. */
+  const selectPins = (ids) => {
+    setIncludedIds(ids)
+
+    const dates = pins
+      .filter((pin) => ids.includes(pin.pin_id))
+      .map(pinDate)
+      .filter(Boolean)
+      .sort()
+
+    if (dates.length === 0) return
+
+    setStartDate(dates[0])
+    setEndDate(dates.at(-1))
+  }
+
+  /** 기간이 바뀌면 그 사이에 찍은 핀만 선택 상태로 다시 맞춘다. */
+  const applyDateRange = (start, end) => {
+    setStartDate(start)
+    setEndDate(end)
+
+    if (!start || !end) return
+
+    setIncludedIds(
+      pins
+        .filter((pin) => {
+          const date = pinDate(pin)
+          return date && date >= start && date <= end
+        })
+        .map((pin) => pin.pin_id),
+    )
+  }
+
   /** 범위를 바꾸면 그 사이 핀만 선택 상태로 다시 맞춘다. */
   const applyRange = (startIndex, endIndex) => {
     const [from, to] =
       startIndex <= endIndex ? [startIndex, endIndex] : [endIndex, startIndex]
 
-    setIncludedIds(pins.slice(from, to + 1).map((pin) => pin.pin_id))
+    selectPins(pins.slice(from, to + 1).map((pin) => pin.pin_id))
   }
 
   const togglePin = (pinId) => {
-    setIncludedIds((prev) =>
-      prev.includes(pinId)
-        ? prev.filter((id) => id !== pinId)
-        : [...prev, pinId],
+    selectPins(
+      includedIds.includes(pinId)
+        ? includedIds.filter((id) => id !== pinId)
+        : [...includedIds, pinId],
     )
   }
 
@@ -139,6 +194,8 @@ const TripSegmentEdit = () => {
     try {
       await updateTrip(segmentId, {
         name,
+        startAt: toIsoWithOriginalTime(startDate, trip.start_at),
+        endAt: toIsoWithOriginalTime(endDate, trip.end_at),
         pinInclusions: pins.map((pin) => ({
           pin_id: pin.pin_id,
           included_in_segment: includedSet.has(pin.pin_id),
@@ -190,41 +247,33 @@ const TripSegmentEdit = () => {
                 />
               </FieldGroup>
 
-              {/* TODO: 기간 수정 대기.
-                  PATCH /trips/{segmentId} Body 에 start_at / end_at 이 없어
-                  값을 보낼 수 없다. 백엔드에 추가 요청 후 열어야 한다.
-                  그때까지는 서버 값을 읽기 전용으로만 보여준다. */}
               <DateGrid>
                 <FieldGroup>
                   <FieldLabel htmlFor="startDate">시작일</FieldLabel>
-                  <SelectShell>
-                    <Select id="startDate" value={formatDateValue(trip.start_at)} disabled>
-                      <option value={formatDateValue(trip.start_at)}>
-                        {formatDateValue(trip.start_at)}
-                      </option>
-                    </Select>
-                    <ChevronIcon
-                      src={selectChevronIcon}
-                      alt=""
-                      aria-hidden="true"
-                    />
-                  </SelectShell>
+                  <DateInput
+                    id="startDate"
+                    type="date"
+                    aria-label="시작일"
+                    value={startDate}
+                    max={endDate || undefined}
+                    onChange={(event) =>
+                      applyDateRange(event.target.value, endDate)
+                    }
+                  />
                 </FieldGroup>
 
                 <FieldGroup>
                   <FieldLabel htmlFor="endDate">종료일</FieldLabel>
-                  <SelectShell>
-                    <Select id="endDate" value={formatDateValue(trip.end_at)} disabled>
-                      <option value={formatDateValue(trip.end_at)}>
-                        {formatDateValue(trip.end_at)}
-                      </option>
-                    </Select>
-                    <ChevronIcon
-                      src={selectChevronIcon}
-                      alt=""
-                      aria-hidden="true"
-                    />
-                  </SelectShell>
+                  <DateInput
+                    id="endDate"
+                    type="date"
+                    aria-label="종료일"
+                    value={endDate}
+                    min={startDate || undefined}
+                    onChange={(event) =>
+                      applyDateRange(startDate, event.target.value)
+                    }
+                  />
                 </FieldGroup>
               </DateGrid>
             </InfoSection>
@@ -397,8 +446,6 @@ const SaveError = styled.p`
 
 
 
-
-
 const PageSurface = styled.div`
   width: 100%;
   min-height: var(--app-viewport-height);
@@ -480,34 +527,23 @@ const TextInput = styled.input`
   }
 `
 
+/* 기간은 시안에서 셀렉트 모양이었지만 값이 날짜라 date 입력을 쓴다.
+   테두리·높이는 구간 이름 입력과 맞춘다. */
+const DateInput = styled(TextInput)`
+  padding: 0 12px;
+
+  /* iOS 사파리는 date 입력에 제멋대로 높이를 준다. */
+  &::-webkit-date-and-time-value {
+    text-align: left;
+  }
+`
+
 const DateGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 `
 
-const SelectShell = styled.div`
-  position: relative;
-  width: 100%;
-  height: 45px;
-`
-
-const Select = styled.select`
-  width: 100%;
-  height: 100%;
-  border: 0;
-  border-radius: 12px;
-  padding: 0 38px 0 14px;
-  color: var(--Text-Primary);
-  background: var(--Surface-Base);
-  font: var(--text-ui-label);
-  appearance: none;
-  outline: none;
-
-  &:focus {
-    box-shadow: 0 0 0 1.5px var(--Border-Strong);
-  }
-`
 
 const RangeSelectRow = styled(Card)`
   position: relative;
