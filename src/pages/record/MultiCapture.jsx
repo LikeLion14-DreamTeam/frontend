@@ -262,7 +262,31 @@ const MultiCapture = () => {
             <img src={closeIcon} alt="" aria-hidden="true" />
           </PreviewClose>
 
-          <PreviewPhoto src={previewShot.url} alt="" />
+          <PreviewStage>
+            <PreviewPhoto src={previewShot.url} alt="" />
+
+            {previewIndex > 0 && (
+              <PreviewNav
+                $side="left"
+                type="button"
+                aria-label="이전 사진"
+                onClick={() => setPreviewId(shots[previewIndex - 1].id)}
+              >
+                <Chevron $direction="left" aria-hidden="true" />
+              </PreviewNav>
+            )}
+
+            {previewIndex < shots.length - 1 && (
+              <PreviewNav
+                $side="right"
+                type="button"
+                aria-label="다음 사진"
+                onClick={() => setPreviewId(shots[previewIndex + 1].id)}
+              >
+                <Chevron $direction="right" aria-hidden="true" />
+              </PreviewNav>
+            )}
+          </PreviewStage>
 
           <PreviewIndex>
             <IndexCurrent>{previewIndex + 1}</IndexCurrent>
@@ -553,13 +577,53 @@ const PreviewClose = styled.button`
   }
 `
 
-const PreviewPhoto = styled.img`
+const PreviewStage = styled.div`
+  position: relative;
   width: 100%;
   margin-top: 59px;
+`
+
+const PreviewPhoto = styled.img`
+  width: 100%;
   aspect-ratio: 3 / 4;
   display: block;
   object-fit: cover;
   background: #d5d5d5;
+`
+
+/* 시안에 없는 요소다. 좌우로 넘길 수단이 필요해 칩과 같은 톤으로 얹었다.
+   첫 장에서는 왼쪽, 마지막 장에서는 오른쪽 버튼을 아예 그리지 않는다. */
+const PreviewNav = styled.button`
+  position: absolute;
+  top: 50%;
+  ${({ $side }) => ($side === 'left' ? 'left: 12px;' : 'right: 12px;')}
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(36 28 22 / 60%);
+  transform: translateY(-50%);
+  cursor: pointer;
+
+  &:active {
+    background: rgb(36 28 22 / 80%);
+  }
+`
+
+const Chevron = styled.span`
+  width: 10px;
+  height: 10px;
+  border-top: 2px solid rgb(242 233 220 / 92%);
+  border-right: 2px solid rgb(242 233 220 / 92%);
+  /* 오른쪽은 45도, 왼쪽은 반대로 돌린다. 살짝 밀어 시각적 중심을 맞춘다. */
+  ${({ $direction }) =>
+    $direction === 'left'
+      ? 'transform: translateX(2px) rotate(-135deg);'
+      : 'transform: translateX(-2px) rotate(45deg);'}
 `
 
 const PreviewIndex = styled.p`
