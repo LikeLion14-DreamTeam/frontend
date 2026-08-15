@@ -62,7 +62,7 @@ const Spine = styled.span`
 
 const Seal = styled.img`
   position: absolute;
-  left: -1px;
+  left: -2px;
   top: 55px;
   width: 16px;
   height: 44px;

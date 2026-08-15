@@ -83,6 +83,7 @@ const Info = styled.div`
 
 const Heading = styled.div`
   min-width: 0;
+  padding-right: 28px;
   display: flex;
   flex-direction: column;
   gap: 8px;
