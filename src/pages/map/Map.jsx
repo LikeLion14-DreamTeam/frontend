@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { Marker, Polyline, useApiIsLoaded } from '@vis.gl/react-google-maps'
@@ -110,6 +110,42 @@ const MapPage = () => {
 
   const [currentPosition, setCurrentPosition] = useState(null)
   const [heading, setHeading] = useState(0)
+  const compassStartedRef = useRef(false)
+
+  /**
+   * 나침반 값. iOS 는 `webkitCompassHeading`(북쪽 기준 시계방향)을 그대로 주고,
+   * 그 밖에는 절대 방위일 때의 `alpha`(반시계방향)를 뒤집어 쓴다.
+   */
+  const handleOrientation = useCallback((event) => {
+    const compass =
+      typeof event.webkitCompassHeading === 'number'
+        ? event.webkitCompassHeading
+        : event.absolute && typeof event.alpha === 'number'
+          ? 360 - event.alpha
+          : null
+
+    if (compass != null && !Number.isNaN(compass)) setHeading(compass)
+  }, [])
+
+  const startCompass = useCallback(() => {
+    if (compassStartedRef.current) return
+
+    compassStartedRef.current = true
+    window.addEventListener('deviceorientationabsolute', handleOrientation)
+    window.addEventListener('deviceorientation', handleOrientation)
+  }, [handleOrientation])
+
+  useEffect(() => {
+    // iOS 는 사용자 탭에서 권한을 받아야 해서 여기서 바로 붙이지 않는다.
+    if (typeof window.DeviceOrientationEvent?.requestPermission !== 'function') {
+      startCompass()
+    }
+
+    return () => {
+      window.removeEventListener('deviceorientationabsolute', handleOrientation)
+      window.removeEventListener('deviceorientation', handleOrientation)
+    }
+  }, [handleOrientation, startCompass])
   const [trips, setTrips] = useState([])
   const [selectedTripId, setSelectedTripId] = useState(null)
   const [tripPins, setTripPins] = useState([])
@@ -126,8 +162,13 @@ const MapPage = () => {
       ({ coords }) => {
         setCurrentPosition({ lat: coords.latitude, lng: coords.longitude })
 
-        // heading 은 움직일 때만 들어온다. 멈춰 있으면 마지막 방향을 유지한다.
-        if (coords.heading != null && !Number.isNaN(coords.heading)) {
+        // 나침반이 붙어 있으면 그쪽이 더 정확하다. 없을 때만 이동 방향을 쓴다.
+        // heading 은 움직일 때만 들어오므로 멈춰 있으면 마지막 방향을 유지한다.
+        if (
+          !compassStartedRef.current &&
+          coords.heading != null &&
+          !Number.isNaN(coords.heading)
+        ) {
           setHeading(coords.heading)
         }
       },
@@ -322,7 +363,22 @@ const MapPage = () => {
   const coverPhoto =
     pinPhotos.find((photo) => photo.is_pin_cover) ?? pinPhotos[0]
 
+  /** iOS 는 사용자 제스처 안에서만 나침반 권한을 물을 수 있다. */
+  const requestCompass = async () => {
+    const { DeviceOrientationEvent } = window
+    if (typeof DeviceOrientationEvent?.requestPermission !== 'function') return
+
+    try {
+      const permission = await DeviceOrientationEvent.requestPermission()
+      if (permission === 'granted') startCompass()
+    } catch {
+      // 거부하면 이동 방향(coords.heading)으로만 돌아간다.
+    }
+  }
+
   const handleLocate = () => {
+    requestCompass()
+
     if (currentPosition) {
       setMapCenter(currentPosition)
       setMapKey((current) => current + 1)
