@@ -89,6 +89,15 @@ const TripSegmentEdit = () => {
 
   const includedSet = useMemo(() => new Set(includedIds), [includedIds])
 
+  /** 선택한 핀의 사진 수 합계. 4.5 가 핀별 photo_count 를 주므로 바로 집계한다. */
+  const includedPhotoCount = useMemo(
+    () =>
+      pins
+        .filter((pin) => includedSet.has(pin.pin_id))
+        .reduce((total, pin) => total + (pin.photo_count ?? 0), 0),
+    [pins, includedSet],
+  )
+
   const pinOptions = pins.map((pin, index) => ({
     value: String(pin.pin_id),
     label: `핀 ${index + 1} · ${pin.place_name || '이름 없는 장소'}`,
@@ -310,6 +319,8 @@ const TripSegmentEdit = () => {
                             <PinTitle>{title}</PinTitle>
                             <PinMeta>
                               {formatPinTime(pin.tagged_at)}
+                              {pin.photo_count != null &&
+                                ` · 사진 ${pin.photo_count}장`}
                               {!hasCoordinates && ' · 위치 정보 없음'}
                             </PinMeta>
                           </PinText>
@@ -340,9 +351,7 @@ const TripSegmentEdit = () => {
                     <ResultDivider />
                     <ResultRow>
                       <ResultLabel>연결된 사진</ResultLabel>
-                      {/* 핀별 사진 수가 응답에 없어 실시간 재집계가 불가능하다.
-                          저장하면 서버가 다시 계산한 값이 내려온다. */}
-                      <ResultValue>{trip.photo_count}장</ResultValue>
+                      <ResultValue>{includedPhotoCount}장</ResultValue>
                     </ResultRow>
                   </ResultCard>
                 </PinAndResult>
