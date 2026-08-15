@@ -1,7 +1,9 @@
 import { ApiError } from '../../api/errors'
 
 const MOCK_TASTE_PROFILE_AXES_STORAGE_KEY = 'orte:mock:taste-profile-axes'
-const MOCK_TASTE_PROFILE_AXES_STORAGE_VERSION = 2
+const MOCK_TASTE_PROFILE_AXES_STORAGE_VERSION = 3
+const DEFAULT_MOCK_TASTE_PROFILE_LAST_UPDATED_AT =
+  '2026-08-15T09:10:00.000000Z'
 const LEGACY_REVERSED_AXIS_CODES = new Set([
   'brightness',
   'vividness',
@@ -19,7 +21,7 @@ const DEFAULT_MOCK_TASTE_PROFILE_AXES = [
 const cloneDefaultTasteProfileAxes = () =>
   DEFAULT_MOCK_TASTE_PROFILE_AXES.map((axis) => ({ ...axis }))
 
-const persistMockTasteProfileAxes = (axes) => {
+const persistMockTasteProfile = ({ axes, lastUpdatedAt }) => {
   if (typeof window === 'undefined') return
 
   try {
@@ -27,6 +29,7 @@ const persistMockTasteProfileAxes = (axes) => {
       MOCK_TASTE_PROFILE_AXES_STORAGE_KEY,
       JSON.stringify({
         version: MOCK_TASTE_PROFILE_AXES_STORAGE_VERSION,
+        last_updated_at: lastUpdatedAt,
         axes,
       }),
     )
@@ -34,6 +37,12 @@ const persistMockTasteProfileAxes = (axes) => {
     // 저장소를 사용할 수 없는 환경에서도 mock API 자체는 정상 동작한다.
   }
 }
+
+const normalizeLastUpdatedAt = (lastUpdatedAt) =>
+  typeof lastUpdatedAt === 'string' &&
+  !Number.isNaN(Date.parse(lastUpdatedAt))
+    ? lastUpdatedAt
+    : DEFAULT_MOCK_TASTE_PROFILE_LAST_UPDATED_AT
 
 const normalizeStoredTasteProfileAxes = (
   storedAxes,
@@ -69,8 +78,13 @@ const normalizeStoredTasteProfileAxes = (
   })
 }
 
-const loadMockTasteProfileAxes = () => {
-  if (typeof window === 'undefined') return cloneDefaultTasteProfileAxes()
+const createDefaultMockTasteProfile = () => ({
+  axes: cloneDefaultTasteProfileAxes(),
+  lastUpdatedAt: DEFAULT_MOCK_TASTE_PROFILE_LAST_UPDATED_AT,
+})
+
+const loadMockTasteProfile = () => {
+  if (typeof window === 'undefined') return createDefaultMockTasteProfile()
 
   try {
     const storedProfile = JSON.parse(
@@ -81,28 +95,46 @@ const loadMockTasteProfileAxes = () => {
       const migratedAxes = normalizeStoredTasteProfileAxes(storedProfile, {
         reverseLegacyDirection: true,
       })
+      const migratedProfile = {
+        axes: migratedAxes,
+        lastUpdatedAt: DEFAULT_MOCK_TASTE_PROFILE_LAST_UPDATED_AT,
+      }
 
-      persistMockTasteProfileAxes(migratedAxes)
-      return migratedAxes
+      persistMockTasteProfile(migratedProfile)
+      return migratedProfile
+    }
+
+    if (!Array.isArray(storedProfile?.axes)) {
+      return createDefaultMockTasteProfile()
+    }
+
+    const normalizedProfile = {
+      axes: normalizeStoredTasteProfileAxes(storedProfile.axes),
+      lastUpdatedAt: normalizeLastUpdatedAt(
+        storedProfile.last_updated_at,
+      ),
     }
 
     if (
-      storedProfile?.version !== MOCK_TASTE_PROFILE_AXES_STORAGE_VERSION ||
-      !Array.isArray(storedProfile.axes)
+      storedProfile.version !== MOCK_TASTE_PROFILE_AXES_STORAGE_VERSION ||
+      storedProfile.last_updated_at !== normalizedProfile.lastUpdatedAt
     ) {
-      return cloneDefaultTasteProfileAxes()
+      persistMockTasteProfile(normalizedProfile)
     }
 
-    return normalizeStoredTasteProfileAxes(storedProfile.axes)
+    return normalizedProfile
   } catch {
-    return cloneDefaultTasteProfileAxes()
+    return createDefaultMockTasteProfile()
   }
 }
 
-export const MOCK_TASTE_PROFILE_AXES = loadMockTasteProfileAxes()
+const MOCK_TASTE_PROFILE = loadMockTasteProfile()
+
+export const MOCK_TASTE_PROFILE_AXES = MOCK_TASTE_PROFILE.axes
 
 /** API 명세 2.4 응답과 동일한 형태의 취향 축 목록을 반환한다. */
 export const getMockTasteProfileAxes = () => ({
+  last_updated_at: MOCK_TASTE_PROFILE.lastUpdatedAt,
   axes: MOCK_TASTE_PROFILE_AXES.map((axis) => ({ ...axis })),
 })
 
@@ -143,7 +175,8 @@ export const updateMockTasteProfileAxis = ({ axisCode, value }) => {
 
   tasteAxis.value = value
   tasteAxis.status = 'REFLECTED'
-  persistMockTasteProfileAxes(MOCK_TASTE_PROFILE_AXES)
+  MOCK_TASTE_PROFILE.lastUpdatedAt = new Date().toISOString()
+  persistMockTasteProfile(MOCK_TASTE_PROFILE)
 
   return {
     axis_code: tasteAxis.axis_code,

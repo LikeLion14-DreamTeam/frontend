@@ -1,6 +1,10 @@
 import apiClient from '../../api/client'
 import { ApiError } from '../../api/errors'
-import { getMockPhotoCount, mockTripStore } from './tripMock'
+import {
+  getMockPhotoCount,
+  getMockVoiceMemoCount,
+  mockTripStore,
+} from './tripMock'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK_API === 'true'
 
@@ -32,6 +36,10 @@ const buildMockTripSummary = (segmentId) => {
     pin_count: includedPins.length,
     photo_count: includedPins.reduce(
       (total, pin) => total + getMockPhotoCount(pin.pin_id),
+      0,
+    ),
+    voice_memo_count: includedPins.reduce(
+      (total, pin) => total + getMockVoiceMemoCount(pin.pin_id),
       0,
     ),
   }

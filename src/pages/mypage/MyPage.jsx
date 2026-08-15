@@ -58,11 +58,8 @@ const TASTE_AXIS_COMMIT_KEYS = new Set([
 const RELEARNING_COMPLETED_MESSAGE =
   '취향 프로필이 갱신되었습니다. 기존 추천은 유지되며, 이후 생성하거나 재추천한 사진부터 새 기준이 적용됩니다.'
 
-// TODO: 취향 프로필 GET 응답에 학습일과 응답 개수가 추가되면 서버 값으로 교체한다.
-const RELEARNING_PROFILE_SUMMARY = {
-  learnedAt: '2025.06.12 학습',
-  responseCounts: '기본 질문 5 · 사진 비교 5 · 무드보드 3',
-}
+const RELEARNING_PROFILE_RESPONSE_COUNTS =
+  '기본 질문 5 · 사진 비교 5 · 무드보드 3'
 
 const getAxisValue = (value) => {
   if (value === null || value === undefined) return 50
@@ -98,12 +95,18 @@ const getProductIcon = (productType) =>
 const getProductName = ({ product_name: productName, tag_id: tagId }) =>
   productName?.trim() || `미확인 제품 (${tagId})`
 
+const formatIsoDate = (isoString) => {
+  const dateParts = /^(\d{4})-(\d{2})-(\d{2})/.exec(isoString ?? '')
+
+  if (!dateParts) return ''
+
+  return `${dateParts[1]}.${dateParts[2]}.${dateParts[3]}`
+}
+
 const getProductRegisteredDate = (registeredAt) => {
-  const dateParts = /^(\d{4})-(\d{2})-(\d{2})/.exec(registeredAt ?? '')
+  const registeredDate = formatIsoDate(registeredAt)
 
-  if (!dateParts) return '등록일 미확인'
-
-  return `${dateParts[1]}.${dateParts[2]}.${dateParts[3]} 태깅`
+  return registeredDate ? `${registeredDate} 태깅` : '등록일 미확인'
 }
 
 const settings = [
@@ -123,6 +126,8 @@ const MyPage = () => {
   const [accountError, setAccountError] = useState('')
   const [accountRequestKey, setAccountRequestKey] = useState(0)
   const [tasteAxes, setTasteAxes] = useState([])
+  const [tasteProfileLastUpdatedAt, setTasteProfileLastUpdatedAt] =
+    useState(null)
   const [isTasteAxesLoading, setIsTasteAxesLoading] = useState(true)
   const [tasteAxesError, setTasteAxesError] = useState('')
   const [tasteAxesRequestKey, setTasteAxesRequestKey] = useState(0)
@@ -202,6 +207,11 @@ const MyPage = () => {
           )
 
           setTasteAxes(presentedTasteAxes)
+          setTasteProfileLastUpdatedAt(
+            typeof tasteProfile.last_updated_at === 'string'
+              ? tasteProfile.last_updated_at
+              : null,
+          )
           savedTasteAxisValuesRef.current = new Map(
             presentedTasteAxes.map((axis) => [axis.axisCode, axis.value]),
           )
@@ -218,6 +228,7 @@ const MyPage = () => {
         }
 
         setTasteAxes([])
+        setTasteProfileLastUpdatedAt(null)
         savedTasteAxisValuesRef.current = new Map()
         setTasteAxesError(
           error.message ?? '취향 프로필을 불러오지 못했습니다.',
@@ -322,6 +333,18 @@ const MyPage = () => {
             : axis,
         ),
       )
+
+      try {
+        const refreshedTasteProfile = await getTasteProfileAxes()
+
+        if (typeof refreshedTasteProfile.last_updated_at === 'string') {
+          setTasteProfileLastUpdatedAt(
+            refreshedTasteProfile.last_updated_at,
+          )
+        }
+      } catch {
+        // 축 값 저장은 완료됐으므로 날짜 갱신 실패만으로 값을 롤백하지 않는다.
+      }
     } catch (error) {
       if (error.code === 'UNAUTHENTICATED') {
         clearSessionToken()
@@ -421,6 +444,10 @@ const MyPage = () => {
     // 서버 세션 해제 실패는 사용자 로그아웃을 되돌리지 않는다.
     void logoutRequest.catch(() => {})
   }
+
+  const tasteProfileUpdatedDate = formatIsoDate(
+    tasteProfileLastUpdatedAt,
+  )
 
   return (
     <PageShell>
@@ -683,10 +710,12 @@ const MyPage = () => {
             />
             <CurrentTasteProfileText>
               <CurrentTasteProfileTitle>
-                지금 프로필 · {RELEARNING_PROFILE_SUMMARY.learnedAt}
+                지금 프로필
+                {tasteProfileUpdatedDate &&
+                  ` · ${tasteProfileUpdatedDate} 학습`}
               </CurrentTasteProfileTitle>
               <CurrentTasteProfileSummary>
-                {RELEARNING_PROFILE_SUMMARY.responseCounts}
+                {RELEARNING_PROFILE_RESPONSE_COUNTS}
               </CurrentTasteProfileSummary>
             </CurrentTasteProfileText>
           </CurrentTasteProfileCard>
@@ -697,8 +726,7 @@ const MyPage = () => {
               aria-hidden="true"
             />
             <span>
-              재학습을 완료하면 기존 프로필이 새 응답으로 교체돼요. 완료
-              전까지는 지금 프로필이 그대로 유지됩니다.
+              재학습을 완료하면 기존 프로필이 새 응답으로 교체돼요. 완료 전까지는 지금 프로필이 그대로 유지됩니다.
             </span>
           </RelearningModalWarning>
         </RelearningModalContent>

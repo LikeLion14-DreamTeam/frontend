@@ -48,8 +48,6 @@ const getTripDeleteMeta = (trip) =>
     formatDateRange(trip.start_at, trip.end_at),
     typeof trip.pin_count === 'number' ? `핀 ${trip.pin_count}개` : '',
     typeof trip.photo_count === 'number' ? `사진 ${trip.photo_count}장` : '',
-    // TODO: API 명세 4.2 구간 상세 응답에 voice_memo_count가 추가되면
-    // 백엔드 집계 값을 받아 삭제 대상 요약에 표시한다.
     typeof trip.voice_memo_count === 'number'
       ? `음성 ${trip.voice_memo_count}개`
       : '',
