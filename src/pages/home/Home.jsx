@@ -13,6 +13,7 @@ import cardEmblemImage from '../../assets/home/card-emblem.png'
 import journeyCardImage from '../../assets/home/journey-card.png'
 import nfcTagImage from '../../assets/home/nfc-tag.png'
 import noteEditIcon from '../../assets/map/note-edit.svg'
+import passportClosedImage from '../../assets/home/passport-closed.png'
 import passportOpenImage from '../../assets/home/passport-open.png'
 
 /**
@@ -95,6 +96,13 @@ const JOURNEY_CARD = 'journey'
 const LAST_TAGGED_CARD = 'lastTagged'
 
 /**
+ * 여권의 첫 장은 덮인 표지다. 도장 면은 그 뒤로 이어진다.
+ *
+ * 표지를 한 장으로 세어 두면 넘기기와 아래 점이 도장 면과 똑같이 동작한다.
+ */
+const PASSPORT_COVER = 'cover'
+
+/**
  * 도장을 여권 펼침 단위로 나눈다. 한 펼침은 [왼쪽 면, 오른쪽 면] 이고
  * 각 면은 4칸이다. 남는 칸은 null 로 채워 빈 도장이 찍힌다.
  * 도장이 하나도 없어도 빈 면 한 장은 보여준다.
@@ -143,7 +151,7 @@ const Home = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [tripError, setTripError] = useState('')
   const [stamps, setStamps] = useState([])
-  const [spreadIndex, setSpreadIndex] = useState(0)
+  const [pageIndex, setPageIndex] = useState(0)
   const [isEditingName, setIsEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
   const [isSavingName, setIsSavingName] = useState(false)
@@ -198,7 +206,10 @@ const Home = () => {
 
   const hasPins = currentTrip?.has_pins === true
   const stampSpreads = toStampSpreads(stamps)
-  const currentSpread = stampSpreads[spreadIndex] ?? stampSpreads[0]
+  const passportPages = [PASSPORT_COVER, ...stampSpreads]
+  const isCoverPage = pageIndex === 0
+  // 표지가 넘어가는 동안 그 아래에 첫 도장 면이 미리 깔려 있어야 한다.
+  const spreadIndex = Math.max(0, pageIndex - 1)
 
   // 진행 중인 여정이 없으면 최근 태깅한 제품 카드 한 장뿐이다.
   const journeyCards = hasPins
@@ -211,7 +222,7 @@ const Home = () => {
 
   const passportSwipe = createSwipeHandlers(
     passportSwipeStart,
-    moveWithin(setSpreadIndex, stampSpreads.length),
+    moveWithin(setPageIndex, passportPages.length),
   )
 
   const journeySwipe = createSwipeHandlers(
@@ -405,36 +416,68 @@ const Home = () => {
           </ResultCard>
         </PassportHead>
 
-        <PassportSpread {...passportSwipe}>
-          <PassportImage src={passportOpenImage} alt="" aria-hidden="true" />
+        <PassportStage {...passportSwipe}>
+          {/* 표지가 넘어가는 걸 보여주려면 도장 면이 그 아래 깔려 있어야 한다. */}
+          <PassportSpread $visible={!isCoverPage} aria-hidden={isCoverPage}>
+            <PassportImage src={passportOpenImage} alt="" aria-hidden="true" />
 
-          <StampPages>
-            {currentSpread.map((side, sideIndex) => (
-              <StampGrid
-                key={sideIndex}
-                $side={sideIndex === 0 ? 'left' : 'right'}
+            {/*
+              면을 전부 겹쳐 두고 현재 것만 드러낸다. 나가는 면과 들어오는 면이
+              동시에 있어야 서로 겹치며 바뀐다.
+            */}
+            {stampSpreads.map((spread, index) => (
+              <StampPages
+                key={index}
+                $visible={index === spreadIndex}
+                aria-hidden={index !== spreadIndex}
               >
-                {side.map((stamp, slotIndex) => (
-                  <Stamp
-                    key={slotIndex}
-                    src={getStampSrc(stamp?.country_code)}
-                    alt={stamp?.country_name ?? ''}
-                  />
+                {spread.map((side, sideIndex) => (
+                  <StampGrid
+                    key={sideIndex}
+                    $side={sideIndex === 0 ? 'left' : 'right'}
+                  >
+                    {side.map((stamp, slotIndex) => (
+                      <Stamp
+                        key={slotIndex}
+                        src={getStampSrc(stamp?.country_code)}
+                        alt={stamp?.country_name ?? ''}
+                      />
+                    ))}
+                  </StampGrid>
                 ))}
-              </StampGrid>
+              </StampPages>
             ))}
-          </StampPages>
-        </PassportSpread>
+          </PassportSpread>
+
+          {/* 눌러도 스와이프해도 첫 도장 면으로 넘어간다. */}
+          <PassportCover
+            type="button"
+            $open={!isCoverPage}
+            aria-label="여권 펼치기"
+            aria-hidden={!isCoverPage}
+            tabIndex={isCoverPage ? 0 : -1}
+            onClick={() => setPageIndex(1)}
+          >
+            <PassportCoverImage
+              $open={!isCoverPage}
+              src={passportClosedImage}
+              alt=""
+              aria-hidden="true"
+            />
+          </PassportCover>
+        </PassportStage>
 
         <PageDots>
-          {stampSpreads.map((_, index) => (
+          {passportPages.map((page, index) => (
             <Dot
               key={index}
               type="button"
-              $active={index === spreadIndex}
-              aria-label={`여권 ${index + 1}번째 면`}
-              aria-current={index === spreadIndex}
-              onClick={() => setSpreadIndex(index)}
+              $active={index === pageIndex}
+              aria-label={
+                page === PASSPORT_COVER ? '여권 표지' : `여권 ${index}번째 면`
+              }
+              aria-current={index === pageIndex}
+              onClick={() => setPageIndex(index)}
             />
           ))}
         </PageDots>
@@ -978,16 +1021,86 @@ const ResultDescription = styled.p`
   font: 400 11px/normal var(--font-sans);
 `
 
-/* 시안 376 × 261. 안쪽 cqw 값의 기준점이라 자신에게는 cqw 를 쓰지 못한다.
-   (컨테이너 단위는 조상 컨테이너를 기준으로 해 여기선 뷰포트로 잡힌다) */
-const PassportSpread = styled.div`
+/* 표지와 도장 면이 같은 자리를 쓴다. 넘겨도 아래 내용이 밀리지 않는다. */
+const PassportStage = styled.div`
   position: relative;
   width: 100%;
   aspect-ratio: 376 / 261;
-  overflow: hidden;
   /* 가로 제스처는 면 넘기기로 쓰고 세로 스크롤은 그대로 둔다. */
   touch-action: pan-y;
+  /* 표지 크기를 이 폭 기준으로 잡는다. */
   container-type: inline-size;
+`
+
+/*
+ * 덮인 여권은 펼친 면의 오른쪽 페이지 자리에 세운다.
+ *
+ * 책을 덮으면 앞표지가 오른쪽 면 위로 포개지고, 펼치면 왼쪽으로 넘어간다.
+ */
+const PassportCover = styled.button`
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  /* 무대와 같은 비율. 퍼센트 높이는 부모 높이가 auto 라 풀린다. */
+  aspect-ratio: 376 / 261;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  /* 표지가 돌아갈 때 앞쪽이 커 보이는 원근. 없으면 납작해졌다 사라진다. */
+  perspective: 900px;
+
+  /* 펼친 뒤에는 도장 면을 덮고 있어도 누름을 가로채지 않는다. */
+  ${({ $open }) => $open && 'pointer-events: none;'}
+`
+
+/*
+ * 표지는 폭으로 크기를 정하고 높이는 비율에서 나온다. 화면이 넓어지면 같이
+ * 커지고, 173 × 249 비율은 그대로다. (45.6% 는 펼친 면 높이의 94.6% 에 해당)
+ *
+ * 회전축은 표지의 왼쪽 모서리, 곧 책등이다. 실제 책처럼 왼쪽으로 넘어간다.
+ * 크기는 폭으로만 정해두었으니 회전이 비율을 건드리지 않는다.
+ */
+const PassportCoverImage = styled.img`
+  width: 45.6%;
+  height: auto;
+  flex: none;
+  aspect-ratio: 173 / 249;
+  display: block;
+  transform-origin: left center;
+  transform: rotateY(${({ $open }) => ($open ? '-180deg' : '0deg')});
+  /* 90도를 넘겨 뒷면이 보이는 순간 사라진다. 안쪽 표지 그림은 없다. */
+  backface-visibility: hidden;
+  transition: transform 1000ms cubic-bezier(0.33, 0, 0.2, 1);
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+`
+
+/* 시안 376 × 261. 안쪽 cqw 값의 기준점이라 자신에게는 cqw 를 쓰지 못한다.
+   (컨테이너 단위는 조상 컨테이너를 기준으로 해 여기선 뷰포트로 잡힌다) */
+const PassportSpread = styled.div`
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  container-type: inline-size;
+  /*
+   * 덮여 있는 동안에는 지면이 보이면 안 된다. 표지는 오른쪽 절반만 가려서
+   * 깔아두기만 하면 왼쪽 면이 그대로 드러난다.
+   *
+   * 표지가 절반쯤 젖혀졌을 때(약 350ms) 맞춰 드러나고 사라진다.
+   */
+  opacity: ${({ $visible }) => ($visible ? 1 : 0)};
+  transition: opacity 320ms ease 300ms;
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
 `
 
 const PassportImage = styled.img`
@@ -1003,13 +1116,20 @@ const PassportImage = styled.img`
 /* 지면 여백은 위 40 · 좌 19 · 우 20 · 아래 52.
    왼쪽 면 162, 오른쪽 면 158, 사이 17 로 합이 지면 폭 337 이다. */
 const StampPages = styled.div`
-  position: relative;
-  height: 100%;
+  position: absolute;
+  inset: 0;
   padding: ${passportScale(40)} ${passportScale(20)} ${passportScale(52)}
     ${passportScale(19)};
   display: flex;
   align-items: center;
   gap: ${passportScale(17)};
+  /* 표지가 아닌 면끼리는 겹쳐 지며 바뀐다. */
+  opacity: ${({ $visible }) => ($visible ? 1 : 0)};
+  transition: opacity 260ms ease;
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
 `
 
 /* 두 면은 시안에서 칸 간격이 서로 다르다. */
