@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { googleLogout } from '@react-oauth/google'
 import { useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
-import Button from '../../components/common/Button'
 import NavBar from '../../components/layout/NavBar'
 import {
   clearSessionToken,
@@ -15,7 +14,7 @@ import {
   updateTasteProfileAxis,
 } from '../../features/onboarding/tasteProfileApi'
 import { getOnboardingFlowPath } from '../../features/onboarding/onboardingFlow'
-import addIcon from '../../assets/icons/mypage/add.svg'
+import { getProducts } from '../../features/products/productApi'
 import briefcaseIcon from '../../assets/icons/mypage/briefcase.svg'
 import chevronRightIcon from '../../assets/icons/mypage/chevron-right.svg'
 import closeIcon from '../../assets/icons/mypage/close.png'
@@ -76,10 +75,15 @@ const createTasteAxisPresentation = (axes = []) => {
   })
 }
 
-const products = [
-  { id: 1, name: '비세토스 백팩', count: '9회 태깅', icon: briefcaseIcon },
-  { id: 2, name: '로고 참 키링', count: '3회 태깅', icon: keyIcon },
-]
+const PRODUCT_ICON_BY_TYPE = {
+  BAG: briefcaseIcon,
+}
+
+const getProductIcon = (productType) =>
+  PRODUCT_ICON_BY_TYPE[productType] ?? keyIcon
+
+const getProductName = ({ product_name: productName, tag_id: tagId }) =>
+  productName?.trim() || `미확인 제품 (${tagId})`
 
 const settings = [
   { label: '위치 권한', state: '허용됨' },
@@ -103,6 +107,10 @@ const MyPage = () => {
   const [tasteAxesRequestKey, setTasteAxesRequestKey] = useState(0)
   const [savingTasteAxisCodes, setSavingTasteAxisCodes] = useState([])
   const [tasteAxisSaveError, setTasteAxisSaveError] = useState('')
+  const [products, setProducts] = useState([])
+  const [isProductsLoading, setIsProductsLoading] = useState(true)
+  const [productsError, setProductsError] = useState('')
+  const [productsRequestKey, setProductsRequestKey] = useState(0)
   const savedTasteAxisValuesRef = useRef(new Map())
   const savingTasteAxisCodesRef = useRef(new Set())
   const [relearningNotice] = useState(() =>
@@ -201,6 +209,49 @@ const MyPage = () => {
       ignore = true
     }
   }, [clearUser, navigate, tasteAxesRequestKey])
+
+  useEffect(() => {
+    let ignore = false
+
+    const loadProducts = async () => {
+      setIsProductsLoading(true)
+      setProductsError('')
+
+      try {
+        const productList = await getProducts()
+
+        if (!ignore) {
+          setProducts(
+            Array.isArray(productList.products) ? productList.products : [],
+          )
+        }
+      } catch (error) {
+        if (ignore) return
+
+        if (error.code === 'UNAUTHENTICATED') {
+          clearSessionToken()
+          clearUser()
+          navigate('/login', { replace: true })
+          return
+        }
+
+        setProducts([])
+        setProductsError(
+          error.message ?? '등록 제품을 불러오지 못했습니다.',
+        )
+      } finally {
+        if (!ignore) {
+          setIsProductsLoading(false)
+        }
+      }
+    }
+
+    loadProducts()
+
+    return () => {
+      ignore = true
+    }
+  }, [clearUser, navigate, productsRequestKey])
 
   const handleTasteAxisChange = (axisCode, rawValue) => {
     const value = getAxisValue(rawValue)
@@ -445,30 +496,70 @@ const MyPage = () => {
         <Panel>
           <SectionHeader>
             <SectionTitle>내 MCM 제품</SectionTitle>
-            <ProductTotal>{products.length}개</ProductTotal>
+            <ProductTotal>
+              {isProductsLoading ? '조회 중' : `${products.length}개`}
+            </ProductTotal>
           </SectionHeader>
 
-          <ProductList>
-            {products.map((product) => (
-              <ProductItem key={product.id}>
-                <ProductIdentity>
-                  <ProductIcon src={product.icon} alt="" aria-hidden="true" />
-                  <ProductName>{product.name}</ProductName>
-                </ProductIdentity>
-                <ProductMeta>
-                  <ProductCount>{product.count}</ProductCount>
-                  <RemoveButton type="button" aria-label={`${product.name} 삭제`}>
-                    <RemoveIcon src={closeIcon} alt="" aria-hidden="true" />
-                  </RemoveButton>
-                </ProductMeta>
-              </ProductItem>
-            ))}
-          </ProductList>
+          {isProductsLoading ? (
+            <ProductFeedback role="status">
+              등록 제품을 불러오는 중...
+            </ProductFeedback>
+          ) : productsError ? (
+            <ProductFeedback role="alert" $error>
+              <span>{productsError}</span>
+              <RetryButton
+                type="button"
+                onClick={() => setProductsRequestKey((key) => key + 1)}
+              >
+                재시도
+              </RetryButton>
+            </ProductFeedback>
+          ) : products.length === 0 ? (
+            <ProductEmptyState>
+              <strong>아직 등록된 제품이 없습니다.</strong>
+              <span>제품에 태깅하면 이 목록에 자동으로 추가됩니다.</span>
+            </ProductEmptyState>
+          ) : (
+            <>
+              <ProductList>
+                {products.map((product) => {
+                  const productName = getProductName(product)
 
-          <TagButton type="button" $variant="secondary">
-            <AddIcon src={addIcon} alt="" aria-hidden="true" />
-            새 제품 태그하기
-          </TagButton>
+                  return (
+                    <ProductItem key={product.tag_id}>
+                      <ProductIdentity>
+                        <ProductIcon
+                          src={getProductIcon(product.product_type)}
+                          alt=""
+                          aria-hidden="true"
+                        />
+                        <ProductName>{productName}</ProductName>
+                      </ProductIdentity>
+                      <ProductMeta>
+                        <ProductCount>
+                          {product.tagging_count}회 태깅
+                        </ProductCount>
+                        <RemoveButton
+                          type="button"
+                          aria-label={`${productName} 연결 해제`}
+                        >
+                          <RemoveIcon
+                            src={closeIcon}
+                            alt=""
+                            aria-hidden="true"
+                          />
+                        </RemoveButton>
+                      </ProductMeta>
+                    </ProductItem>
+                  )
+                })}
+              </ProductList>
+              <ProductRegistrationGuide>
+                제품에 태깅하면 자동으로 등록됩니다.
+              </ProductRegistrationGuide>
+            </>
+          )}
         </Panel>
 
         <AccountPanel aria-label="설정">
@@ -798,6 +889,41 @@ const ProductList = styled.div`
   gap: 6px;
 `
 
+const ProductFeedback = styled.p`
+  min-height: 58px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: ${({ $error }) => ($error ? '#b42318' : 'var(--Text-Secondary)')};
+  font: var(--text-ui-caption);
+  text-align: center;
+`
+
+const ProductEmptyState = styled.p`
+  min-height: 76px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--Text-Secondary);
+  font: var(--text-ui-caption);
+  text-align: center;
+
+  strong {
+    color: var(--Text-Primary);
+    font: var(--text-ui-label);
+  }
+`
+
+const ProductRegistrationGuide = styled.p`
+  color: var(--Text-Secondary);
+  font: var(--text-ui-caption);
+  text-align: center;
+`
+
 const ProductItem = styled.article`
   width: 100%;
   min-height: 38px;
@@ -869,30 +995,6 @@ const RemoveIcon = styled.img`
   height: 16px;
   display: block;
   object-fit: cover;
-`
-
-const TagButton = styled(Button)`
-  height: 44px;
-  border-color: rgb(181 118 59 / 50%);
-  border-radius: 22px;
-  color: var(--Primary-Cognac);
-  background: transparent;
-  font: var(--text-ui-button);
-
-  &:hover {
-    border-color: var(--Primary-Cognac);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--Primary-Cognac);
-    outline-offset: 3px;
-  }
-`
-
-const AddIcon = styled.img`
-  width: 12px;
-  height: 12px;
-  display: block;
 `
 
 const AccountPanel = styled.section`
