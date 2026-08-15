@@ -111,10 +111,15 @@ const PHOTO_COUNT_BY_PIN = {
   202: 9,
 }
 
+const VOICE_MEMO_PIN_IDS = new Set([101, 104, 201])
+
 /** 세션 동안 유지되는 mock 상태. tripApi 의 mock 분기가 직접 읽고 쓴다. */
 export const mockTripStore = createInitialState()
 
 export const getMockPhotoCount = (pinId) => PHOTO_COUNT_BY_PIN[pinId] ?? 0
+
+export const getMockVoiceMemoCount = (pinId) =>
+  VOICE_MEMO_PIN_IDS.has(pinId) ? 1 : 0
 
 /** 테스트나 초기화가 필요할 때 사용한다. */
 export const resetMockTripStore = () => {

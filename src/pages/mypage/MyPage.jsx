@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { googleLogout } from '@react-oauth/google'
 import { useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
+import ConfirmationModal from '../../components/common/ConfirmationModal'
 import NavBar from '../../components/layout/NavBar'
 import {
   clearSessionToken,
@@ -22,7 +23,11 @@ import briefcaseIcon from '../../assets/icons/mypage/briefcase.svg'
 import chevronRightIcon from '../../assets/icons/mypage/chevron-right.svg'
 import closeIcon from '../../assets/icons/mypage/close.png'
 import keyIcon from '../../assets/icons/mypage/key.svg'
+import relearningCurrentIcon from '../../assets/icons/mypage/relearning-current.svg'
+import relearningWarningIcon from '../../assets/icons/mypage/relearning-warning.svg'
 import refreshIcon from '../../assets/icons/mypage/refresh.svg'
+import unlinkPreservedIcon from '../../assets/icons/mypage/unlink-preserved.svg'
+import unlinkWarningIcon from '../../assets/icons/mypage/unlink-warning.svg'
 import userIcon from '../../assets/icons/mypage/user.svg'
 
 const stats = [
@@ -52,6 +57,9 @@ const TASTE_AXIS_COMMIT_KEYS = new Set([
 
 const RELEARNING_COMPLETED_MESSAGE =
   '취향 프로필이 갱신되었습니다. 기존 추천은 유지되며, 이후 생성하거나 재추천한 사진부터 새 기준이 적용됩니다.'
+
+const RELEARNING_PROFILE_RESPONSE_COUNTS =
+  '기본 질문 5 · 사진 비교 5 · 무드보드 3'
 
 const getAxisValue = (value) => {
   if (value === null || value === undefined) return 50
@@ -87,6 +95,20 @@ const getProductIcon = (productType) =>
 const getProductName = ({ product_name: productName, tag_id: tagId }) =>
   productName?.trim() || `미확인 제품 (${tagId})`
 
+const formatIsoDate = (isoString) => {
+  const dateParts = /^(\d{4})-(\d{2})-(\d{2})/.exec(isoString ?? '')
+
+  if (!dateParts) return ''
+
+  return `${dateParts[1]}.${dateParts[2]}.${dateParts[3]}`
+}
+
+const getProductRegisteredDate = (registeredAt) => {
+  const registeredDate = formatIsoDate(registeredAt)
+
+  return registeredDate ? `${registeredDate} 태깅` : '등록일 미확인'
+}
+
 const settings = [
   { label: '위치 권한', state: '허용됨' },
   { label: '카메라 권한', state: '허용됨' },
@@ -104,16 +126,21 @@ const MyPage = () => {
   const [accountError, setAccountError] = useState('')
   const [accountRequestKey, setAccountRequestKey] = useState(0)
   const [tasteAxes, setTasteAxes] = useState([])
+  const [tasteProfileLastUpdatedAt, setTasteProfileLastUpdatedAt] =
+    useState(null)
   const [isTasteAxesLoading, setIsTasteAxesLoading] = useState(true)
   const [tasteAxesError, setTasteAxesError] = useState('')
   const [tasteAxesRequestKey, setTasteAxesRequestKey] = useState(0)
   const [savingTasteAxisCodes, setSavingTasteAxisCodes] = useState([])
   const [tasteAxisSaveError, setTasteAxisSaveError] = useState('')
+  const [isRelearningConfirmOpen, setIsRelearningConfirmOpen] =
+    useState(false)
   const [products, setProducts] = useState([])
   const [isProductsLoading, setIsProductsLoading] = useState(true)
   const [productsError, setProductsError] = useState('')
   const [productsRequestKey, setProductsRequestKey] = useState(0)
   const [unlinkingProductTagId, setUnlinkingProductTagId] = useState(null)
+  const [productPendingUnlink, setProductPendingUnlink] = useState(null)
   const [productUnlinkError, setProductUnlinkError] = useState('')
   const savedTasteAxisValuesRef = useRef(new Map())
   const savingTasteAxisCodesRef = useRef(new Set())
@@ -180,6 +207,11 @@ const MyPage = () => {
           )
 
           setTasteAxes(presentedTasteAxes)
+          setTasteProfileLastUpdatedAt(
+            typeof tasteProfile.last_updated_at === 'string'
+              ? tasteProfile.last_updated_at
+              : null,
+          )
           savedTasteAxisValuesRef.current = new Map(
             presentedTasteAxes.map((axis) => [axis.axisCode, axis.value]),
           )
@@ -196,6 +228,7 @@ const MyPage = () => {
         }
 
         setTasteAxes([])
+        setTasteProfileLastUpdatedAt(null)
         savedTasteAxisValuesRef.current = new Map()
         setTasteAxesError(
           error.message ?? '취향 프로필을 불러오지 못했습니다.',
@@ -300,6 +333,18 @@ const MyPage = () => {
             : axis,
         ),
       )
+
+      try {
+        const refreshedTasteProfile = await getTasteProfileAxes()
+
+        if (typeof refreshedTasteProfile.last_updated_at === 'string') {
+          setTasteProfileLastUpdatedAt(
+            refreshedTasteProfile.last_updated_at,
+          )
+        }
+      } catch {
+        // 축 값 저장은 완료됐으므로 날짜 갱신 실패만으로 값을 롤백하지 않는다.
+      }
     } catch (error) {
       if (error.code === 'UNAUTHENTICATED') {
         clearSessionToken()
@@ -331,26 +376,30 @@ const MyPage = () => {
   }
 
   const handleStartRelearning = () => {
-    const shouldStartRelearning = window.confirm(
-      '재학습을 완료하면 기존 취향 프로필이 새 응답으로 교체됩니다. 완료 전까지는 기존 프로필이 유지됩니다. 재학습을 시작할까요?',
-    )
-
-    if (!shouldStartRelearning) return
+    setIsRelearningConfirmOpen(false)
 
     navigate(
       getOnboardingFlowPath('/onboarding/basic-question', true),
     )
   }
 
-  const handleUnlinkProduct = async (product) => {
+  const handleOpenProductUnlink = (product) => {
     if (unlinkingProductTagId !== null) return
 
-    const productName = getProductName(product)
-    const shouldUnlink = window.confirm(
-      `${productName}의 연결을 해제할까요?\n\n기존 핀·사진·포토북은 삭제되지 않으며, 이 태그는 다시 자동 등록되지 않습니다.`,
-    )
+    setProductUnlinkError('')
+    setProductPendingUnlink(product)
+  }
 
-    if (!shouldUnlink) return
+  const handleCancelProductUnlink = () => {
+    if (unlinkingProductTagId !== null) return
+
+    setProductPendingUnlink(null)
+  }
+
+  const handleConfirmProductUnlink = async () => {
+    if (!productPendingUnlink || unlinkingProductTagId !== null) return
+
+    const product = productPendingUnlink
 
     setUnlinkingProductTagId(product.tag_id)
     setProductUnlinkError('')
@@ -364,6 +413,7 @@ const MyPage = () => {
             currentProduct.tag_id !== unlinkedProduct.tag_id,
         ),
       )
+      setProductPendingUnlink(null)
     } catch (error) {
       if (error.code === 'UNAUTHENTICATED') {
         clearSessionToken()
@@ -375,6 +425,7 @@ const MyPage = () => {
       setProductUnlinkError(
         error.message ?? '제품 연결을 해제하지 못했습니다.',
       )
+      setProductPendingUnlink(null)
     } finally {
       setUnlinkingProductTagId(null)
     }
@@ -393,6 +444,10 @@ const MyPage = () => {
     // 서버 세션 해제 실패는 사용자 로그아웃을 되돌리지 않는다.
     void logoutRequest.catch(() => {})
   }
+
+  const tasteProfileUpdatedDate = formatIsoDate(
+    tasteProfileLastUpdatedAt,
+  )
 
   return (
     <PageShell>
@@ -438,7 +493,10 @@ const MyPage = () => {
         <Panel>
           <SectionHeader>
             <SectionTitle>취향 프로필</SectionTitle>
-            <RelearnButton type="button" onClick={handleStartRelearning}>
+            <RelearnButton
+              type="button"
+              onClick={() => setIsRelearningConfirmOpen(true)}
+            >
               재학습
               <RefreshIcon src={refreshIcon} alt="" aria-hidden="true" />
             </RelearnButton>
@@ -591,7 +649,7 @@ const MyPage = () => {
                               : '연결 해제'
                           }`}
                           disabled={unlinkingProductTagId !== null}
-                          onClick={() => void handleUnlinkProduct(product)}
+                          onClick={() => handleOpenProductUnlink(product)}
                         >
                           <RemoveIcon
                             src={closeIcon}
@@ -634,6 +692,105 @@ const MyPage = () => {
       <NavigationBoundary>
         <NavBar />
       </NavigationBoundary>
+
+      <ConfirmationModal
+        open={isRelearningConfirmOpen}
+        title="취향 프로필을 다시 만들까요?"
+        confirmLabel="재학습 시작하기"
+        onConfirm={handleStartRelearning}
+        onCancel={() => setIsRelearningConfirmOpen(false)}
+        ariaDescribedBy="relearning-profile-warning"
+      >
+        <RelearningModalContent>
+          <CurrentTasteProfileCard>
+            <CurrentTasteProfileIcon
+              src={relearningCurrentIcon}
+              alt=""
+              aria-hidden="true"
+            />
+            <CurrentTasteProfileText>
+              <CurrentTasteProfileTitle>
+                지금 프로필
+                {tasteProfileUpdatedDate &&
+                  ` · ${tasteProfileUpdatedDate} 학습`}
+              </CurrentTasteProfileTitle>
+              <CurrentTasteProfileSummary>
+                {RELEARNING_PROFILE_RESPONSE_COUNTS}
+              </CurrentTasteProfileSummary>
+            </CurrentTasteProfileText>
+          </CurrentTasteProfileCard>
+          <RelearningModalWarning id="relearning-profile-warning">
+            <RelearningModalWarningIcon
+              src={relearningWarningIcon}
+              alt=""
+              aria-hidden="true"
+            />
+            <span>
+              재학습을 완료하면 기존 프로필이 새 응답으로 교체돼요. 완료 전까지는 지금 프로필이 그대로 유지됩니다.
+            </span>
+          </RelearningModalWarning>
+        </RelearningModalContent>
+      </ConfirmationModal>
+
+      <ConfirmationModal
+        open={productPendingUnlink !== null}
+        title="이 제품의 연결을 해제할까요?"
+        confirmLabel={
+          unlinkingProductTagId === null
+            ? '연결 해제하기'
+            : '연결 해제 중...'
+        }
+        onConfirm={() => void handleConfirmProductUnlink()}
+        onCancel={handleCancelProductUnlink}
+        confirmDisabled={unlinkingProductTagId !== null}
+        cancelDisabled={unlinkingProductTagId !== null}
+        ariaDescribedBy="product-unlink-notice"
+      >
+        {productPendingUnlink && (
+          <ProductUnlinkContent>
+            <ProductUnlinkSummary>
+              <ProductIdentity>
+                <ProductIcon
+                  src={getProductIcon(productPendingUnlink.product_type)}
+                  alt=""
+                  aria-hidden="true"
+                />
+                <ProductName>
+                  {getProductName(productPendingUnlink)}
+                </ProductName>
+              </ProductIdentity>
+              <ProductUnlinkDate>
+                {getProductRegisteredDate(
+                  productPendingUnlink.registered_at,
+                )}
+              </ProductUnlinkDate>
+            </ProductUnlinkSummary>
+            <ProductUnlinkNotice id="product-unlink-notice">
+              <ProductUnlinkNoticeRow>
+                <ProductUnlinkNoticeIcon
+                  src={unlinkPreservedIcon}
+                  alt=""
+                  aria-hidden="true"
+                />
+                <span>
+                  이 제품으로 남긴 핀·사진·포토북은 그대로 유지돼요.
+                </span>
+              </ProductUnlinkNoticeRow>
+              <ProductUnlinkNoticeRow>
+                <ProductUnlinkNoticeIcon
+                  src={unlinkWarningIcon}
+                  alt=""
+                  aria-hidden="true"
+                />
+                <span>
+                  해제하면 이 태그는 자동으로 다시 등록되지 않아요. 다시
+                  쓰려면 직접 태깅해야 합니다.
+                </span>
+              </ProductUnlinkNoticeRow>
+            </ProductUnlinkNotice>
+          </ProductUnlinkContent>
+        )}
+      </ConfirmationModal>
     </PageShell>
   )
 }
@@ -830,6 +987,69 @@ const RelearningNotice = styled.p`
   word-break: keep-all;
 `
 
+const RelearningModalContent = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+`
+
+const CurrentTasteProfileCard = styled.div`
+  min-height: 56px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 12px;
+  background: var(--Background-Base);
+`
+
+const CurrentTasteProfileIcon = styled.img`
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  display: block;
+`
+
+const CurrentTasteProfileText = styled.div`
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+`
+
+const CurrentTasteProfileTitle = styled.p`
+  color: var(--Text-Primary);
+  font: var(--text-ui-label);
+`
+
+const CurrentTasteProfileSummary = styled.p`
+  overflow: hidden;
+  color: var(--Text-Secondary);
+  font: 400 11px/18px var(--font-sans);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`
+
+const RelearningModalWarning = styled.p`
+  min-height: 66px;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  border-radius: 12px;
+  background: rgb(181 118 59 / 10%);
+  color: var(--Primary-Cognac);
+  font: 400 11px/18px var(--font-sans);
+  word-break: keep-all;
+`
+
+const RelearningModalWarningIcon = styled.img`
+  width: 18px;
+  height: 17px;
+  flex: 0 0 18px;
+  display: block;
+`
+
 const PreferenceFeedback = styled.p`
   min-height: 132px;
   display: flex;
@@ -994,6 +1214,52 @@ const ProductItem = styled.article`
   gap: 12px;
   border-radius: 8px;
   background: var(--Background-Base);
+`
+
+const ProductUnlinkContent = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+`
+
+const ProductUnlinkSummary = styled(ProductItem)`
+  flex: none;
+`
+
+const ProductUnlinkDate = styled.span`
+  flex: 0 0 auto;
+  color: #6b7280;
+  font: var(--text-ui-nav);
+  white-space: nowrap;
+`
+
+const ProductUnlinkNotice = styled.div`
+  min-height: 90px;
+  padding: 12px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 12px;
+  background: rgb(181 118 59 / 10%);
+`
+
+const ProductUnlinkNoticeRow = styled.p`
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 5px;
+  color: var(--Primary-Cognac);
+  font: 400 11px/18px var(--font-sans);
+  word-break: keep-all;
+`
+
+const ProductUnlinkNoticeIcon = styled.img`
+  width: 13px;
+  height: 12px;
+  flex: 0 0 13px;
+  display: block;
+  object-fit: contain;
 `
 
 const ProductIdentity = styled.div`

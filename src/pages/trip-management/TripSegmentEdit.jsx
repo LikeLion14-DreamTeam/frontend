@@ -3,8 +3,10 @@ import { useNavigate, useParams } from 'react-router-dom'
 import styled from 'styled-components'
 import Button from '../../components/common/Button'
 import Card from '../../components/common/Card'
+import ConfirmationModal from '../../components/common/ConfirmationModal'
 import Header from '../../components/layout/Header'
 import checkboxCheckedIcon from '../../assets/icons/trip-checkbox-checked.svg'
+import deleteWarningIcon from '../../assets/icons/trip-delete-warning.svg'
 import editBackIcon from '../../assets/icons/trip-edit-back.svg'
 import selectChevronIcon from '../../assets/icons/trip-select-chevron.svg'
 import {
@@ -26,6 +28,32 @@ const formatDateValue = (isoString) => {
 
   return `${date.getFullYear()}.${pad2(date.getMonth() + 1)}.${pad2(date.getDate())}`
 }
+
+const formatDateRange = (startAt, endAt) => {
+  const start = formatDateValue(startAt)
+  const end = formatDateValue(endAt)
+
+  if (!start) return end
+  if (!end) return start
+
+  const compactEnd = start.slice(0, 4) === end.slice(0, 4)
+    ? end.slice(5)
+    : end
+
+  return `${start} – ${compactEnd}`
+}
+
+const getTripDeleteMeta = (trip) =>
+  [
+    formatDateRange(trip.start_at, trip.end_at),
+    typeof trip.pin_count === 'number' ? `핀 ${trip.pin_count}개` : '',
+    typeof trip.photo_count === 'number' ? `사진 ${trip.photo_count}장` : '',
+    typeof trip.voice_memo_count === 'number'
+      ? `음성 ${trip.voice_memo_count}개`
+      : '',
+  ]
+    .filter(Boolean)
+    .join(' · ')
 
 const pinTimeFormatter = new Intl.DateTimeFormat('ko-KR', {
   month: '2-digit',
@@ -379,44 +407,50 @@ const TripSegmentEdit = () => {
                 {isSaving ? '저장 중...' : '변경사항 저장'}
               </SaveButton>
 
-              {/* TODO: 임시 UI. 디자인 문의 회신 오면 위치·문구·색상을 맞춘다.
-                  현재 index.css 에 위험 동작용 색상 토큰이 없어 코냑색을 쓴다. */}
-              {isConfirmingDelete ? (
-                <DeleteConfirm>
-                  <DeleteWarning>
-                    이 구간의 핀·사진·음성 메모와 포토북이 모두 삭제됩니다.
-                    되돌릴 수 없습니다.
-                  </DeleteWarning>
-                  <DeleteActions>
-                    <DeleteCancelButton
-                      type="button"
-                      onClick={() => setIsConfirmingDelete(false)}
-                      disabled={isDeleting}
-                    >
-                      취소
-                    </DeleteCancelButton>
-                    <DeleteConfirmButton
-                      type="button"
-                      onClick={handleDelete}
-                      disabled={isDeleting}
-                    >
-                      {isDeleting ? '삭제 중...' : '삭제할게요'}
-                    </DeleteConfirmButton>
-                  </DeleteActions>
-                </DeleteConfirm>
-              ) : (
-                <DeleteTrigger
-                  type="button"
-                  onClick={() => setIsConfirmingDelete(true)}
-                  disabled={isSaving}
-                >
-                  구간 삭제
-                </DeleteTrigger>
-              )}
+              <DeleteTrigger
+                type="button"
+                $variant="ghost"
+                onClick={() => setIsConfirmingDelete(true)}
+                disabled={isSaving || isDeleting}
+              >
+                구간 삭제하기
+              </DeleteTrigger>
             </Footer>
           </>
         )}
       </TripSegmentEditWrapper>
+
+      <ConfirmationModal
+        open={trip !== null && isConfirmingDelete}
+        title="이 구간을 삭제할까요?"
+        confirmLabel={isDeleting ? '구간 삭제 중...' : '구간 삭제하기'}
+        onConfirm={() => void handleDelete()}
+        onCancel={() => setIsConfirmingDelete(false)}
+        confirmDisabled={isDeleting}
+        cancelDisabled={isDeleting}
+        ariaDescribedBy="trip-delete-warning"
+      >
+        {trip && (
+          <TripDeleteModalContent>
+            <TripDeleteTargetCard>
+              <TripDeleteTargetName>{trip.name}</TripDeleteTargetName>
+              <TripDeleteTargetMeta>
+                {getTripDeleteMeta(trip)}
+              </TripDeleteTargetMeta>
+            </TripDeleteTargetCard>
+            <TripDeleteWarning id="trip-delete-warning">
+              <TripDeleteWarningIcon
+                src={deleteWarningIcon}
+                alt=""
+                aria-hidden="true"
+              />
+              <span>
+                구간에 담긴 핀과 사진, 음성 메모가 모두 함께 삭제돼요. 되돌릴 수 없습니다.
+              </span>
+            </TripDeleteWarning>
+          </TripDeleteModalContent>
+        )}
+      </ConfirmationModal>
     </PageSurface>
   )
 }
@@ -439,77 +473,68 @@ const SaveError = styled.p`
   word-break: keep-all;
 `
 
-/* 아래는 디자인 회신 전까지 쓰는 임시 스타일이다. */
-const DeleteTrigger = styled.button`
+const DeleteTrigger = styled(Button)`
   width: 100%;
-  min-height: 44px;
-  margin-top: 10px;
-  border: 0;
-  background: none;
-  color: var(--Text-Secondary);
+  height: 52px;
+  flex: none;
   font: var(--text-ui-button);
-  text-decoration: underline;
-  cursor: pointer;
 
   &:disabled {
-    color: var(--State-Disabled-Text);
     cursor: not-allowed;
   }
 `
 
-const DeleteConfirm = styled.div`
-  margin-top: 10px;
-  border: 1px solid var(--Primary-Cognac);
-  border-radius: 12px;
-  padding: 14px;
+const TripDeleteModalContent = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  background: rgb(181 118 59 / 9%);
+  gap: 16px;
 `
 
-const DeleteWarning = styled.p`
+const TripDeleteTargetCard = styled.div`
+  height: 74px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--Background-Base);
+`
+
+const TripDeleteTargetName = styled.p`
+  overflow: hidden;
   color: var(--Text-Primary);
-  font: var(--text-ui-caption);
-  text-align: center;
+  font: var(--text-ui-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`
+
+const TripDeleteTargetMeta = styled.p`
+  overflow: hidden;
+  color: var(--Text-Secondary);
+  font: var(--text-ui-nav);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`
+
+const TripDeleteWarning = styled.p`
+  min-height: 66px;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  border-radius: 12px;
+  background: rgb(181 118 59 / 10%);
+  color: var(--Primary-Cognac);
+  font: 400 11px/18px var(--font-sans);
   word-break: keep-all;
 `
 
-const DeleteActions = styled.div`
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-`
-
-const DeleteCancelButton = styled.button`
-  min-height: 44px;
-  border: 1px solid var(--Border-Default);
-  border-radius: 22px;
-  background: var(--Surface-Base);
-  color: var(--Text-Secondary);
-  font: var(--text-ui-button);
-  cursor: pointer;
-
-  &:disabled {
-    color: var(--State-Disabled-Text);
-    cursor: not-allowed;
-  }
-`
-
-const DeleteConfirmButton = styled.button`
-  min-height: 44px;
-  border: 0;
-  border-radius: 22px;
-  background: var(--Primary-Cognac);
-  color: var(--Text-Inverse);
-  font: var(--text-ui-button);
-  cursor: pointer;
-
-  &:disabled {
-    background: var(--State-Disabled-Fill);
-    color: var(--State-Disabled-Text);
-    cursor: not-allowed;
-  }
+const TripDeleteWarningIcon = styled.img`
+  width: 18px;
+  height: 17px;
+  flex: 0 0 18px;
+  display: block;
 `
 
 const PageSurface = styled.div`
@@ -845,7 +870,8 @@ const ResultDivider = styled.div`
 const Footer = styled.footer`
   width: 100%;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  gap: 10px;
 `
 
 const SaveButton = styled(Button)`
