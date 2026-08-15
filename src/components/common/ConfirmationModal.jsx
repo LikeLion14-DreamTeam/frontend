@@ -193,7 +193,9 @@ const Sheet = styled.section`
   bottom: 0;
   left: 0;
   display: flex;
-  height: min(374px, calc(100% - 16px));
+  /* 높이를 내용에 맞춘다. 고정하면 남는 공간이 전부 본문과 버튼 사이에 생긴다.
+     시안의 374px 는 삭제 확인처럼 내용이 꽉 찬 경우의 결과값이다. */
+  max-height: calc(100% - 16px);
   flex-direction: column;
   overflow: hidden;
   padding: 32px 24px max(18px, env(safe-area-inset-bottom));
@@ -225,6 +227,8 @@ const Content = styled.div`
   min-height: 0;
   flex: 1 1 auto;
   margin-top: 14px;
+  /* 내용이 최대 높이를 넘기면 잘리지 않고 스크롤되게 한다. */
+  overflow-y: auto;
 `
 
 const Actions = styled.div`
