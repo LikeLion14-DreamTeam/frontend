@@ -1,5 +1,6 @@
 import apiClient from '../../api/client'
 import { ApiError } from '../../api/errors'
+import { fetchAllPages } from '../../api/pagination'
 import {
   getMockPhotoCount,
   getMockVoiceMemoCount,
@@ -45,8 +46,8 @@ const buildMockTripSummary = (segmentId) => {
   }
 }
 
-/** 4.1 여행 구간 목록 조회 */
-export const getTrips = async ({ cursor = null, limit = 20 } = {}) => {
+/** 4.1 여행 구간 목록 조회. 마지막 페이지까지 이어 받는다. */
+export const getTrips = async ({ limit = 20 } = {}) => {
   if (USE_MOCK) {
     return {
       trips: Object.values(mockTripStore.trips).map(
@@ -62,7 +63,10 @@ export const getTrips = async ({ cursor = null, limit = 20 } = {}) => {
     }
   }
 
-  return apiClient.get('/trips', { params: { cursor, limit } })
+  return fetchAllPages(
+    (cursor) => apiClient.get('/trips', { params: { cursor, limit } }),
+    'trips',
+  )
 }
 
 /** 4.2 여행 구간 상세(요약) 조회 */
@@ -109,11 +113,11 @@ export const updateTrip = async (
   })
 }
 
-/** 4.5 구간 내 핀 목록 조회. 제외된 핀도 included_in_segment: false 로 함께 온다. */
-export const getTripPins = async (
-  segmentId,
-  { cursor = null, limit = 20 } = {},
-) => {
+/**
+ * 4.5 구간 내 핀 목록 조회. 마지막 페이지까지 이어 받는다.
+ * 제외된 핀도 included_in_segment: false 로 함께 온다.
+ */
+export const getTripPins = async (segmentId, { limit = 20 } = {}) => {
   if (USE_MOCK) {
     if (!mockTripStore.trips[segmentId]) throw mockNotFound()
 
@@ -126,7 +130,9 @@ export const getTripPins = async (
     }
   }
 
-  return apiClient.get(`/trips/${segmentId}/pins`, {
-    params: { cursor, limit },
-  })
+  return fetchAllPages(
+    (cursor) =>
+      apiClient.get(`/trips/${segmentId}/pins`, { params: { cursor, limit } }),
+    'pins',
+  )
 }

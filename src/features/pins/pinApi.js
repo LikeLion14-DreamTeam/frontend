@@ -1,5 +1,6 @@
 import apiClient from '../../api/client'
 import { ApiError } from '../../api/errors'
+import { fetchAllPages } from '../../api/pagination'
 import { getMockUploadedUrl } from '../../api/uploads'
 import { mockPinStore } from './pinMock'
 
@@ -107,15 +108,12 @@ export const updatePin = async (pinId, { placeName, textNote }) => {
 }
 
 /**
- * 5.4 핀 사진 목록 조회
+ * 5.4 핀 사진 목록 조회. 마지막 페이지까지 이어 받는다.
  *
  * 명세 0-1 에 따라 태깅 세션 개념이 없으므로, 한 핀의 사진이 곧 하나의 촬영 묶음이다.
  * `is_pin_cover` 가 대표사진 표시다.
  */
-export const getPinPhotos = async (
-  pinId,
-  { cursor = null, limit = 50 } = {},
-) => {
+export const getPinPhotos = async (pinId, { limit = 50 } = {}) => {
   if (USE_MOCK) {
     if (!mockPinStore.pins[pinId]) throw mockNotFound()
 
@@ -125,7 +123,11 @@ export const getPinPhotos = async (
     }
   }
 
-  return apiClient.get(`/pins/${pinId}/photos`, { params: { cursor, limit } })
+  return fetchAllPages(
+    (cursor) =>
+      apiClient.get(`/pins/${pinId}/photos`, { params: { cursor, limit } }),
+    'photos',
+  )
 }
 
 /** mock 전용. 두 좌표 사이 거리(m). 5.5 반경 검증에 쓴다. */
