@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { uploadAudio } from '../../api/uploads'
@@ -8,6 +8,7 @@ import {
   addCapturedPhotos,
   attachUploadedPhotos,
 } from '../../features/pins/recordPhotos'
+import { reverseGeocode } from '../../features/pins/reverseGeocode'
 import useRecordDraftStore from '../../features/pins/useRecordDraftStore'
 import useVoiceRecorder, {
   formatVoiceDuration,
@@ -51,6 +52,9 @@ const PinSaveComplete = () => {
   const storedPlaceName = useRecordDraftStore((draft) => draft.placeName)
   const storedTextNote = useRecordDraftStore((draft) => draft.textNote)
   const setContext = useRecordDraftStore((draft) => draft.setContext)
+  const setLocationDetails = useRecordDraftStore(
+    (draft) => draft.setLocationDetails,
+  )
   const clearDraft = useRecordDraftStore((draft) => draft.clearDraft)
 
   const [memo, setMemo] = useState(storedTextNote)
@@ -61,6 +65,7 @@ const PinSaveComplete = () => {
   const createdPinIdRef = useRef(null)
   const uploadedPhotosRef = useRef(null)
   const uploadedAudioRef = useRef(null)
+  const locationRequestRef = useRef(null)
   const {
     status: voiceStatus,
     durationSec: voiceDurationSec,
@@ -82,6 +87,43 @@ const PinSaveComplete = () => {
     time: formatRecordTime(photos[0]?.capturedAt),
     photoCount: photos.length,
   }
+
+  /**
+   * 좌표를 도시·나라로 바꾼다. 화면당 한 번만 요청하고 결과를 기록에 남긴다.
+   *
+   * 이미 값이 있으면(촬영을 이어서 하다가 돌아온 경우) 다시 부르지 않는다.
+   * 저장 버튼이 먼저 눌려도 handleSave 가 같은 요청을 기다린다.
+   */
+  const resolveLocationDetails = useCallback(() => {
+    if (city || latitude == null || longitude == null) return null
+
+    locationRequestRef.current ??= reverseGeocode({ latitude, longitude })
+
+    return locationRequestRef.current
+  }, [city, latitude, longitude])
+
+  // 저장 화면에 들어오면 바로 주소를 받아 온다. 좌표 대신 실제 주소가 보인다.
+  useEffect(() => {
+    const request = resolveLocationDetails()
+    if (!request) return undefined
+
+    let ignore = false
+
+    void request.then((place) => {
+      if (ignore || !place) return
+
+      setLocationDetails({
+        // 주소는 이미 있으면 그대로 둔다.
+        address: address || place.address,
+        city: place.city,
+        countryName: place.countryName,
+      })
+    })
+
+    return () => {
+      ignore = true
+    }
+  }, [address, resolveLocationDetails, setLocationDetails])
 
   useEffect(() => {
     if (!isVoiceSheetOpen) return undefined
@@ -161,13 +203,16 @@ const PinSaveComplete = () => {
       }
 
       if (!createdPinIdRef.current) {
+        // 아직 안 끝났으면 기다린다. 도시가 비면 방문 도시와 도장이 빠진다.
+        const place = await resolveLocationDetails()
+
         const createdPin = await createPin({
           nfcTagId: tagId,
           latitude,
           longitude,
-          address,
-          city,
-          countryName,
+          address: address || (place?.address ?? ''),
+          city: city || (place?.city ?? ''),
+          countryName: countryName || (place?.countryName ?? ''),
           placeName,
           textNote: memo,
           audioFile: uploadedAudioRef.current?.url,

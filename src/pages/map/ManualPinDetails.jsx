@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { uploadAudio } from '../../api/uploads'
@@ -8,6 +8,7 @@ import {
   addCapturedPhotos,
   attachUploadedPhotos,
 } from '../../features/pins/recordPhotos'
+import { reverseGeocode } from '../../features/pins/reverseGeocode'
 import useVoiceRecorder, {
   formatVoiceDuration,
 } from '../../features/pins/useVoiceRecorder'
@@ -52,6 +53,8 @@ const ManualPinDetails = () => {
     ? location.state.longitude
     : FALLBACK_LOCATION.longitude
   const address = location.state?.address ?? ''
+  /** 위치 선택 화면에서 이미 받아 온 주소·도시·나라. 없으면 여기서 다시 묻는다. */
+  const passedPlace = location.state?.place ?? null
   const savedAt = useRef(formatCurrentDate()).current
 
   const [placeName, setPlaceName] = useState('')
@@ -60,6 +63,8 @@ const ManualPinDetails = () => {
   const [isVoiceSheetOpen, setIsVoiceSheetOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [resolvedPlace, setResolvedPlace] = useState(null)
+  const locationRequestRef = useRef(null)
   const photoInputRef = useRef(null)
   const photosRef = useRef([])
   const createdPinIdRef = useRef(null)
@@ -75,6 +80,31 @@ const ManualPinDetails = () => {
     stopRecording,
     deleteRecording,
   } = useVoiceRecorder()
+
+  /**
+   * 지도에서 고른 좌표를 도시·나라로 바꾼다. 화면당 한 번만 요청한다.
+   * 저장 버튼이 먼저 눌려도 handleSave 가 같은 요청을 기다린다.
+   */
+  const resolveLocationDetails = useCallback(() => {
+    if (passedPlace) return Promise.resolve(passedPlace)
+
+    locationRequestRef.current ??= reverseGeocode({ latitude, longitude })
+
+    return locationRequestRef.current
+  }, [latitude, longitude, passedPlace])
+
+  // 화면에 들어오면 바로 받아 온다. 검색어를 안 넣었어도 주소가 보인다.
+  useEffect(() => {
+    let ignore = false
+
+    void resolveLocationDetails().then((place) => {
+      if (!ignore) setResolvedPlace(place)
+    })
+
+    return () => {
+      ignore = true
+    }
+  }, [resolveLocationDetails])
 
   useEffect(() => {
     photosRef.current = photos
@@ -165,12 +195,16 @@ const ManualPinDetails = () => {
       }
 
       if (!createdPinIdRef.current) {
+        // 아직 안 끝났으면 기다린다. 도시가 비면 방문 도시와 도장이 빠진다.
+        const place = await resolveLocationDetails()
+
         const createdPin = await createPin({
           latitude,
           longitude,
-          address,
-          city: '',
-          countryName: '',
+          // 검색창에 직접 적은 주소가 있으면 그쪽을 우선한다.
+          address: address || (place?.address ?? ''),
+          city: place?.city ?? '',
+          countryName: place?.countryName ?? '',
           placeName,
           textNote: memo,
           audioFile: uploadedAudioRef.current?.url,
@@ -240,7 +274,9 @@ const ManualPinDetails = () => {
 
         <ChosenLocation>
           <LocationCopy>
-            <ChosenName>{address || '지도에서 선택한 위치'}</ChosenName>
+            <ChosenName>
+              {address || resolvedPlace?.address || '지도에서 선택한 위치'}
+            </ChosenName>
             <ChosenAddress>
               위도 {latitude.toFixed(5)} · 경도 {longitude.toFixed(5)}
             </ChosenAddress>
