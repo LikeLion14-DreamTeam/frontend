@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
-import { Marker, Polyline } from '@vis.gl/react-google-maps'
+import { Marker, Polyline, useApiIsLoaded } from '@vis.gl/react-google-maps'
 import Button from '../../components/common/Button'
 import GoogleMap from '../../components/common/GoogleMap'
 import NavBar from '../../components/layout/NavBar'
@@ -14,9 +14,28 @@ import recordPlusIcon from '../../assets/map/record-plus.png'
 import tripAvatar from '../../assets/map/trip-avatar.svg'
 import tripSelectChevron from '../../assets/icons/trip-select-chevron.svg'
 import { getPin, getPinPhotos } from '../../features/pins/pinApi'
+import { getTripPins, getTrips } from '../../features/trips/tripApi'
 import { MAP_STYLES } from './mapStyles'
 
-const PARIS_CENTER = { lat: 48.8569, lng: 2.3376 }
+// 여정을 아직 못 받았을 때 잠깐 보여줄 위치.
+const DEFAULT_CENTER = { lat: 48.8569, lng: 2.3376 }
+
+// 아이콘 파일의 원본 크기. 정중앙을 좌표에 맞추는 데 쓴다.
+const PIN_SIZE = { width: 38, height: 38 }
+const ACTIVE_PIN_SIZE = { width: 48, height: 48 }
+const CURRENT_POSITION_SIZE = { width: 68, height: 56 }
+
+const rangeFormatter = new Intl.DateTimeFormat('ko-KR', {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
+
+const formatRange = (startAt, endAt) =>
+  [startAt, endAt]
+    .filter(Boolean)
+    .map((value) => rangeFormatter.format(new Date(value)).replace(/\.$/, ''))
+    .join(' ~ ')
 
 const sheetDateFormatter = new Intl.DateTimeFormat('ko-KR', {
   year: 'numeric',
@@ -32,94 +51,126 @@ const formatTaggedAt = (taggedAt) =>
     ? sheetDateFormatter.format(new Date(taggedAt)).replace(/\. /g, '.')
     : ''
 
-// TODO: 지도 뷰 API 연동 대기. GET /trips/{segmentId}/pins(4.5)로 교체해야 한다.
-// 그때까지는 핀 상세로 이동만 되도록 id 를 mock 의 pin_id 와 맞춰둔다.
-const pins = [
-  {
-    id: 101,
-    name: '파리 에펠탑 근처',
-    lat: 48.8584,
-    lng: 2.2945,
-  },
-  {
-    id: 102,
-    name: '루브르 박물관 앞',
-    lat: 48.8606,
-    lng: 2.3376,
-  },
-  {
-    id: 103,
-    name: '몽마르트르 언덕',
-    lat: 48.8867,
-    lng: 2.3431,
-  },
-  {
-    id: 104,
-    name: '이름 없는 장소',
-    lat: 48.853,
-    lng: 2.3499,
-  },
-  {
-    id: 105,
-    name: '베르사유 궁전 정원',
-    lat: 48.8049,
-    lng: 2.1204,
-  },
-  {
-    // 진행 중인 여정의 핀. 핀 삭제(5.3) 흐름 확인용이라 좌표만 파리 쪽에 맞춰둔다.
-    id: 106,
-    name: '서울시청 앞',
-    lat: 48.8656,
-    lng: 2.3212,
-  },
-]
-
-const routePath = pins.map(({ lat, lng }) => ({ lat, lng }))
-
-const tripGroups = [
-  {
-    country: 'FRANCE',
-    countryKo: '프랑스',
-    cities: [
-      { id: 'paris', name: '파리', stats: '핀 12 · 사진 138' },
-      { id: 'versailles', name: '베르사유', stats: '핀 3 · 사진 24' },
-    ],
-  },
-  {
-    country: 'CZECHIA',
-    countryKo: '체코',
-    cities: [
-      { id: 'prague', name: '프라하', stats: '핀 9 · 사진 94' },
-      {
-        id: 'cesky-krumlov',
-        name: '체스키크룸로프',
-        stats: '핀 4 · 사진 31',
-      },
-    ],
-  },
-  {
-    country: 'JAPAN',
-    countryKo: '일본',
-    cities: [{ id: 'kyoto', name: '교토', stats: '핀 7 · 사진 62' }],
-  },
-]
-
 const MapPage = () => {
   const navigate = useNavigate()
+  const apiLoaded = useApiIsLoaded()
+
+  /**
+   * 구글 지도는 아이콘의 아래 가운데를 좌표에 맞춘다. 그래서 핀 그림이 좌표보다
+   * 위(북쪽)에 떠 보인다. 아이콘 정중앙을 좌표에 맞춘다.
+   */
+  const centeredIcon = (url, { width, height }) => {
+    if (!apiLoaded || !window.google?.maps) return url
+
+    const { Size, Point } = window.google.maps
+
+    return {
+      url,
+      scaledSize: new Size(width, height),
+      anchor: new Point(width / 2, height / 2),
+    }
+  }
   const [selectedPinId, setSelectedPinId] = useState(null)
   const [dropdownOpen, setDropdownOpen] = useState(false)
-  const [selectedTrip, setSelectedTrip] = useState({
-    id: 'paris',
-    city: '파리',
-    country: '프랑스',
-  })
-  const [mapCenter, setMapCenter] = useState(PARIS_CENTER)
+  const [mapCenter, setMapCenter] = useState(DEFAULT_CENTER)
   const [mapKey, setMapKey] = useState(0)
 
-  const selectedPin = useMemo(
-    () => pins.find(({ id }) => id === selectedPinId),
-    [selectedPinId],
+  const [trips, setTrips] = useState([])
+  const [selectedTripId, setSelectedTripId] = useState(null)
+  const [tripPins, setTripPins] = useState([])
+  const [tripError, setTripError] = useState('')
+
+  /** 4.1. 첫 여정을 기본 선택으로 잡는다. */
+  useEffect(() => {
+    let ignore = false
+
+    const load = async () => {
+      try {
+        const { trips: list } = await getTrips()
+
+        if (ignore) return
+
+        setTrips(list)
+        setSelectedTripId((current) => current ?? list[0]?.segment_id ?? null)
+      } catch (error) {
+        if (!ignore) setTripError(error.message)
+      }
+    }
+
+    load()
+
+    return () => {
+      ignore = true
+    }
+  }, [])
+
+  /** 4.5. 고른 여정의 핀만 받아 지도에 올린다. */
+  useEffect(() => {
+    if (!selectedTripId) return undefined
+
+    let ignore = false
+    setTripError('')
+
+    const load = async () => {
+      try {
+        const { pins } = await getTripPins(selectedTripId)
+
+        if (ignore) return
+
+        setTripPins(pins)
+        setSelectedPinId(null)
+      } catch (error) {
+        if (ignore) return
+
+        setTripPins([])
+        setTripError(error.message)
+      }
+    }
+
+    load()
+
+    return () => {
+      ignore = true
+    }
+  }, [selectedTripId])
+
+  /**
+   * 구간에서 제외한 핀은 지도에 올리지 않는다. 좌표가 없는 핀도 그릴 수 없다.
+   * 방문한 순서대로 정렬해 마커 순번과 동선이 어긋나지 않게 한다.
+   */
+  const mapPins = useMemo(
+    () =>
+      tripPins
+        .filter(
+          ({ latitude, longitude, included_in_segment }) =>
+            included_in_segment && latitude != null && longitude != null,
+        )
+        .sort((a, b) => a.tagged_at.localeCompare(b.tagged_at)),
+    [tripPins],
   )
+
+  const routePath = useMemo(
+    () =>
+      mapPins.map(({ latitude, longitude }) => ({
+        lat: latitude,
+        lng: longitude,
+      })),
+    [mapPins],
+  )
+
+  // 여정을 바꾸면 그 여정의 첫 핀으로 지도를 옮긴다.
+  useEffect(() => {
+    const [first] = mapPins
+    if (!first) return
+
+    setMapCenter({ lat: first.latitude, lng: first.longitude })
+    setMapKey((current) => current + 1)
+  }, [mapPins])
+
+  const selectedTrip = trips.find(
+    ({ segment_id }) => segment_id === selectedTripId,
+  )
+  const selectedPin = mapPins.find(({ pin_id }) => pin_id === selectedPinId)
 
   const [pinDetail, setPinDetail] = useState(null)
   const [pinPhotos, setPinPhotos] = useState([])
@@ -164,7 +215,9 @@ const MapPage = () => {
     }
   }, [selectedPinId])
 
-  const selectedIndex = pins.findIndex(({ id }) => id === selectedPinId)
+  const selectedIndex = mapPins.findIndex(
+    ({ pin_id }) => pin_id === selectedPinId,
+  )
   const coverPhoto =
     pinPhotos.find((photo) => photo.is_pin_cover) ?? pinPhotos[0]
 
@@ -177,8 +230,8 @@ const MapPage = () => {
     })
   }
 
-  const selectTrip = (city, country) => {
-    setSelectedTrip({ id: city.id, city: city.name, country })
+  const selectTrip = (segmentId) => {
+    setSelectedTripId(segmentId)
     setDropdownOpen(false)
   }
 
@@ -206,24 +259,28 @@ const MapPage = () => {
             strokeWeight={3}
           />
 
-          {pins.map((pin) => {
-            const isSelected = pin.id === selectedPinId
+          {mapPins.map((pin) => {
+            const isSelected = pin.pin_id === selectedPinId
 
             return (
               <Marker
-                key={pin.id}
-                position={{ lat: pin.lat, lng: pin.lng }}
-                icon={isSelected ? activePinIcon : pinIcon}
-                title={pin.name}
+                key={pin.pin_id}
+                position={{ lat: pin.latitude, lng: pin.longitude }}
+                icon={
+                  isSelected
+                    ? centeredIcon(activePinIcon, ACTIVE_PIN_SIZE)
+                    : centeredIcon(pinIcon, PIN_SIZE)
+                }
+                title={pin.place_name || '이름 없는 장소'}
                 zIndex={isSelected ? 3 : 2}
-                onClick={() => setSelectedPinId(pin.id)}
+                onClick={() => setSelectedPinId(pin.pin_id)}
               />
             )
           })}
 
           <Marker
             position={{ lat: 48.8589, lng: 2.3462 }}
-            icon={currentPositionIcon}
+            icon={centeredIcon(currentPositionIcon, CURRENT_POSITION_SIZE)}
             title="현재 위치"
             zIndex={4}
           />
@@ -248,7 +305,7 @@ const MapPage = () => {
         }}
       >
         <TripAvatar src={tripAvatar} alt="" />
-        <TripName>{`${selectedTrip.city} · ${selectedTrip.country}`}</TripName>
+        <TripName>{selectedTrip?.name ?? '여정 선택'}</TripName>
         <Chevron src={tripSelectChevron} alt="" />
       </TripSelector>
 
@@ -277,7 +334,7 @@ const MapPage = () => {
           aria-label={selectedPin ? '핀 정보 접기' : '핀 정보 펼치기'}
           onClick={() => {
             if (selectedPin) setSelectedPinId(null)
-            else setSelectedPinId(pins[2].id)
+            else if (mapPins[0]) setSelectedPinId(mapPins[0].pin_id)
           }}
         >
           <span />
@@ -320,9 +377,9 @@ const MapPage = () => {
                 이 핀 기록 자세히 보기
               </DetailButton>
 
-              <Pagination aria-label={`${selectedIndex + 1} / ${pins.length}`}>
-                {pins.map((pin, index) => (
-                  <Dot key={pin.id} $active={index === selectedIndex} />
+              <Pagination aria-label={`${selectedIndex + 1} / ${mapPins.length}`}>
+                {mapPins.map((pin, index) => (
+                  <Dot key={pin.pin_id} $active={index === selectedIndex} />
                 ))}
               </Pagination>
             </>
@@ -334,34 +391,36 @@ const MapPage = () => {
 
       {dropdownOpen && (
         <TripDropdown id="trip-dropdown">
-          {tripGroups.map((group) => (
-            <TripGroup key={group.country}>
-              <CountryHeading>
-                <CountryName>{group.country}</CountryName>
-                <CountryNameKo>{group.countryKo}</CountryNameKo>
-              </CountryHeading>
+          {/* TODO: 국가별 묶음은 4.1 응답에 국가 정보가 없어 붙이지 못했다. */}
+          <TripGroup>
+            {trips.length === 0 && (
+              <DropdownMessage>
+                {tripError || '종료된 여정이 없습니다.'}
+              </DropdownMessage>
+            )}
 
-              {group.cities.map((city) => {
-                const isSelected = city.id === selectedTrip.id
+            {trips.map((trip) => {
+              const isSelected = trip.segment_id === selectedTripId
 
-                return (
-                  <CityButton
-                    key={city.id}
-                    type="button"
-                    $selected={isSelected}
-                    aria-pressed={isSelected}
-                    onClick={() => selectTrip(city, group.countryKo)}
-                  >
-                    <CityText>
-                      <CityName $selected={isSelected}>{city.name}</CityName>
-                      <CityStats>{city.stats}</CityStats>
-                    </CityText>
-                    {isSelected && <CheckIcon src={dropdownCheckIcon} alt="" />}
-                  </CityButton>
-                )
-              })}
-            </TripGroup>
-          ))}
+              return (
+                <CityButton
+                  key={trip.segment_id}
+                  type="button"
+                  $selected={isSelected}
+                  aria-pressed={isSelected}
+                  onClick={() => selectTrip(trip.segment_id)}
+                >
+                  <CityText>
+                    <CityName $selected={isSelected}>{trip.name}</CityName>
+                    <CityStats>
+                      {formatRange(trip.start_at, trip.end_at)}
+                    </CityStats>
+                  </CityText>
+                  {isSelected && <CheckIcon src={dropdownCheckIcon} alt="" />}
+                </CityButton>
+              )
+            })}
+          </TripGroup>
         </TripDropdown>
       )}
     </Page>
@@ -648,31 +707,6 @@ const TripGroup = styled.div`
   flex-direction: column;
 `
 
-const CountryHeading = styled.div`
-  padding: 14px 12px 6px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-
-  ${TripGroup}:first-child & {
-    padding-top: 8px;
-  }
-`
-
-const CountryName = styled.span`
-  color: var(--Accent-Gold);
-  font-family: var(--font-serif);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 1.82px;
-  line-height: 18px;
-`
-
-const CountryNameKo = styled.span`
-  color: var(--Text-Secondary);
-  font: var(--text-ui-nav);
-`
-
 const CityButton = styled.button`
   width: 100%;
   min-height: 58px;
@@ -686,6 +720,12 @@ const CityButton = styled.button`
     $selected ? 'rgb(181 118 59 / 10%)' : 'transparent'};
   text-align: left;
   cursor: pointer;
+`
+
+const DropdownMessage = styled.p`
+  padding: 14px 15px;
+  color: var(--Text-Secondary);
+  font: var(--text-ui-body-m);
 `
 
 const CityText = styled.span`
