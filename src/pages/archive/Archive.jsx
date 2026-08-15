@@ -1,57 +1,105 @@
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import Header from '../../components/layout/Header'
 import NavBar from '../../components/layout/NavBar'
-import archiveCover from '../../assets/photobooks/archive-cover-2.png'
 import { PhotobookListItem } from '../../features/photobooks/components'
-
-// 6.1 UI 확인용 데이터다. API 연결 단계에서 조회 결과로 교체한다.
-const ARCHIVE_FIXTURES = [
-  {
-    id: 30,
-    title: '파리 · 암스테르담',
-    period: '2024.09.12 — 2024.09.27',
-    completedAt: '2024-09-27T10:00:00.000Z',
-    coverUrl: archiveCover,
-    pinCount: 12,
-    photoCount: 138,
-    voiceCount: 6,
-  },
-  {
-    id: 29,
-    title: '파리 · 암스테르담',
-    period: '2024.05.03 — 2024.05.11',
-    completedAt: '2024-05-11T10:00:00.000Z',
-    coverUrl: archiveCover,
-    pinCount: 9,
-    photoCount: 94,
-    voiceCount: 4,
-  },
-  {
-    id: 28,
-    title: '파리 · 암스테르담',
-    period: '2023.11.08 — 2023.11.19',
-    completedAt: '2023-11-19T10:00:00.000Z',
-    coverUrl: archiveCover,
-    pinCount: 7,
-    photoCount: 72,
-    voiceCount: 3,
-  },
-]
+import { getPhotobooks } from '../../features/photobooks/photobookApi'
 
 const SORT = {
   latest: 'latest',
   photos: 'photos',
 }
 
+const pad2 = (value) => String(value).padStart(2, '0')
+
+const formatDate = (value) => {
+  if (!value) return ''
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+
+  return `${date.getFullYear()}.${pad2(date.getMonth() + 1)}.${pad2(date.getDate())}`
+}
+
+const formatPeriod = (startAt, endAt) => {
+  const start = formatDate(startAt)
+  const end = formatDate(endAt)
+
+  return [start, end].filter(Boolean).join(' — ')
+}
+
+const getPhotobookTitle = (photobook) => {
+  const name = photobook.name?.trim()
+  if (name) return name
+
+  const cityName = Array.isArray(photobook.cities)
+    ? photobook.cities.filter(Boolean).join(' · ')
+    : ''
+
+  return cityName || '이름 없는 포토북'
+}
+
+const getCount = (value) => {
+  const count = Number(value)
+  return Number.isFinite(count) ? Math.max(0, Math.trunc(count)) : 0
+}
+
+const toListItem = (photobook) => ({
+  id: photobook.photobook_id,
+  title: getPhotobookTitle(photobook),
+  period: formatPeriod(photobook.start_at, photobook.end_at),
+  completedAt: photobook.end_at,
+  coverUrl: photobook.cover_photo_url,
+  photoCount: getCount(photobook.photo_count),
+})
+
 const Archive = () => {
   const navigate = useNavigate()
   const [sortBy, setSortBy] = useState(SORT.latest)
   const [refreshingId, setRefreshingId] = useState(null)
+  const [photobooks, setPhotobooks] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [errorMessage, setErrorMessage] = useState('')
 
-  const photobooks = useMemo(() => {
-    const next = [...ARCHIVE_FIXTURES]
+  useEffect(() => {
+    let ignore = false
+
+    const loadPhotobooks = async () => {
+      setIsLoading(true)
+      setErrorMessage('')
+
+      try {
+        const photobookData = await getPhotobooks()
+
+        if (!ignore) {
+          setPhotobooks(
+            Array.isArray(photobookData.photobooks)
+              ? photobookData.photobooks
+              : [],
+          )
+        }
+      } catch (error) {
+        if (ignore) return
+
+        setPhotobooks([])
+        setErrorMessage(
+          error.message ?? '포토북 목록을 불러오지 못했습니다.',
+        )
+      } finally {
+        if (!ignore) setIsLoading(false)
+      }
+    }
+
+    loadPhotobooks()
+
+    return () => {
+      ignore = true
+    }
+  }, [])
+
+  const sortedPhotobooks = useMemo(() => {
+    const next = photobooks.map(toListItem)
 
     if (sortBy === SORT.photos) {
       return next.sort((a, b) => b.photoCount - a.photoCount)
@@ -60,8 +108,9 @@ const Archive = () => {
     return next.sort(
       (a, b) => new Date(b.completedAt) - new Date(a.completedAt),
     )
-  }, [sortBy])
+  }, [photobooks, sortBy])
 
+  // 실제 커버 변경은 API 명세 6.4 연결 단계에서 교체한다.
   const handleRefreshCover = (photobookId) => {
     setRefreshingId(photobookId)
 
@@ -109,23 +158,39 @@ const Archive = () => {
                 </SortButton>
               </SortTabs>
 
-              <CompletedCount>완성된 여정 {photobooks.length}개</CompletedCount>
+              <CompletedCount>
+                완성된 여정 {sortedPhotobooks.length}개
+              </CompletedCount>
             </SortRow>
           </SortSection>
         </ArchiveHeader>
 
         <PhotobookList aria-label="완성된 포토북 목록">
-          {photobooks.map((photobook, index) => (
-            <Fragment key={photobook.id}>
-              <PhotobookListItem
-                {...photobook}
-                onOpen={() => navigate(`/archive/trip/${photobook.id}`)}
-                onRefresh={() => handleRefreshCover(photobook.id)}
-                isRefreshing={refreshingId === photobook.id}
-              />
-              {index < photobooks.length - 1 ? <ItemDivider /> : null}
-            </Fragment>
-          ))}
+          {isLoading ? <StateMessage>불러오는 중...</StateMessage> : null}
+
+          {!isLoading && errorMessage ? (
+            <StateMessage role="alert">{errorMessage}</StateMessage>
+          ) : null}
+
+          {!isLoading && !errorMessage && sortedPhotobooks.length === 0 ? (
+            <StateMessage>아직 완성된 여정이 없습니다.</StateMessage>
+          ) : null}
+
+          {!isLoading && !errorMessage
+            ? sortedPhotobooks.map((photobook, index) => (
+                <Fragment key={photobook.id}>
+                  <PhotobookListItem
+                    {...photobook}
+                    onOpen={() => navigate(`/archive/trip/${photobook.id}`)}
+                    onRefresh={() => handleRefreshCover(photobook.id)}
+                    isRefreshing={refreshingId === photobook.id}
+                  />
+                  {index < sortedPhotobooks.length - 1 ? (
+                    <ItemDivider />
+                  ) : null}
+                </Fragment>
+              ))
+            : null}
         </PhotobookList>
       </ArchiveWrapper>
 
@@ -241,6 +306,15 @@ const PhotobookList = styled.section`
   display: flex;
   flex-direction: column;
   gap: 20px;
+`
+
+const StateMessage = styled.p`
+  width: 100%;
+  padding: 40px 0;
+  color: var(--Text-Secondary);
+  font: var(--text-ui-body-m);
+  text-align: center;
+  word-break: keep-all;
 `
 
 const ItemDivider = styled.div`
