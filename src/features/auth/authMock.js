@@ -12,6 +12,9 @@ export const MOCK_GOOGLE_LOGIN_RESPONSE = {
 
 export const MOCK_CURRENT_USER_RESPONSE = {
   ...MOCK_GOOGLE_LOGIN_RESPONSE.user,
+  pin_count: 4,
+  completed_trip_count: 1,
+  visited_city_count: 1,
 }
 
 export const updateMockAccount = ({
