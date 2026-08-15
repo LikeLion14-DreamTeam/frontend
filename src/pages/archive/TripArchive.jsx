@@ -1,287 +1,309 @@
-import React from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import styled from 'styled-components'
-import Card from '../../components/common/Card'
-import GoogleMap from '../../components/common/GoogleMap'
+import paperTexture from '../../assets/pin-save/manual-pin-form-bg.png'
+import Header from '../../components/layout/Header'
+import {
+  PhotobookCityHeader,
+  PhotobookPinBlock,
+} from '../../features/photobooks/components'
 
-// 지도 확인용 임시 좌표. 실제 핀 데이터가 붙으면 API 응답으로 교체한다.
-const tripArchives = {
-  1: {
-    title: '파리 - 프라하',
-    period: '2024년 9월 3일 - 9월 18일',
-    duration: '16일',
-    tags: ['파리', '프라하', '체스키크룸로프'],
-    points: [
-      { name: '개선문', lat: 48.8738, lng: 2.295 },
-      { name: '루브르', lat: 48.8606, lng: 2.3376 },
-      { name: '카를교', lat: 50.0865, lng: 14.4114 },
-    ],
-  },
-  2: {
-    title: '도쿄 - 교토',
-    period: '2024년 3월 4일 - 3월 14일',
-    duration: '11일',
-    tags: ['도쿄', '교토', '오사카'],
-    points: [
-      { name: '시부야', lat: 35.6595, lng: 139.7004 },
-      { name: '기요미즈데라', lat: 34.9949, lng: 135.785 },
-      { name: '도톤보리', lat: 34.6687, lng: 135.5013 },
-    ],
-  },
+const PHOTO_GRADIENTS = {
+  amber: 'linear-gradient(180deg, #ebcea4 0%, #a87a52 100%)',
+  brown: 'linear-gradient(180deg, #c9a88b 0%, #3a2a20 100%)',
+  sage: 'linear-gradient(180deg, #f0e2cb 0%, #9da69b 100%)',
+  olive: 'linear-gradient(180deg, #d8c6a6 0%, #6b5b3e 100%)',
 }
 
-const fallbackArchive = tripArchives[2]
+const makePhotos = (pinId, gradients) =>
+  gradients.map((gradient, index) => ({
+    id: `${pinId}-photo-${index + 1}`,
+    gradient,
+  }))
+
+const NOTE =
+  '계단 끝에서 도시가 한 번에 펼쳐졌다. 숨 고르느라 오래 서 있었음.'
+
+// 6.2 UI 확인용 데이터다. API 연결 단계에서 상세 조회 응답으로 교체한다.
+const TRIP_ARCHIVE_FIXTURE = {
+  title: '파리 · 암스테르담',
+  period: '2024.09.03 – 2024.09.18',
+  pinCount: 12,
+  photoCount: 138,
+  voiceCount: 6,
+  cities: [
+    {
+      id: 'paris-primary',
+      name: 'PARIS',
+      pins: [
+        {
+          id: 101,
+          placeName: '몽마르트 언덕',
+          recordedAt: '2024.09.13 17:20',
+          photos: makePhotos('101', [
+            PHOTO_GRADIENTS.amber,
+            PHOTO_GRADIENTS.brown,
+            PHOTO_GRADIENTS.sage,
+            PHOTO_GRADIENTS.olive,
+          ]),
+          note: NOTE,
+          voiceDuration: 38,
+        },
+        {
+          id: 102,
+          placeName: '몽마르트 언덕',
+          recordedAt: '2024.09.13 17:20',
+          photos: makePhotos('102', [
+            PHOTO_GRADIENTS.sage,
+            PHOTO_GRADIENTS.amber,
+          ]),
+        },
+        {
+          id: 103,
+          placeName: '몽마르트 언덕',
+          recordedAt: '2024.09.13 17:20',
+          photos: makePhotos('103', [
+            PHOTO_GRADIENTS.brown,
+            PHOTO_GRADIENTS.sage,
+            PHOTO_GRADIENTS.olive,
+          ]),
+          note: NOTE,
+          voiceDuration: 38,
+        },
+      ],
+    },
+    {
+      id: 'paris-secondary',
+      name: 'PARIS',
+      pins: [
+        {
+          id: 104,
+          placeName: '몽마르트 언덕',
+          recordedAt: '2024.09.13 17:20',
+          photos: makePhotos('104', [
+            PHOTO_GRADIENTS.amber,
+            PHOTO_GRADIENTS.brown,
+            PHOTO_GRADIENTS.sage,
+            PHOTO_GRADIENTS.olive,
+          ]),
+          note: NOTE,
+          voiceDuration: 38,
+        },
+        {
+          id: 105,
+          placeName: '몽마르트 언덕',
+          recordedAt: '2024.09.13 17:20',
+          photos: makePhotos('105', [
+            PHOTO_GRADIENTS.sage,
+            PHOTO_GRADIENTS.amber,
+          ]),
+        },
+      ],
+    },
+  ],
+}
 
 const TripArchive = () => {
   const { tripID } = useParams()
-  const archive = tripArchives[tripID] || fallbackArchive
+  const navigate = useNavigate()
+  const [playingVoiceId, setPlayingVoiceId] = useState(null)
+  const archive = TRIP_ARCHIVE_FIXTURE
+
+  const handleToggleVoice = (pinId) => {
+    setPlayingVoiceId((currentId) => (currentId === pinId ? null : pinId))
+  }
 
   return (
-    <>
-      <PageHeader>
-        <BackLink to="/archive" aria-label="아카이브 화면으로 돌아가기">
-          &lt;
-        </BackLink>
-        <HeaderTitle>포토북 상세 화면</HeaderTitle>
-      </PageHeader>
+    <PageSurface>
+      <Header to="/archive" ariaLabel="포토북 목록으로 돌아가기" />
 
-      <TripArchiveWrapper>
-        <IntroCard>
-          <IntroHeader>
-            <TripTitle>{archive.title}</TripTitle>
-            <ManageLink to="/trip-management">여행 구간 관리</ManageLink>
-          </IntroHeader>
-          <TripMetaRow>
-            <TripMeta>{archive.period}</TripMeta>
-            <DurationBadge>{archive.duration}</DurationBadge>
-          </TripMetaRow>
-          <TagList aria-label="여행 도시 목록">
-            {archive.tags.map((tag) => (
-              <Tag key={tag}>{tag}</Tag>
-            ))}
-          </TagList>
-        </IntroCard>
+      <PageContent>
+        <HeroSection>
+          <TripSummary>
+            <TitleBlock>
+              <TitleRow>
+                <TripTitle>{archive.title}</TripTitle>
+                <ManageLink to={`/trip-management/${tripID}`}>
+                  여행 구간 관리
+                </ManageLink>
+              </TitleRow>
+              <TripPeriod>{archive.period}</TripPeriod>
+            </TitleBlock>
 
-        <MapSection>
-          <GoogleMap markers={archive.points} height="470px" />
-        </MapSection>
+            <TripStats>
+              {archive.pinCount} PIN · {archive.photoCount} PHOTO ·{' '}
+              {archive.voiceCount} VOICE
+            </TripStats>
+          </TripSummary>
 
-        <JourneyCard>
-          <SectionTitle>이번 여정</SectionTitle>
-          <SkeletonLine $width="66%" />
-          <SkeletonLine $width="28%" />
-        </JourneyCard>
+          <MapHero role="img" aria-label="여행 핀 지도">
+            지도 화면
+          </MapHero>
+        </HeroSection>
 
+        {archive.cities.map((city) => (
+          <CitySection key={city.id}>
+            <CityContent>
+              <PhotobookCityHeader
+                city={city.name}
+                pinCount={city.pins.length}
+              />
 
-        <PhotobookPlaceholder>포토북 Placeholder</PhotobookPlaceholder>
-        
-        <PhotobookMetaCard>
-          <MetaWrapper>
-            <MetaTitle>저장된 핀</MetaTitle>
-            <MetaInfo>12곳</MetaInfo>
-          </MetaWrapper>
-          <MetaWrapper>
-            <MetaTitle>포토북 사진</MetaTitle>
-            <MetaInfo>38장</MetaInfo>
-          </MetaWrapper>
-          <MetaWrapper>
-            <MetaTitle>방문 도시</MetaTitle>
-            <MetaInfo>3개</MetaInfo>
-          </MetaWrapper>
-        </PhotobookMetaCard>
-
-        <LinkText to="/archive">포토북 목록으로 돌아가기</LinkText>
-
-      </TripArchiveWrapper>
-    </>
+              <PinList>
+                {city.pins.map((pin) => (
+                  <PhotobookPinBlock
+                    key={pin.id}
+                    placeName={pin.placeName}
+                    recordedAt={pin.recordedAt}
+                    photos={pin.photos}
+                    note={pin.note}
+                    voiceMemo={
+                      pin.voiceDuration
+                        ? {
+                            duration: pin.voiceDuration,
+                            progress: 0.32,
+                            isPlaying: playingVoiceId === pin.id,
+                            onToggle: () => handleToggleVoice(pin.id),
+                          }
+                        : undefined
+                    }
+                    onOpenDetail={() => navigate(`/map/pin/${pin.id}`)}
+                  />
+                ))}
+              </PinList>
+            </CityContent>
+          </CitySection>
+        ))}
+      </PageContent>
+    </PageSurface>
   )
 }
 
 export default TripArchive
 
-const PageHeader = styled.header`
+const PageSurface = styled.div`
   width: 100%;
-  height: 50px;
-  border-bottom: 1px solid #e5e7eb;
-  background: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 10;
+  height: var(--app-viewport-height);
+  min-height: var(--app-viewport-height);
+  overflow-y: auto;
+  scrollbar-width: none;
+  background-color: var(--Background-Base);
+  background-image: url(${paperTexture});
+  background-repeat: repeat-y;
+  background-position: top center;
+  background-size: 100% auto;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 `
 
-const BackLink = styled(Link)`
-  width: 40px;
-  height: 100%;
-  color: #111827;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: absolute;
-  left: 12px;
-  text-decoration: none;
-  font-size: 22px;
-  line-height: 1;
-`
-
-const HeaderTitle = styled.h1`
-  color: #111827;
-  font-size: 13px;
-  font-weight: 700;
-`
-
-const TripArchiveWrapper = styled.main`
+const PageContent = styled.main`
   width: 100%;
   max-width: 450px;
-  min-height: 100vh;
   margin: 0 auto;
-  padding: 72px 24px 34px;
-  font-family: var(--font-sans);
-`
-
-const IntroCard = styled.section`
-  border: 1px solid #e5e7eb;
-  border-radius: 4px;
-  padding: 14px 14px 12px;
-  background: #fbfcfd;
+  padding: 4px 0 184px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 50px;
 `
 
-const IntroHeader = styled.div`
+const HeroSection = styled.section`
+  width: 100%;
+  padding: 0 24px;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
+  gap: 29px;
 `
 
-const TripTitle = styled.h2`
-  color: #111827;
-  font-size: 18px;
-  font-weight: 700;
+const TripSummary = styled.div`
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+`
+
+const TitleBlock = styled.div`
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+`
+
+const TitleRow = styled.div`
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+`
+
+const TripTitle = styled.h1`
+  min-width: 0;
+  color: var(--Text-Primary);
+  font: var(--text-ui-h2);
+  letter-spacing: -0.22px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 `
 
 const ManageLink = styled(Link)`
   flex: 0 0 auto;
-  color: #6b7280;
-  font-size: 11px;
+  color: #b6aca2;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
   text-decoration: underline;
+  text-underline-position: from-font;
 `
 
-const TripMetaRow = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+const TripPeriod = styled.p`
+  color: var(--Text-Secondary);
+  font: var(--text-ui-body-m);
 `
 
-const TripMeta = styled.p`
-  color: #4b5563;
-  font-size: 12px;
+const TripStats = styled.p`
+  min-height: 20px;
+  color: var(--Text-Secondary);
+  font: var(--text-ui-body-m);
 `
 
-const DurationBadge = styled.span`
-  min-height: 28px;
-  display: inline-flex;
-  align-items: center;
-  border: 1px solid #d9dde3;
-  border-radius: 999px;
-  padding: 0 12px;
-  color: #111827;
-  background: #fff;
-  font-size: 12px;
-  font-weight: 600;
-`
-
-const TagList = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-`
-
-const Tag = styled.span`
-  min-height: 28px;
-  display: inline-flex;
-  align-items: center;
-  border: 1px solid #d9dde3;
-  border-radius: 4px;
-  padding: 0 10px;
-  color: #111827;
-  background: #fff;
-  font-size: 12px;
-`
-
-const MapSection = styled.section`
-  margin-top: 22px;
-`
-
-const JourneyCard = styled.section`
-  min-height: 78px;
-  margin-top: 20px;
-  border: 1px solid #e5e7eb;
-  border-radius: 4px;
-  padding: 14px;
-  background: #fbfcfd;
-`
-
-const SectionTitle = styled.h3`
-  margin-bottom: 12px;
-  color: #111827;
-  font-size: 14px;
-  font-weight: 700;
-`
-
-const SkeletonLine = styled.span`
-  width: ${({ $width }) => $width};
-  height: 8px;
-  display: block;
-  border-radius: 999px;
-  background: #e5e7eb;
-
-  & + & {
-    margin-top: 8px;
-  }
-`
-
-const PhotobookPlaceholder = styled.div`
+const MapHero = styled.div`
   width: 100%;
-  height: 520px;
-  margin-top: 12px;
+  height: 224px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #111827;
-  color: #fff;
-  font-size: 13px;
+  overflow: hidden;
+  border-radius: 15px;
+  background: #e0e0e0;
+  box-shadow: 0 2px 6px rgb(48 38 28 / 6%);
+  color: #9ca3af;
+  font-family: Inter, sans-serif;
+  font-size: 11px;
 `
 
-const PhotobookMetaCard = styled(Card)`
-  margin-top: 16px;
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
+const CitySection = styled.section`
+  width: 100%;
+  padding: 26px;
+  background: #efe7da;
+  box-shadow: 0 4px 7px rgb(48 38 28 / 11%);
 `
 
-const MetaWrapper = styled.div`
+const CityContent = styled.div`
+  width: 100%;
+  max-width: 350px;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
+  gap: 28px;
 `
 
-const MetaTitle = styled.p`
-  font-size: 12px;
-`
-
-const MetaInfo = styled.p`
-  font-weight: bold;
-`
-
-const LinkText = styled(Link)`
-  display: inline-block;
-  margin-top: 24px;
-  font-size: 12px;
-  color: #555;
+const PinList = styled.div`
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
 `

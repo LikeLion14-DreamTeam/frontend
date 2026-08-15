@@ -7,8 +7,12 @@ const normalizePhoto = (photo, index, placeName) =>
   typeof photo === 'string'
     ? { id: `${photo}-${index}`, url: photo, alt: `${placeName} 사진 ${index + 1}` }
     : {
-        id: photo.id ?? photo.photoId ?? `${photo.url}-${index}`,
+        id:
+          photo.id ??
+          photo.photoId ??
+          `${photo.url ?? photo.gradient ?? 'photo'}-${index}`,
         url: photo.url,
+        gradient: photo.gradient,
         alt: photo.alt ?? `${placeName} 사진 ${index + 1}`,
       }
 
@@ -54,16 +58,27 @@ const PhotobookPinBlock = ({
 
         <PhotoGrid $count={photoCount}>
           {normalizedPhotos.length ? (
-            normalizedPhotos.map((photo, index) => (
-              <Photo
-                key={photo.id}
-                $count={photoCount}
-                $index={index}
-                src={photo.url}
-                alt={photo.alt}
-                loading="lazy"
-              />
-            ))
+            normalizedPhotos.map((photo, index) =>
+              photo.url ? (
+                <Photo
+                  key={photo.id}
+                  $count={photoCount}
+                  $index={index}
+                  src={photo.url}
+                  alt={photo.alt}
+                  loading="lazy"
+                />
+              ) : (
+                <PhotoPlaceholder
+                  key={photo.id}
+                  role="img"
+                  aria-label={photo.alt}
+                  $count={photoCount}
+                  $index={index}
+                  $gradient={photo.gradient}
+                />
+              ),
+            )
           ) : (
             <PhotoPlaceholder $count={photoCount} aria-label="사진 없음" />
           )}
@@ -232,7 +247,9 @@ const PhotoPlaceholder = styled.div`
   width: 100%;
   height: 100%;
   border-radius: 12px;
-  background: linear-gradient(180deg, #f0e2cb 0%, #9da69b 100%);
+  background: ${({ $gradient }) =>
+    $gradient ?? 'linear-gradient(180deg, #f0e2cb 0%, #9da69b 100%)'};
+  ${threePhotoPosition}
 `
 
 const Record = styled.div`
