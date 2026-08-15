@@ -9,7 +9,10 @@ import {
   replaceSelectionPhotos,
   syncSelectionPhotos,
 } from '../../features/onboarding/selectionPhotoApi'
-import { AB_PHOTO_ROUNDS } from '../../features/onboarding/selectionPhotoData'
+import {
+  AB_PHOTO_ROUNDS,
+  selectRandomPhotoSets,
+} from '../../features/onboarding/selectionPhotoData'
 import {
   getOnboardingFlowPath,
   isRelearningFlow,
@@ -26,6 +29,9 @@ const AbPreference = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const isRelearning = isRelearningFlow(location.search)
+  const [photoRounds] = useState(() =>
+    selectRandomPhotoSets(AB_PHOTO_ROUNDS),
+  )
   const [round, setRound] = useState(1)
   const [answers, setAnswers] = useState(() =>
     Array(TOTAL_ROUND).fill(null),
@@ -34,7 +40,7 @@ const AbPreference = () => {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
-  const photoRound = AB_PHOTO_ROUNDS[round - 1]
+  const photoRound = photoRounds[round - 1]
   const selectedPhotoId = answers[round - 1]
   const isLastRound = round === TOTAL_ROUND
 

@@ -12,7 +12,10 @@ import {
   replaceSelectionPhotos,
   syncSelectionPhotos,
 } from '../../features/onboarding/selectionPhotoApi'
-import { MOODBOARD_PHOTO_ROUNDS } from '../../features/onboarding/selectionPhotoData'
+import {
+  MOODBOARD_PHOTO_ROUNDS,
+  selectRandomPhotoSets,
+} from '../../features/onboarding/selectionPhotoData'
 import {
   getOnboardingFlowPath,
   isRelearningFlow,
@@ -27,6 +30,9 @@ const MoodBoard = () => {
   const isRelearning = isRelearningFlow(location.search)
   const user = useAuthStore((state) => state.user)
   const setUser = useAuthStore((state) => state.setUser)
+  const [photoRounds] = useState(() =>
+    selectRandomPhotoSets(MOODBOARD_PHOTO_ROUNDS),
+  )
   const [round, setRound] = useState(1)
   const [answers, setAnswers] = useState(() =>
     Array.from({ length: TOTAL_ROUND }, () => []),
@@ -35,7 +41,7 @@ const MoodBoard = () => {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
-  const photoRound = MOODBOARD_PHOTO_ROUNDS[round - 1]
+  const photoRound = photoRounds[round - 1]
   const selectedPhotoIds = answers[round - 1]
   const isLastRound = round === TOTAL_ROUND
   const isFilled = selectedPhotoIds.length === SELECT_LIMIT
