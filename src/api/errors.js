@@ -34,7 +34,10 @@ export const createApiError = (error) => {
     return error
   }
 
-  const serverError = error.response?.data?.error
+  // 대부분의 API는 `{ error: { code, message } }` 형식이지만, 대표사진
+  // 새로고침의 409은 `{ code, message }`를 최상위에 내려준다.
+  const responseBody = error.response?.data
+  const serverError = responseBody?.error ?? responseBody
 
   return new ApiError({
     status: error.response?.status ?? 0,
