@@ -1,10 +1,17 @@
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
+import { uploadAudio } from '../../api/uploads'
 import Button from '../../components/common/Button'
-import Tile from '../../components/common/Tile'
+import { createPin } from '../../features/pins/pinApi'
+import {
+  addCapturedPhotos,
+  attachUploadedPhotos,
+} from '../../features/pins/recordPhotos'
+import useVoiceRecorder, {
+  formatVoiceDuration,
+} from '../../features/pins/useVoiceRecorder'
 import backIcon from '../../assets/icons/trip-edit-back.svg'
-import chevronIcon from '../../assets/icons/trip-select-chevron.svg'
 import closeIcon from '../../assets/pin-save/close.svg'
 import backgroundTexture from '../../assets/pin-save/manual-pin-form-bg.png'
 import photoAddIcon from '../../assets/pin-save/manual-pin-photo-add.svg'
@@ -19,23 +26,191 @@ const WAVEFORM_HEIGHTS = [
   22, 10, 14, 7, 17, 11, 6, 13, 9, 5, 8, 6, 4, 5, 3, 4, 3, 2, 3, 2,
 ]
 
+const FALLBACK_LOCATION = { latitude: 37.5796, longitude: 126.9849 }
+
+const formatCurrentDate = () => {
+  const now = new Date()
+  const pad = (value) => String(value).padStart(2, '0')
+
+  return {
+    date: `${now.getFullYear()}.${pad(now.getMonth() + 1)}.${pad(now.getDate())}`,
+    time: new Intl.DateTimeFormat('ko-KR', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }).format(now),
+  }
+}
+
 const ManualPinDetails = () => {
   const navigate = useNavigate()
-  const [address, setAddress] = useState('')
+  const location = useLocation()
+  const latitude = Number.isFinite(location.state?.latitude)
+    ? location.state.latitude
+    : FALLBACK_LOCATION.latitude
+  const longitude = Number.isFinite(location.state?.longitude)
+    ? location.state.longitude
+    : FALLBACK_LOCATION.longitude
+  const address = location.state?.address ?? ''
+  const savedAt = useRef(formatCurrentDate()).current
+
+  const [placeName, setPlaceName] = useState('')
   const [memo, setMemo] = useState('')
-  const [hasPhotos, setHasPhotos] = useState(false)
+  const [photos, setPhotos] = useState([])
   const [isVoiceSheetOpen, setIsVoiceSheetOpen] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const photoInputRef = useRef(null)
+  const photosRef = useRef([])
+  const createdPinIdRef = useRef(null)
+  const uploadedPhotosRef = useRef(null)
+  const uploadedAudioRef = useRef(null)
+  const {
+    status: voiceStatus,
+    durationSec: voiceDurationSec,
+    audioFile: voiceFile,
+    audioUrl: voiceUrl,
+    errorMessage: voiceError,
+    startRecording,
+    stopRecording,
+    deleteRecording,
+  } = useVoiceRecorder()
+
+  useEffect(() => {
+    photosRef.current = photos
+  }, [photos])
+
+  useEffect(
+    () => () => {
+      photosRef.current.forEach((photo) => URL.revokeObjectURL(photo.url))
+    },
+    [],
+  )
 
   useEffect(() => {
     if (!isVoiceSheetOpen) return undefined
 
     const closeOnEscape = (event) => {
-      if (event.key === 'Escape') setIsVoiceSheetOpen(false)
+      if (event.key !== 'Escape') return
+      if (voiceStatus === 'recording' || voiceStatus === 'requesting') {
+        stopRecording()
+      }
+      setIsVoiceSheetOpen(false)
     }
 
     window.addEventListener('keydown', closeOnEscape)
     return () => window.removeEventListener('keydown', closeOnEscape)
-  }, [isVoiceSheetOpen])
+  }, [isVoiceSheetOpen, stopRecording, voiceStatus])
+
+  const handlePhotoSelection = (event) => {
+    const selectedPhotos = Array.from(event.target.files ?? [])
+      .filter((file) => file.type.startsWith('image/'))
+      .map((file) => ({
+        id: `${file.name}-${file.lastModified}-${
+          crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`
+        }`,
+        file,
+        url: URL.createObjectURL(file),
+        capturedAt: new Date(file.lastModified || Date.now()).toISOString(),
+      }))
+
+    if (selectedPhotos.length > 0) {
+      setPhotos((current) => [...current, ...selectedPhotos])
+    }
+
+    event.target.value = ''
+  }
+
+  const handleOpenVoiceMemo = () => {
+    setIsVoiceSheetOpen(true)
+    if (voiceStatus === 'idle' || voiceStatus === 'error') {
+      void startRecording()
+    }
+  }
+
+  const handleCloseVoiceMemo = () => {
+    if (voiceStatus === 'recording' || voiceStatus === 'requesting') {
+      stopRecording()
+    }
+    setIsVoiceSheetOpen(false)
+  }
+
+  const handleRecordAgain = () => {
+    uploadedAudioRef.current = null
+    deleteRecording()
+    void startRecording()
+  }
+
+  const handleDeleteRecording = () => {
+    uploadedAudioRef.current = null
+    deleteRecording()
+    setIsVoiceSheetOpen(false)
+  }
+
+  const handleSave = async () => {
+    if (isSaving) return
+
+    setIsSaving(true)
+    setSaveError('')
+
+    try {
+      if (
+        voiceFile &&
+        uploadedAudioRef.current?.sourceFile !== voiceFile
+      ) {
+        uploadedAudioRef.current = {
+          sourceFile: voiceFile,
+          url: await uploadAudio(voiceFile),
+        }
+      }
+
+      if (!createdPinIdRef.current) {
+        const createdPin = await createPin({
+          latitude,
+          longitude,
+          address,
+          city: '',
+          countryName: '',
+          placeName,
+          textNote: memo,
+          audioFile: uploadedAudioRef.current?.url,
+        })
+
+        createdPinIdRef.current = createdPin.pin_id
+      }
+
+      if (photos.length > 0) {
+        let photoResult
+
+        if (uploadedPhotosRef.current) {
+          photoResult = await attachUploadedPhotos(
+            createdPinIdRef.current,
+            uploadedPhotosRef.current,
+          )
+        } else {
+          const uploadResult = await addCapturedPhotos(
+            createdPinIdRef.current,
+            photos,
+            { latitude, longitude },
+          )
+          uploadedPhotosRef.current = uploadResult.uploadedPhotos
+          photoResult = uploadResult.result
+        }
+
+        if ((photoResult.rejected?.length ?? 0) > 0) {
+          throw new Error('일부 사진을 핀에 첨부하지 못했습니다.')
+        }
+      }
+
+      navigate('/map', { replace: true })
+    } catch (error) {
+      setSaveError(
+        error.message ?? '핀을 저장하지 못했습니다. 잠시 후 다시 시도해주세요.',
+      )
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   return (
     <Page>
@@ -49,7 +224,7 @@ const ManualPinDetails = () => {
         >
           <img src={backIcon} alt="" aria-hidden="true" />
         </BackButton>
-        <HeaderTitle>구간 편집</HeaderTitle>
+        <HeaderTitle>핀 추가</HeaderTitle>
       </Header>
 
       <Content>
@@ -65,8 +240,10 @@ const ManualPinDetails = () => {
 
         <ChosenLocation>
           <LocationCopy>
-            <ChosenName>북촌 한옥마을 입구</ChosenName>
-            <ChosenAddress>서울 종로구 계동길 37</ChosenAddress>
+            <ChosenName>{address || '지도에서 선택한 위치'}</ChosenName>
+            <ChosenAddress>
+              위도 {latitude.toFixed(5)} · 경도 {longitude.toFixed(5)}
+            </ChosenAddress>
           </LocationCopy>
           <ChangeLocationButton
             type="button"
@@ -80,46 +257,58 @@ const ManualPinDetails = () => {
           <AddressIcon src={locationIcon} alt="" aria-hidden="true" />
           <AddressInput
             type="text"
-            value={address}
-            onChange={(event) => setAddress(event.target.value)}
-            placeholder="상세 주소를 입력해주세요"
-            aria-label="상세 주소"
+            value={placeName}
+            onChange={(event) => setPlaceName(event.target.value)}
+            placeholder="장소 상세 이름을 입력해주세요"
+            aria-label="장소 상세 이름"
           />
         </AddressField>
 
         <DateFields>
           <FieldGroup>
             <FieldLabel>날짜</FieldLabel>
-            <SelectButton type="button">
-              <span>2024.11.03</span>
-              <Chevron src={chevronIcon} alt="" aria-hidden="true" />
-            </SelectButton>
+            <DateValue>{savedAt.date}</DateValue>
           </FieldGroup>
           <FieldGroup>
             <FieldLabel>시각</FieldLabel>
-            <SelectButton type="button">
-              <span>오후 2:40</span>
-              <Chevron src={chevronIcon} alt="" aria-hidden="true" />
-            </SelectButton>
+            <DateValue>{savedAt.time}</DateValue>
           </FieldGroup>
         </DateFields>
 
         <PhotoSection>
           <FieldLabel>사진</FieldLabel>
-          {hasPhotos ? (
+          <HiddenPhotoInput
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handlePhotoSelection}
+          />
+          {photos.length > 0 ? (
             <PhotoViewport>
               <PhotoStrip aria-label="추가된 사진">
-                {Array.from({ length: 4 }, (_, index) => (
-                  <PhotoTile
-                    key={index}
-                    interactive={false}
-                    aria-label={`추가된 사진 ${index + 1}`}
-                  />
+                {photos.map((photo, index) => (
+                  <PhotoTile key={photo.id}>
+                    <PhotoPreview
+                      src={photo.url}
+                      alt={`추가된 사진 ${index + 1}`}
+                    />
+                  </PhotoTile>
                 ))}
+                <AddMorePhotoButton
+                  type="button"
+                  onClick={() => photoInputRef.current?.click()}
+                >
+                  <AddPhotoIcon src={photoAddIcon} alt="" aria-hidden="true" />
+                  더 추가
+                </AddMorePhotoButton>
               </PhotoStrip>
             </PhotoViewport>
           ) : (
-            <AddPhotoButton type="button" onClick={() => setHasPhotos(true)}>
+            <AddPhotoButton
+              type="button"
+              onClick={() => photoInputRef.current?.click()}
+            >
               <AddPhotoIcon src={photoAddIcon} alt="" aria-hidden="true" />
               <span>사진 추가</span>
             </AddPhotoButton>
@@ -138,24 +327,32 @@ const ManualPinDetails = () => {
             <VoiceMemoButton
               type="button"
               $variant="ghost"
-              onClick={() => setIsVoiceSheetOpen(true)}
+              onClick={handleOpenVoiceMemo}
+              disabled={isSaving || Boolean(createdPinIdRef.current)}
             >
               <VoiceIcon src={microphoneIcon} alt="" aria-hidden="true" />
-              음성 메모 추가
+              {voiceFile ? '음성 메모 확인' : '음성 메모 추가'}
             </VoiceMemoButton>
             <CharacterCount>{memo.length} / 300</CharacterCount>
           </NoteActions>
         </NoteField>
       </Content>
 
-      <AddPinButton type="button">핀 추가하기</AddPinButton>
+      <AddPinButton
+        type="button"
+        onClick={handleSave}
+        disabled={isSaving}
+      >
+        {isSaving ? '저장 중...' : '핀 추가하기'}
+      </AddPinButton>
+      {saveError && <SaveError role="alert">{saveError}</SaveError>}
 
       {isVoiceSheetOpen && (
         <ModalLayer>
           <Scrim
             type="button"
             aria-label="음성 메모 닫기"
-            onClick={() => setIsVoiceSheetOpen(false)}
+            onClick={handleCloseVoiceMemo}
           />
           <VoiceSheet
             role="dialog"
@@ -167,14 +364,19 @@ const ManualPinDetails = () => {
             <CloseButton
               type="button"
               aria-label="음성 메모 닫기"
-              onClick={() => setIsVoiceSheetOpen(false)}
+              onClick={handleCloseVoiceMemo}
             >
               <CloseIcon src={closeIcon} alt="" aria-hidden="true" />
             </CloseButton>
 
             <RecordingState>
-              <RecordingDot src={recordingDotIcon} alt="" aria-hidden="true" />
-              녹음 중
+              {voiceStatus === 'recording' && (
+                <RecordingDot src={recordingDotIcon} alt="" aria-hidden="true" />
+              )}
+              {voiceStatus === 'requesting' && '마이크 권한 확인 중'}
+              {voiceStatus === 'recording' && '녹음 중'}
+              {voiceStatus === 'recorded' && '녹음 완료'}
+              {voiceStatus === 'error' && '녹음 오류'}
             </RecordingState>
 
             <Waveform aria-hidden="true">
@@ -182,23 +384,50 @@ const ManualPinDetails = () => {
                 <WaveformBar
                   key={`${height}-${index}`}
                   $height={height}
-                  $active={index < 38}
+                  $active={
+                    voiceStatus === 'recording' ||
+                    (voiceStatus === 'recorded' && index < 38)
+                  }
                 />
               ))}
             </Waveform>
 
-            <RecordingTime>00:23</RecordingTime>
-            <RecordAgainButton type="button">다시녹음</RecordAgainButton>
-            <StopButton
+            <RecordingTime>
+              {formatVoiceDuration(voiceDurationSec)}
+            </RecordingTime>
+            {voiceUrl && (
+              <VoicePlayback controls src={voiceUrl} aria-label="녹음 미리 듣기" />
+            )}
+            {voiceError && <VoiceError role="alert">{voiceError}</VoiceError>}
+            <RecordAgainButton
               type="button"
-              aria-label="녹음 중지"
-              onClick={() => setIsVoiceSheetOpen(false)}
+              onClick={handleRecordAgain}
+              disabled={
+                voiceStatus === 'requesting' || voiceStatus === 'recording'
+              }
             >
-              <StopIcon aria-hidden="true" />
-            </StopButton>
+              다시녹음
+            </RecordAgainButton>
+            {voiceStatus === 'recording' ? (
+              <StopButton
+                type="button"
+                aria-label="녹음 중지"
+                onClick={stopRecording}
+              >
+                <StopIcon aria-hidden="true" />
+              </StopButton>
+            ) : (
+              <ConfirmRecordingButton
+                type="button"
+                onClick={handleCloseVoiceMemo}
+                disabled={voiceStatus === 'requesting'}
+              >
+                완료
+              </ConfirmRecordingButton>
+            )}
             <DeleteRecordingButton
               type="button"
-              onClick={() => setIsVoiceSheetOpen(false)}
+              onClick={handleDeleteRecording}
             >
               삭제
             </DeleteRecordingButton>
@@ -410,36 +639,18 @@ const FieldLabel = styled.p`
   font: var(--text-ui-caption);
 `
 
-const SelectButton = styled.button`
+const DateValue = styled.div`
   width: 100%;
   height: 45px;
   padding: 12px 14px;
   display: flex;
   align-items: center;
-  gap: 8px;
   overflow: hidden;
-  border: 0;
   border-radius: 12px;
   background: var(--Surface-Base);
   color: var(--Text-Primary);
   font: var(--text-ui-label);
   text-align: left;
-  cursor: pointer;
-
-  span {
-    min-width: 0;
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-`
-
-const Chevron = styled.img`
-  width: 11.5px;
-  height: 6.5px;
-  flex: 0 0 auto;
-  display: block;
 `
 
 const PhotoSection = styled.section`
@@ -464,6 +675,10 @@ const AddPhotoButton = styled.button`
   cursor: pointer;
 `
 
+const HiddenPhotoInput = styled.input`
+  display: none;
+`
+
 const AddPhotoIcon = styled.img`
   width: 20px;
   height: 20px;
@@ -477,14 +692,29 @@ const PhotoViewport = styled.div`
 `
 
 const PhotoStrip = styled.div`
-  width: 475px;
+  width: max-content;
   display: flex;
   gap: 10px;
 `
 
-const PhotoTile = styled(Tile)`
+const PhotoTile = styled.div`
   width: 111.333px;
   height: 124px;
+  flex: 0 0 111.333px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--Map-Land);
+`
+
+const PhotoPreview = styled.img`
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+`
+
+const AddMorePhotoButton = styled(AddPhotoButton)`
+  width: 111.333px;
   flex: 0 0 111.333px;
 `
 
@@ -564,6 +794,17 @@ const AddPinButton = styled(Button)`
   font: var(--text-ui-button);
 `
 
+const SaveError = styled.p`
+  position: absolute;
+  z-index: 3;
+  top: 827px;
+  right: 24px;
+  left: 24px;
+  color: #b42318;
+  font: var(--text-ui-caption);
+  text-align: center;
+`
+
 const ModalLayer = styled.div`
   position: fixed;
   z-index: 50;
@@ -587,7 +828,7 @@ const VoiceSheet = styled.section`
   right: 0;
   bottom: 0;
   left: 0;
-  height: 298px;
+  height: 320px;
   overflow: hidden;
   border-radius: 30px 30px 0 0;
   background: var(--Surface-Base);
@@ -683,7 +924,7 @@ const RecordingTime = styled.p`
 
 const SheetTextButton = styled.button`
   position: absolute;
-  top: 234px;
+  top: 257px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -698,7 +939,7 @@ const RecordAgainButton = styled(SheetTextButton)`
 
 const StopButton = styled.button`
   position: absolute;
-  top: 211px;
+  top: 232px;
   left: 50%;
   width: 68px;
   height: 68px;
@@ -718,6 +959,30 @@ const StopIcon = styled.span`
   height: 20px;
   border-radius: 4px;
   background: var(--Text-Inverse);
+`
+
+const ConfirmRecordingButton = styled(StopButton)`
+  color: var(--Text-Inverse);
+  font: var(--text-ui-button);
+`
+
+const VoicePlayback = styled.audio`
+  position: absolute;
+  top: 184px;
+  left: 50%;
+  width: 220px;
+  height: 32px;
+  transform: translateX(-50%);
+`
+
+const VoiceError = styled.p`
+  position: absolute;
+  top: 184px;
+  right: 36px;
+  left: 36px;
+  color: #b42318;
+  font: var(--text-ui-caption);
+  text-align: center;
 `
 
 const DeleteRecordingButton = styled(SheetTextButton)`

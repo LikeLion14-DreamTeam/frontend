@@ -36,6 +36,102 @@ const buildMockPinDetail = (pinId) => {
   }
 }
 
+/** mock 전용. 새 핀과 선택적인 음성 메모를 진행 중인 여정에 저장한다. */
+const createMockPin = (pinPayload) => {
+  const pinId =
+    Math.max(0, ...Object.keys(mockPinStore.pins).map(Number)) + 1
+  const taggedAt = new Date().toISOString()
+
+  const pin = {
+    pin_id: pinId,
+    segment_id: null,
+    nfc_tag_id: pinPayload.nfc_tag_id ?? null,
+    latitude: pinPayload.latitude ?? null,
+    longitude: pinPayload.longitude ?? null,
+    address: pinPayload.address ?? '',
+    city: pinPayload.city ?? '',
+    country_name: pinPayload.country_name ?? '',
+    place_name: pinPayload.place_name ?? '',
+    tagged_at: taggedAt,
+    text_note: pinPayload.text_note ?? '',
+  }
+
+  let voiceMemo = null
+
+  if (pinPayload.audio_file) {
+    const voiceMemoId =
+      Math.max(
+        0,
+        ...Object.values(mockPinStore.voiceMemos)
+          .filter(Boolean)
+          .map((memo) => memo.voice_memo_id),
+      ) + 1
+
+    mockPinStore.voiceMemos[pinId] = {
+      voice_memo_id: voiceMemoId,
+      audio_file:
+        getMockUploadedUrl(pinPayload.audio_file) ?? pinPayload.audio_file,
+      duration_sec: 0,
+      saved_at: taggedAt,
+    }
+    voiceMemo = { voice_memo_id: voiceMemoId }
+  } else {
+    mockPinStore.voiceMemos[pinId] = null
+  }
+
+  mockPinStore.pins[pinId] = pin
+  mockPinStore.photos[pinId] = []
+
+  return {
+    pin_id: pin.pin_id,
+    segment_id: pin.segment_id,
+    latitude: pin.latitude,
+    longitude: pin.longitude,
+    address: pin.address,
+    place_name: pin.place_name,
+    tagged_at: pin.tagged_at,
+    text_note: pin.text_note,
+    voice_memo: voiceMemo,
+  }
+}
+
+/**
+ * API 명세 8.2: NFC 태깅 또는 수동 촬영 결과를 새 핀으로 저장한다.
+ *
+ * 여행 구간은 요청에서 지정하지 않으며 서버가 항상 segment_id = null 로 만든다.
+ * `audioFile` 은 업로드된 음성 파일의 공개 URL이다. 촬영 사진은 핀 생성 후
+ * 5.5 API로 별도 등록한다.
+ */
+export const createPin = async ({
+  nfcTagId,
+  latitude,
+  longitude,
+  address,
+  city,
+  countryName,
+  placeName = '',
+  textNote = '',
+  audioFile,
+}) => {
+  const pinPayload = {
+    nfc_tag_id: nfcTagId ?? null,
+    latitude,
+    longitude,
+    address,
+    city,
+    country_name: countryName,
+    place_name: placeName,
+    text_note: textNote,
+    audio_file: audioFile ?? null,
+  }
+
+  if (USE_MOCK) {
+    return createMockPin(pinPayload)
+  }
+
+  return apiClient.post('/pins', pinPayload)
+}
+
 /**
  * 진행 중인 여행의 핀 목록.
  *
@@ -153,7 +249,8 @@ const PHOTO_RADIUS_METERS = 1000
  * 5.5 사진 등록
  *
  * 핀 반경 1km 이내에서 촬영된 사진만 등록한다. 반경 밖이거나 좌표가 없는 사진은
- * 그것만 제외하고 나머지는 정상 등록한다(요청 전체를 거부하지 않음).
+ * 그것만 제외하고 나머지는 정상 등록한다(요청 전체를 거부하지 않음). 단, 위치
+ * 권한 없이 만든 좌표 없는 핀의 즉시 촬영 사진은 함께 좌표가 없어도 등록한다.
  *
  * API 명세는 종료된 여행의 핀을 409 로 막지만, 팀 논의로 허용하기로 정해
  * 여행 종료 여부는 보지 않는다.
@@ -171,15 +268,25 @@ export const addPinPhotos = async (pinId, photos) => {
     const stored = mockPinStore.photos[pinId] ?? []
 
     photos.forEach((photo) => {
+      const isLocationlessCapture =
+        pin.latitude == null &&
+        pin.longitude == null &&
+        photo.latitude == null &&
+        photo.longitude == null
+
       if (photo.latitude == null || photo.longitude == null) {
-        rejected.push({ file_id: photo.file_id, reason: 'MISSING_COORDINATES' })
-        return
+        if (!isLocationlessCapture) {
+          rejected.push({ file_id: photo.file_id, reason: 'MISSING_COORDINATES' })
+          return
+        }
       }
 
-      const distance = distanceInMeters(
-        { lat: pin.latitude, lng: pin.longitude },
-        { lat: photo.latitude, lng: photo.longitude },
-      )
+      const distance = isLocationlessCapture
+        ? 0
+        : distanceInMeters(
+            { lat: pin.latitude, lng: pin.longitude },
+            { lat: photo.latitude, lng: photo.longitude },
+          )
 
       if (distance > PHOTO_RADIUS_METERS) {
         rejected.push({ file_id: photo.file_id, reason: 'OUT_OF_RADIUS' })
