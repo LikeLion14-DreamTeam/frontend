@@ -5,7 +5,7 @@ import { Marker, Polyline, useApiIsLoaded } from '@vis.gl/react-google-maps'
 import Button from '../../components/common/Button'
 import GoogleMap from '../../components/common/GoogleMap'
 import NavBar from '../../components/layout/NavBar'
-import currentPositionIcon from '../../assets/map/current-position.svg'
+import currentPositionSvg from '../../assets/map/current-position.svg?raw'
 import dropdownCheckIcon from '../../assets/map/dropdown-check.svg'
 import activePinIcon from '../../assets/map/map-pin-active.svg'
 import pinIcon from '../../assets/map/map-pin.svg'
@@ -31,7 +31,35 @@ const ONGOING_TRIP_ID = 'ongoing'
 // 아이콘 파일의 원본 크기. 정중앙을 좌표에 맞추는 데 쓴다.
 const PIN_SIZE = { width: 38, height: 38 }
 const ACTIVE_PIN_SIZE = { width: 48, height: 48 }
-const CURRENT_POSITION_SIZE = { width: 68, height: 56 }
+
+/* 현재 위치 아이콘은 점(17, 28)에서 오른쪽으로 원뿔이 뻗은 모양이다.
+   그 점을 축으로 돌리면 원뿔이 원래 68x56 박스를 벗어나 잘리므로,
+   점에서 원뿔 끝까지(38.25)를 반지름으로 하는 정사각형으로 다시 잡는다. */
+const CURRENT_POSITION_ORIGIN = { x: 17, y: 28 }
+const CURRENT_POSITION_RADIUS = 38.25
+const CURRENT_POSITION_BOX = CURRENT_POSITION_RADIUS * 2
+
+/**
+ * 진행 방향만큼 돌린 현재 위치 아이콘을 만든다.
+ * 원본 SVG 를 그대로 쓰고 바깥 그룹에 회전만 얹는다.
+ */
+const buildCurrentPositionIcon = (heading) => {
+  const { x, y } = CURRENT_POSITION_ORIGIN
+  const viewBox = `${x - CURRENT_POSITION_RADIUS} ${y - CURRENT_POSITION_RADIUS} ${CURRENT_POSITION_BOX} ${CURRENT_POSITION_BOX}`
+
+  const svg = currentPositionSvg
+    .replace(
+      /width="[^"]*" height="[^"]*" viewBox="[^"]*"/,
+      `width="${CURRENT_POSITION_BOX}" height="${CURRENT_POSITION_BOX}" viewBox="${viewBox}"`,
+    )
+    // 아이콘이 기본으로 동쪽을 보고 있어 90도를 뺀다(heading 은 북쪽이 0).
+    .replace(
+      '<g id="Group 3">',
+      `<g id="Group 3" transform="rotate(${heading - 90} ${x} ${y})">`,
+    )
+
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+}
 
 /** 여정 목록 부제. 아직 못 받은 값은 빼고 잇는다. */
 const formatCounts = ({ pin_count, photo_count }) =>
@@ -80,10 +108,34 @@ const MapPage = () => {
   const [mapCenter, setMapCenter] = useState(DEFAULT_CENTER)
   const [mapKey, setMapKey] = useState(0)
 
+  const [currentPosition, setCurrentPosition] = useState(null)
+  const [heading, setHeading] = useState(0)
   const [trips, setTrips] = useState([])
   const [selectedTripId, setSelectedTripId] = useState(null)
   const [tripPins, setTripPins] = useState([])
   const [tripError, setTripError] = useState('')
+
+  /**
+   * 현재 위치 마커. 걸어 다니며 쓰는 화면이라 한 번만 받지 않고 계속 따라간다.
+   * 권한을 거부하면 마커를 그리지 않는다.
+   */
+  useEffect(() => {
+    if (!navigator.geolocation) return undefined
+
+    const watchId = navigator.geolocation.watchPosition(
+      ({ coords }) => {
+        setCurrentPosition({ lat: coords.latitude, lng: coords.longitude })
+
+        // heading 은 움직일 때만 들어온다. 멈춰 있으면 마지막 방향을 유지한다.
+        if (coords.heading != null && !Number.isNaN(coords.heading)) {
+          setHeading(coords.heading)
+        }
+      },
+      () => setCurrentPosition(null),
+    )
+
+    return () => navigator.geolocation.clearWatch(watchId)
+  }, [])
 
   /**
    * 4.1 로 종료된 여정을 받고, 진행 중인 여행이 있으면 목록 맨 앞에 얹는다.
@@ -216,6 +268,11 @@ const MapPage = () => {
   )
   const selectedPin = mapPins.find(({ pin_id }) => pin_id === selectedPinId)
 
+  const currentPositionIcon = useMemo(
+    () => buildCurrentPositionIcon(heading),
+    [heading],
+  )
+
   const [pinDetail, setPinDetail] = useState(null)
   const [pinPhotos, setPinPhotos] = useState([])
   const [sheetError, setSheetError] = useState('')
@@ -266,10 +323,19 @@ const MapPage = () => {
     pinPhotos.find((photo) => photo.is_pin_cover) ?? pinPhotos[0]
 
   const handleLocate = () => {
+    if (currentPosition) {
+      setMapCenter(currentPosition)
+      setMapKey((current) => current + 1)
+      return
+    }
+
     if (!navigator.geolocation) return
 
     navigator.geolocation.getCurrentPosition(({ coords }) => {
-      setMapCenter({ lat: coords.latitude, lng: coords.longitude })
+      const position = { lat: coords.latitude, lng: coords.longitude }
+
+      setCurrentPosition(position)
+      setMapCenter(position)
       setMapKey((current) => current + 1)
     })
   }
@@ -322,12 +388,17 @@ const MapPage = () => {
             )
           })}
 
-          <Marker
-            position={{ lat: 48.8589, lng: 2.3462 }}
-            icon={centeredIcon(currentPositionIcon, CURRENT_POSITION_SIZE)}
-            title="현재 위치"
-            zIndex={4}
-          />
+          {currentPosition && (
+            <Marker
+              position={currentPosition}
+              icon={centeredIcon(currentPositionIcon, {
+                width: CURRENT_POSITION_BOX,
+                height: CURRENT_POSITION_BOX,
+              })}
+              title="현재 위치"
+              zIndex={4}
+            />
+          )}
         </GoogleMap>
       </MapLayer>
 
