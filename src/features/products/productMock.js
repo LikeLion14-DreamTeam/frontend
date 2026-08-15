@@ -1,6 +1,7 @@
 import { ApiError } from '../../api/errors'
 
 const MOCK_PRODUCTS_STORAGE_KEY = 'orte:mock:products'
+const MOCK_USER_ID = 1
 
 const DEFAULT_MOCK_PRODUCTS = [
   {
@@ -70,6 +71,38 @@ const MOCK_PRODUCTS = loadMockProducts()
 export const getMockProducts = () => ({
   products: MOCK_PRODUCTS.map((product) => ({ ...product })),
 })
+
+/** API 명세 8.1과 같이 NFC 태그를 현재 사용자 계정에 연결한다. */
+export const linkMockProduct = (tagId) => {
+  const linkedProduct = MOCK_PRODUCTS.find(
+    (product) => product.tag_id === tagId,
+  )
+
+  if (linkedProduct) {
+    return {
+      tag_id: linkedProduct.tag_id,
+      user_id: MOCK_USER_ID,
+      registered_at: linkedProduct.registered_at,
+    }
+  }
+
+  const registeredAt = new Date().toISOString()
+
+  MOCK_PRODUCTS.push({
+    tag_id: tagId,
+    product_type: null,
+    product_name: '',
+    registered_at: registeredAt,
+    pin_count: 0,
+  })
+  persistMockProducts()
+
+  return {
+    tag_id: tagId,
+    user_id: MOCK_USER_ID,
+    registered_at: registeredAt,
+  }
+}
 
 /** API 명세 7.2와 같이 제품의 계정 연결을 해제한다. */
 export const unlinkMockProduct = (tagId) => {
