@@ -44,6 +44,28 @@ const findComponent = (components, type) =>
   components.find((component) => component.types.includes(type))
 
 /**
+ * 결과 중 사람이 읽을 주소를 고른다.
+ *
+ * 산속이나 바다처럼 도로명이 없는 곳은 첫 결과가 `RHV5+M2 일본 야마나시현…`
+ * 같은 플러스 코드다. 좌표를 문자로 줄인 구글 표기라 주소로 보여줄 게 못 된다.
+ * 결과는 좁은 범위부터 오므로, 플러스 코드가 아닌 것 중 첫 번째가 가장 정확하다.
+ */
+const pickAddressResult = (results) =>
+  results.find((result) => !result.types.includes('plus_code')) ?? results[0]
+
+/**
+ * 앞에 붙은 플러스 코드를 떼어낸다.
+ *
+ * 플러스 코드 결과밖에 없을 때를 위한 대비다. 코드만 지우면 뒤에 남는
+ * `일본 야마나시현 호쿠토시` 가 주소 역할을 한다.
+ */
+const PLUS_CODE_PREFIX =
+  /^[23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]{2,3}\s*/
+
+const toReadableAddress = (formattedAddress = '') =>
+  formattedAddress.replace(PLUS_CODE_PREFIX, '').trim()
+
+/**
  * @param latitude 위도. 위치 권한을 거부했으면 null 이다.
  * @param longitude 경도
  * @returns `{ address, city, countryName, countryCode }` 또는 실패 시 null
@@ -61,8 +83,7 @@ export const reverseGeocode = async ({ latitude, longitude }) => {
       language: 'ko',
     })
 
-    // 첫 결과가 좌표에 가장 가까운 주소다.
-    const [best] = results
+    const best = pickAddressResult(results)
     if (!best) return null
 
     const components = best.address_components
@@ -73,7 +94,7 @@ export const reverseGeocode = async ({ latitude, longitude }) => {
     const country = findComponent(components, 'country')
 
     return {
-      address: best.formatted_address ?? '',
+      address: toReadableAddress(best.formatted_address),
       city: city ?? '',
       countryName: country?.long_name ?? '',
       // ISO 3166-1 alpha-2. 여권 도장 파일명(`KR.webp`)과 같은 값이다.

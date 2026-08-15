@@ -53,6 +53,8 @@ const ManualPinDetails = () => {
     ? location.state.longitude
     : FALLBACK_LOCATION.longitude
   const address = location.state?.address ?? ''
+  /** 위치 선택 화면에서 이미 받아 온 주소·도시·나라. 없으면 여기서 다시 묻는다. */
+  const passedPlace = location.state?.place ?? null
   const savedAt = useRef(formatCurrentDate()).current
 
   const [placeName, setPlaceName] = useState('')
@@ -84,10 +86,12 @@ const ManualPinDetails = () => {
    * 저장 버튼이 먼저 눌려도 handleSave 가 같은 요청을 기다린다.
    */
   const resolveLocationDetails = useCallback(() => {
+    if (passedPlace) return Promise.resolve(passedPlace)
+
     locationRequestRef.current ??= reverseGeocode({ latitude, longitude })
 
     return locationRequestRef.current
-  }, [latitude, longitude])
+  }, [latitude, longitude, passedPlace])
 
   // 화면에 들어오면 바로 받아 온다. 검색어를 안 넣었어도 주소가 보인다.
   useEffect(() => {
