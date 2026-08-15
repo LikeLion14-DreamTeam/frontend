@@ -73,6 +73,7 @@ const PinDetail = () => {
   const [pin, setPin] = useState(null)
   const [photos, setPhotos] = useState([])
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [refreshError, setRefreshError] = useState('')
   const [journey, setJourney] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
@@ -283,6 +284,7 @@ const PinDetail = () => {
 
   const handleRefreshSuggested = async () => {
     setIsRefreshing(true)
+    setRefreshError('')
 
     try {
       const result = await refreshRepresentativePhotos(pinID)
@@ -291,7 +293,7 @@ const PinDetail = () => {
         representative_photos: result.representative_photos,
       }))
     } catch (error) {
-      setErrorMessage(error.message)
+      setRefreshError(error.message)
     } finally {
       setIsRefreshing(false)
     }
@@ -535,15 +537,21 @@ const PinDetail = () => {
               <RefreshButton
                 type="button"
                 onClick={handleRefreshSuggested}
-                disabled={isRefreshing || photos.length === 0}
+                disabled={isRefreshing || photos.length < 4}
               >
                 <img src={refreshIcon} alt="" />
                 {isRefreshing ? '고르는 중...' : '재추천'}
               </RefreshButton>
             </SuggestedHeading>
             <SuggestedDescription>
-              AI가 이 장소 주변, 같은 시간대에 찍은 사진 중에서 골랐어요
+              AI가 취향 프로파일을 기준으로 상위 사진 중 3장을 골랐어요
             </SuggestedDescription>
+            {photos.length < 4 && !refreshError && (
+              <RefreshHint>
+                대표사진 새로고침은 사진이 4장 이상일 때만 가능합니다.
+              </RefreshHint>
+            )}
+            {refreshError && <RefreshError role="alert">{refreshError}</RefreshError>}
 
             <SuggestedGrid>
               {representativePhotos.map((photo, index) => (
@@ -1148,11 +1156,26 @@ const RefreshButton = styled.button`
     height: 15px;
     display: block;
   }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+  }
 `
 
 const SuggestedDescription = styled.p`
   color: var(--Text-Secondary);
   font: var(--text-ui-nav);
+`
+
+const RefreshHint = styled.p`
+  color: var(--Text-Secondary);
+  font: var(--text-ui-caption);
+`
+
+const RefreshError = styled.p`
+  color: var(--Status-Error, #b3261e);
+  font: var(--text-ui-caption);
 `
 
 const SuggestedGrid = styled.div`

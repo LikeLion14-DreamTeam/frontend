@@ -386,7 +386,8 @@ export const deletePhoto = async (photoId) => {
  * 그중 무작위 3개를 대표사진으로 지정한다(기존 3장 해제 후 새 3장에 is_pin_cover=true).
  * 이전 추천 이력은 보존하지 않으며, 이 행위 자체는 취향 학습에 반영되지 않는다.
  *
- * mock 에는 취향 프로파일이 없어 무작위 3장으로만 다시 지정한다.
+ * mock 에는 취향 프로파일이 없어 저장된 사진 순서를 프로파일 재정렬 결과로
+ * 간주하고, 그 상위 10장 안에서 무작위 3장을 다시 지정한다.
  */
 export const refreshRepresentativePhotos = async (pinId) => {
   if (USE_MOCK) {
@@ -394,9 +395,18 @@ export const refreshRepresentativePhotos = async (pinId) => {
     if (!pin) throw mockNotFound()
 
     const photos = mockPinStore.photos[pinId] ?? []
-    const picked = [...photos]
+    if (photos.length < 4) {
+      throw new ApiError({
+        status: 409,
+        code: 'CONFLICT',
+        message: '대표사진 새로고침은 사진이 4장 이상일 때만 가능합니다.',
+      })
+    }
+
+    const picked = photos
+      .slice(0, 10)
       .sort(() => Math.random() - 0.5)
-      .slice(0, Math.min(3, photos.length))
+      .slice(0, 3)
     const pickedIds = new Set(picked.map((photo) => photo.photo_id))
 
     photos.forEach((photo) => {
