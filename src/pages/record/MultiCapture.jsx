@@ -285,9 +285,9 @@ const MultiCapture = () => {
 export default MultiCapture
 
 /* 하단 패널의 확정 높이. 뷰파인더가 남은 공간을 채우므로 구성을 바꾸면 함께 고친다.
-   66(썸네일) + 15(간격) + 72(컨트롤) + 20(아래 여백)
+   66(썸네일) + 15(간격) + 72(컨트롤) + 17(아래 여백)
    시안은 45 지만 화면이 짧을 때 뷰파인더가 너무 줄어 조금 좁혔다. */
-const BOTTOM_PANEL_HEIGHT = '173px'
+const BOTTOM_PANEL_HEIGHT = '170px'
 
 /* 뷰파인더와 썸네일 사이의 최소 간격. 남는 높이가 있으면 위아래로 나뉘어
    이보다 벌어지고, 화면이 짧으면 뷰파인더가 줄어 이 간격을 지킨다.
@@ -417,7 +417,7 @@ const RetryButton = styled.button`
 const BottomPanel = styled.section`
   flex: 0 0 auto;
   height: calc(${BOTTOM_PANEL_HEIGHT} + env(safe-area-inset-bottom));
-  padding: 0 24px calc(20px + env(safe-area-inset-bottom));
+  padding: 0 24px calc(17px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
 `
