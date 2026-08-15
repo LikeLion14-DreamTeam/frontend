@@ -1,18 +1,19 @@
 import { useState } from 'react'
 import { GoogleLogin } from '@react-oauth/google'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import Button from '../../components/common/Button'
 import Header from '../../components/layout/Header'
 import { setSessionToken } from '../../api/session'
 import { loginWithGoogle } from '../../features/auth/authApi'
-import { getAuthenticatedEntryPath } from '../../features/auth/authRoutes'
+import { getPostLoginPath } from '../../features/auth/authRoutes'
 import useAuthStore from '../../features/auth/useAuthStore'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim()
 
 const Login = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   const setUser = useAuthStore((state) => state.setUser)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
@@ -34,7 +35,9 @@ const Login = () => {
 
       setSessionToken(sessionToken)
       setUser(user)
-      navigate(getAuthenticatedEntryPath(user), { replace: true })
+      navigate(getPostLoginPath(user, location.state?.from), {
+        replace: true,
+      })
     } catch (error) {
       setErrorMessage(
         error.message ?? '로그인에 실패했습니다. 잠시 후 다시 시도해 주세요.',

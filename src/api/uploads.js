@@ -73,3 +73,15 @@ export const uploadPhoto = async (file) => {
 
   return file_id
 }
+
+/** 음성 파일을 업로드하고 8.2의 audio_file에 전달할 file_id를 반환한다. */
+export const uploadAudio = async (file) => {
+  const { upload_url, file_id } = await createUpload({
+    fileType: 'audio',
+    contentType: file.type || 'audio/webm',
+  })
+
+  await uploadFile({ uploadUrl: upload_url, fileId: file_id, file })
+
+  return file_id
+}

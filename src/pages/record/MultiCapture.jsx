@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import styled, { createGlobalStyle } from 'styled-components'
 import trashIcon from '../../assets/icons/capture-trash.svg'
 import closeIcon from '../../assets/icons/capture-close.svg'
+import { linkProduct } from '../../features/products/productApi'
+import useRecordDraftStore from '../../features/pins/useRecordDraftStore'
 
 /**
  * 연속 촬영 화면 (피그마 `8 사진 촬영 화면`, `8.1 사진 촬영 세부`)
@@ -27,8 +29,8 @@ const JPEG_QUALITY = 0.92
 // 저장 비율 3:4 고정. 뷰파인더도 같은 비율이라 보이는 그대로 찍힌다.
 const CAPTURE_RATIO = 3 / 4
 
-// TODO: NFC 태그·위치 연동 전까지 쓰는 임시 문구.
-const TAG_CONTEXT = '경복궁 광화문 앞 · 태그 인식됨'
+// 개발 모드의 StrictMode 재마운트에서도 같은 NFC 연결 요청을 중복 호출하지 않는다.
+const requestedTagLinks = new Set()
 
 /** 상하단 안전영역을 화면 배경색과 맞춘다. 그 영역은 배경 "색상"만 따라간다. */
 const DarkSafeArea = createGlobalStyle`
@@ -41,20 +43,32 @@ const DarkSafeArea = createGlobalStyle`
 
 const MultiCapture = () => {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const videoRef = useRef(null)
   const streamRef = useRef(null)
-  const shotsRef = useRef([])
 
-  const [shots, setShots] = useState([])
+  const storedPhotos = useRecordDraftStore((draft) => draft.photos)
+  const hasResolvedLocation = useRecordDraftStore(
+    (draft) => draft.hasResolvedLocation,
+  )
+  const setTagId = useRecordDraftStore((draft) => draft.setTagId)
+  const setPhotos = useRecordDraftStore((draft) => draft.setPhotos)
+  const setCoordinates = useRecordDraftStore((draft) => draft.setCoordinates)
+  const clearDraft = useRecordDraftStore((draft) => draft.clearDraft)
+
+  const queryTagId = (
+    searchParams.get('tagId') ??
+    searchParams.get('tag_id') ??
+    ''
+  ).trim()
+
+  const [shots, setShots] = useState(() => storedPhotos)
   const [previewId, setPreviewId] = useState(null)
   const [status, setStatus] = useState('starting')
   const [errorMessage, setErrorMessage] = useState('')
 
   const previewIndex = shots.findIndex((shot) => shot.id === previewId)
   const previewShot = previewIndex === -1 ? null : shots[previewIndex]
-
-  // 미리보기에 쓰는 objectURL 은 해제 시점을 놓치면 메모리에 남는다.
-  shotsRef.current = shots
 
   const stopStream = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop())
@@ -109,9 +123,49 @@ const MultiCapture = () => {
 
     return () => {
       stopStream()
-      shotsRef.current.forEach((shot) => URL.revokeObjectURL(shot.url))
     }
   }, [startCamera, stopStream])
+
+  useEffect(() => {
+    const tagId = queryTagId || null
+    setTagId(tagId)
+
+    if (!tagId || requestedTagLinks.has(tagId)) return
+
+    requestedTagLinks.add(tagId)
+    void linkProduct(tagId)
+      .catch(() => {
+        // 자동 등록 실패는 촬영을 막지 않는다.
+      })
+      .finally(() => {
+        // StrictMode의 같은 순간 중복만 막고, 다음 태깅에서는 실패 여부와 관계없이
+        // 다시 서버 상태를 확인할 수 있게 요청 표시를 해제한다.
+        requestedTagLinks.delete(tagId)
+      })
+  }, [queryTagId, setTagId])
+
+  useEffect(() => {
+    if (hasResolvedLocation) return
+
+    if (!navigator.geolocation) {
+      setCoordinates({ latitude: null, longitude: null })
+      return
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setCoordinates({
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+        })
+      },
+      () => {
+        // 위치를 얻지 못해도 촬영과 핀 저장은 계속할 수 있다.
+        setCoordinates({ latitude: null, longitude: null })
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+    )
+  }, [hasResolvedLocation, setCoordinates])
 
   const handleShutter = () => {
     const video = videoRef.current
@@ -152,8 +206,12 @@ const MultiCapture = () => {
         setShots((prev) => [
           ...prev,
           {
-            id: `${prev.length}-${blob.size}`,
+            id: crypto.randomUUID?.() ?? `${Date.now()}-${blob.size}`,
             url: URL.createObjectURL(blob),
+            file: new File([blob], `orte-${Date.now()}.jpg`, {
+              type: blob.type,
+              lastModified: Date.now(),
+            }),
             capturedAt: new Date().toISOString(),
           },
         ])
@@ -182,9 +240,26 @@ const MultiCapture = () => {
     setPreviewId(next?.id ?? null)
   }
 
-  const handleDone = () => {
+  const handleClose = () => {
+    if (
+      shots.length > 0 &&
+      !window.confirm('촬영한 사진을 모두 폐기하고 홈으로 이동할까요?')
+    ) {
+      return
+    }
+
     stopStream()
-    navigate(-1)
+    clearDraft()
+    shots.forEach((shot) => URL.revokeObjectURL(shot.url))
+    navigate('/', { replace: true })
+  }
+
+  const handleDone = () => {
+    if (shots.length === 0) return
+
+    stopStream()
+    setPhotos(shots)
+    navigate('/record/pin-saved')
   }
 
   return (
@@ -200,7 +275,9 @@ const MultiCapture = () => {
           <GridLine style={{ top: '33.333%' }} aria-hidden="true" />
           <GridLine style={{ top: '66.666%' }} aria-hidden="true" />
 
-          <TagChip>{TAG_CONTEXT}</TagChip>
+          <TagChip>
+            {queryTagId ? 'NFC 태그 인식됨' : '태그 없이 촬영 중'}
+          </TagChip>
           <CountChip>{shots.length} 장</CountChip>
         </Viewfinder>
 
@@ -235,7 +312,7 @@ const MultiCapture = () => {
         </ThumbnailStrip>
 
         <ControlRow>
-          <TextButton type="button" onClick={handleDone}>
+          <TextButton type="button" onClick={handleClose}>
             닫기
           </TextButton>
 
@@ -246,7 +323,12 @@ const MultiCapture = () => {
             disabled={status !== 'ready'}
           />
 
-          <TextButton type="button" $accent onClick={handleDone}>
+          <TextButton
+            type="button"
+            $accent
+            onClick={handleDone}
+            disabled={shots.length === 0}
+          >
             완료
           </TextButton>
         </ControlRow>

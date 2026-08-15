@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import styled from 'styled-components'
 import { useNavigate } from 'react-router-dom'
 import Button from '../../components/common/Button'
@@ -12,6 +13,25 @@ const BUKCHON_CENTER = { lat: 37.5796, lng: 126.9849 }
 
 const ManualPinAdd = () => {
   const navigate = useNavigate()
+  const [selectedCenter, setSelectedCenter] = useState(BUKCHON_CENTER)
+  const [address, setAddress] = useState('')
+
+  const handleCenterChanged = (event) => {
+    const center = event.detail?.center
+    if (!center) return
+
+    setSelectedCenter({ lat: center.lat, lng: center.lng })
+  }
+
+  const handleContinue = () => {
+    navigate('/map/pin/new/details', {
+      state: {
+        latitude: selectedCenter.lat,
+        longitude: selectedCenter.lng,
+        address: address.trim(),
+      },
+    })
+  }
 
   return (
     <Page>
@@ -27,6 +47,7 @@ const ManualPinAdd = () => {
             clickableIcons: false,
             gestureHandling: 'greedy',
             keyboardShortcuts: false,
+            onCenterChanged: handleCenterChanged,
           }}
         />
       </MapLayer>
@@ -35,8 +56,10 @@ const ManualPinAdd = () => {
         <SearchIcon src={searchIcon} alt="" aria-hidden="true" />
         <SearchInput
           type="search"
-          aria-label="장소나 주소 검색"
-          placeholder="장소나 주소로 검색"
+          value={address}
+          onChange={(event) => setAddress(event.target.value)}
+          aria-label="선택 위치의 주소"
+          placeholder="주소 입력 (선택)"
         />
       </SearchBar>
 
@@ -50,11 +73,13 @@ const ManualPinAdd = () => {
       <AddressSheet>
         <SheetHandle aria-hidden="true" />
         <LocationLabel>선택한 위치</LocationLabel>
-        <LocationTitle>북촌 한옥마을 입구</LocationTitle>
-        <LocationMeta>서울 종로구 계동길 37&nbsp; · &nbsp;현재 지도 중심</LocationMeta>
+        <LocationTitle>{address.trim() || '지도에서 선택한 위치'}</LocationTitle>
+        <LocationMeta>
+          위도 {selectedCenter.lat.toFixed(5)} · 경도 {selectedCenter.lng.toFixed(5)}
+        </LocationMeta>
         <ContinueButton
           type="button"
-          onClick={() => navigate('/map/pin/new/details')}
+          onClick={handleContinue}
         >
           이 위치로 계속
         </ContinueButton>
