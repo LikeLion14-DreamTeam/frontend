@@ -321,8 +321,6 @@ const PinDetail = () => {
   const hiddenPhotoCount = Math.max(photos.length - previewPhotos.length, 0)
   // 5.3: 여정에 배정되기 전(진행 중)인 핀만 삭제할 수 있다.
   const isDeletable = pin.segment_id === null
-  const hasMemo =
-    Boolean(pin.text_note) || Boolean(pin.voice_memo) || isEditingNote
 
   return (
     <Page>
@@ -377,111 +375,114 @@ const PinDetail = () => {
               </PinMeta>
             </HeadingGroup>
 
-            {hasMemo && (
-              <Memo>
-                <MemoRule />
-                <MemoBody>
-                  {isEditingNote ? (
-                    <NoteEditor>
-                      <NoteInput
-                        value={noteDraft}
-                        onChange={(event) => setNoteDraft(event.target.value)}
-                        aria-label="텍스트 기록"
-                        placeholder="이 순간을 기록해보세요"
-                        rows={3}
-                      />
-                      {noteError && <NoteError role="alert">{noteError}</NoteError>}
-                      <NoteActions>
-                        <NoteCancel
-                          type="button"
-                          onClick={() => setIsEditingNote(false)}
-                          disabled={isSavingNote}
-                        >
-                          취소
-                        </NoteCancel>
-                        <NoteSave
-                          type="button"
-                          onClick={saveNote}
-                          disabled={isSavingNote}
-                        >
-                          {isSavingNote ? '저장 중...' : '저장'}
-                        </NoteSave>
-                      </NoteActions>
-                    </NoteEditor>
-                  ) : (
-                    pin.text_note && <MemoText>{pin.text_note}</MemoText>
-                  )}
-
-                  {pin.voice_memo && (
-                    <>
-                      <VoiceBar>
-                        <PlayButton
-                          type="button"
-                          aria-label={isPlaying ? '음성 일시정지' : '음성 재생'}
-                          aria-pressed={isPlaying}
-                          onClick={handleTogglePlay}
-                          disabled={!audioSrc}
-                        >
-                          <img
-                            src={isPlaying ? voicePauseIcon : voicePlayIcon}
-                            alt=""
-                          />
-                        </PlayButton>
-                        <Waveform aria-hidden="true">
-                          {waveHeights.map((height, index) => (
-                            <Wave
-                              key={`${height}-${index}`}
-                              $height={height}
-                              $played={
-                                index < waveHeights.length * playedRatio
-                              }
-                            />
-                          ))}
-                        </Waveform>
-                        <Duration>
-                          {formatDuration(pin.voice_memo.duration_sec)}
-                        </Duration>
-                      </VoiceBar>
-
-                      <audio
-                        ref={audioRef}
-                        src={audioSrc ?? undefined}
-                        preload="none"
-                        onPlay={() => setIsPlaying(true)}
-                        onPause={() => setIsPlaying(false)}
-                        onTimeUpdate={(event) => {
-                          const { currentTime, duration } = event.currentTarget
-                          setPlayedRatio(
-                            duration ? currentTime / duration : 0,
-                          )
-                        }}
-                        onEnded={() => {
-                          setIsPlaying(false)
-                          setPlayedRatio(0)
-                        }}
-                        onError={() =>
-                          setVoiceError('음성을 재생할 수 없어요.')
-                        }
-                      />
-
-                      {voiceError && (
-                        <VoiceError role="alert">{voiceError}</VoiceError>
-                      )}
-                    </>
-                  )}
-                </MemoBody>
-
-                {!isEditingNote && (
-                  <EditNoteButton
-                    type="button"
-                    aria-label="텍스트 기록 수정"
-                    onClick={startEditingNote}
-                  >
-                    <img src={noteEditIcon} alt="" />
-                  </EditNoteButton>
+            {/* 기록이 없어도 형식은 그대로 두고, 수정 버튼으로 새로 남길 수 있게 한다. */}
+            <Memo>
+              <MemoRule />
+              <MemoBody>
+                {isEditingNote ? (
+                  <NoteEditor>
+                    <NoteInput
+                      value={noteDraft}
+                      onChange={(event) => setNoteDraft(event.target.value)}
+                      aria-label="텍스트 기록"
+                      placeholder="이 순간을 기록해보세요"
+                      rows={3}
+                    />
+                    {noteError && <NoteError role="alert">{noteError}</NoteError>}
+                    <NoteActions>
+                      <NoteCancel
+                        type="button"
+                        onClick={() => setIsEditingNote(false)}
+                        disabled={isSavingNote}
+                      >
+                        취소
+                      </NoteCancel>
+                      <NoteSave
+                        type="button"
+                        onClick={saveNote}
+                        disabled={isSavingNote}
+                      >
+                        {isSavingNote ? '저장 중...' : '저장'}
+                      </NoteSave>
+                    </NoteActions>
+                  </NoteEditor>
+                ) : pin.text_note ? (
+                  <MemoText>{pin.text_note}</MemoText>
+                ) : (
+                  !pin.voice_memo && (
+                    <MemoEmpty>남긴 기록이 없습니다.</MemoEmpty>
+                  )
                 )}
-              </Memo>
-            )}
+
+                {pin.voice_memo && (
+                  <>
+                    <VoiceBar>
+                      <PlayButton
+                        type="button"
+                        aria-label={isPlaying ? '음성 일시정지' : '음성 재생'}
+                        aria-pressed={isPlaying}
+                        onClick={handleTogglePlay}
+                        disabled={!audioSrc}
+                      >
+                        <img
+                          src={isPlaying ? voicePauseIcon : voicePlayIcon}
+                          alt=""
+                        />
+                      </PlayButton>
+                      <Waveform aria-hidden="true">
+                        {waveHeights.map((height, index) => (
+                          <Wave
+                            key={`${height}-${index}`}
+                            $height={height}
+                            $played={
+                              index < waveHeights.length * playedRatio
+                            }
+                          />
+                        ))}
+                      </Waveform>
+                      <Duration>
+                        {formatDuration(pin.voice_memo.duration_sec)}
+                      </Duration>
+                    </VoiceBar>
+
+                    <audio
+                      ref={audioRef}
+                      src={audioSrc ?? undefined}
+                      preload="none"
+                      onPlay={() => setIsPlaying(true)}
+                      onPause={() => setIsPlaying(false)}
+                      onTimeUpdate={(event) => {
+                        const { currentTime, duration } = event.currentTarget
+                        setPlayedRatio(
+                          duration ? currentTime / duration : 0,
+                        )
+                      }}
+                      onEnded={() => {
+                        setIsPlaying(false)
+                        setPlayedRatio(0)
+                      }}
+                      onError={() =>
+                        setVoiceError('음성을 재생할 수 없어요.')
+                      }
+                    />
+
+                    {voiceError && (
+                      <VoiceError role="alert">{voiceError}</VoiceError>
+                    )}
+                  </>
+                )}
+              </MemoBody>
+
+              {!isEditingNote && (
+                <EditNoteButton
+                  type="button"
+                  aria-label="텍스트 기록 수정"
+                  onClick={startEditingNote}
+                >
+                  <img src={noteEditIcon} alt="" />
+                </EditNoteButton>
+              )}
+            </Memo>
           </PinIntro>
 
           <PhotosSection>
@@ -861,9 +862,10 @@ const Memo = styled.div`
   align-items: stretch;
 `
 
+/* Memo 가 align-items: stretch 라 본문 높이를 그대로 따라간다.
+   기록 줄 수와 음성 메모 유무에 따라 길이가 달라진다. */
 const MemoRule = styled.div`
   width: 2px;
-  min-height: 72px;
   flex: 0 0 auto;
   background: var(--Accent-Gold);
 `
@@ -879,6 +881,12 @@ const MemoBody = styled.div`
 
 const MemoText = styled.p`
   color: var(--Text-Primary);
+  font: var(--text-ui-body-m);
+`
+
+/* 기록이 없을 때 자리를 지키는 문구. 실제 기록과 구분되게 흐린 색을 쓴다. */
+const MemoEmpty = styled.p`
+  color: var(--Text-Secondary);
   font: var(--text-ui-body-m);
 `
 
