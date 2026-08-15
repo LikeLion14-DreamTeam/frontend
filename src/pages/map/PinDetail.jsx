@@ -10,6 +10,7 @@ import refreshIcon from '../../assets/map/refresh.svg'
 import voicePlayIcon from '../../assets/map/voice-play.svg'
 import voicePauseIcon from '../../assets/map/voice-pause.png'
 import photoAddIcon from '../../assets/map/photo-add-round.svg'
+import noteEditIcon from '../../assets/map/note-edit.svg'
 import { MAP_STYLES } from './mapStyles'
 import {
   deletePin,
@@ -408,18 +409,7 @@ const PinDetail = () => {
                       </NoteActions>
                     </NoteEditor>
                   ) : (
-                    pin.text_note && (
-                      <NoteRow>
-                        <MemoText>{pin.text_note}</MemoText>
-                        <EditIndicator
-                          type="button"
-                          aria-label="텍스트 기록 수정"
-                          onClick={startEditingNote}
-                        >
-                          수정
-                        </EditIndicator>
-                      </NoteRow>
-                    )
+                    pin.text_note && <MemoText>{pin.text_note}</MemoText>
                   )}
 
                   {pin.voice_memo && (
@@ -480,6 +470,16 @@ const PinDetail = () => {
                     </>
                   )}
                 </MemoBody>
+
+                {!isEditingNote && (
+                  <EditNoteButton
+                    type="button"
+                    aria-label="텍스트 기록 수정"
+                    onClick={startEditingNote}
+                  >
+                    <img src={noteEditIcon} alt="" />
+                  </EditNoteButton>
+                )}
               </Memo>
             )}
           </PinIntro>
@@ -827,9 +827,10 @@ const DetailContent = styled.div`
   gap: 38px;
 `
 
+/* PHOTOS·SUGGESTED 와 같이 본문 폭을 꽉 채운다. 여기만 354 로 묶어두면
+   화면이 402 보다 넓을 때 수정 버튼이 오른쪽 여백만큼 안쪽으로 밀린다. */
 const PinIntro = styled.section`
   width: 100%;
-  max-width: 354px;
   display: flex;
   flex-direction: column;
   gap: 22px;
@@ -853,10 +854,11 @@ const PinMeta = styled.p`
   white-space: nowrap;
 `
 
+/* 2(줄) + 16 + 본문 + 2 + 17(수정). 수정 버튼은 오른쪽 끝에 붙고 본문이 남는 폭을 쓴다.
+   gap 을 쓰면 본문과 수정 버튼 사이에도 16 이 끼어 본문이 좁아진다. */
 const Memo = styled.div`
   display: flex;
   align-items: stretch;
-  gap: 16px;
 `
 
 const MemoRule = styled.div`
@@ -869,6 +871,7 @@ const MemoRule = styled.div`
 const MemoBody = styled.div`
   min-width: 0;
   flex: 1;
+  margin-left: 16px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -879,22 +882,31 @@ const MemoText = styled.p`
   font: var(--text-ui-body-m);
 `
 
-const NoteRow = styled.div`
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-`
-
-/* TODO: 임시 UI. 시안에 텍스트 기록 수정 지시자가 없어 문구·모양을 임의로 정했다. */
-const EditIndicator = styled.button`
+/* 기록 길이와 상관없이 메모 블록 오른쪽 위에 고정된다(시안 기준 위에서 5). */
+const EditNoteButton = styled.button`
+  position: relative;
   flex: 0 0 auto;
+  align-self: flex-start;
+  width: 17px;
+  height: 16px;
+  margin: 5px 12px 0;
   padding: 0;
   border: 0;
   background: none;
-  color: var(--Primary-Cognac);
-  font: var(--text-ui-caption);
-  text-decoration: underline;
   cursor: pointer;
+
+  img {
+    width: 18.5px;
+    height: 17.5px;
+    display: block;
+  }
+
+  /* 아이콘이 작아 탭 영역만 넓힌다. 자리는 그대로다. */
+  &::after {
+    content: '';
+    position: absolute;
+    inset: -10px;
+  }
 `
 
 const NoteEditor = styled.div`
