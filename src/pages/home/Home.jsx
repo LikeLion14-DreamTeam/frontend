@@ -1,7 +1,18 @@
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
+import ConfirmationModal from '../../components/common/ConfirmationModal'
 import NavBar from '../../components/layout/NavBar'
+import {
+  endCurrentTrip,
+  getCountryStamps,
+  getCurrentTrip,
+  updateCurrentTripName,
+} from '../../features/trips/tripApi'
+import cardEmblemImage from '../../assets/home/card-emblem.png'
 import journeyCardImage from '../../assets/home/journey-card.png'
+import nfcTagImage from '../../assets/home/nfc-tag.png'
+import noteEditIcon from '../../assets/map/note-edit.svg'
 import passportOpenImage from '../../assets/home/passport-open.png'
 
 /**
@@ -13,13 +24,20 @@ const journeyScale = (px) => `${((px / 362) * 100).toFixed(4)}cqw`
 /** 여권 면(시안 폭 376px)용. 위에 얹는 스탬프도 같은 단위로 배치한다. */
 const passportScale = (px) => `${((px / 376) * 100).toFixed(4)}cqw`
 
-/** 파일명이 곧 나라 이름이다. 정적으로 58개를 나열하지 않고 폴더에서 모은다. */
+/** 진행 중인 여정이 없을 때 뜨는 카드(시안 폭 350px)용. */
+const lastTaggedScale = (px) => `${((px / 350) * 100).toFixed(4)}cqw`
+
+/**
+ * 파일명이 곧 ISO 3166-1 alpha-2 국가 코드다. 구글 역지오코딩의
+ * `address_components` 중 country 의 `short_name` 이 이 값이라, 응답 언어와
+ * 무관하게 항상 같은 코드가 온다. 정적으로 58개를 나열하지 않고 폴더에서 모은다.
+ */
 const stampModules = import.meta.glob('../../assets/stamps/*.webp', {
   eager: true,
   import: 'default',
 })
 
-const stampByCountry = Object.fromEntries(
+const stampByCountryCode = Object.fromEntries(
   Object.entries(stampModules).map(([path, url]) => [
     path.slice(path.lastIndexOf('/') + 1, -'.webp'.length),
     url,
@@ -27,30 +45,234 @@ const stampByCountry = Object.fromEntries(
 )
 
 /** 빈 칸은 Empty, 스탬프가 없는 나라는 Country 로 대체한다. */
-const getStampSrc = (country) => {
-  if (!country) return stampByCountry.Empty
+const getStampSrc = (countryCode) => {
+  if (!countryCode) return stampByCountryCode.Empty
 
-  return stampByCountry[country] ?? stampByCountry.Country
+  return stampByCountryCode[countryCode] ?? stampByCountryCode.Country
 }
 
+const STAMPS_PER_SIDE = 4
+const STAMPS_PER_SPREAD = STAMPS_PER_SIDE * 2
+
+/** 이만큼 가로로 움직여야 넘긴 것으로 본다. */
+const SWIPE_THRESHOLD = 40
+
 /**
- * 한 면에 4개씩, 왼쪽 면부터 채운다.
- * TODO: 방문한 나라 목록으로 채운다. 지금은 시안 값이다.
+ * 좌우 스와이프 핸들러를 만든다. 여정 카드와 여권이 같은 방식으로 넘어간다.
+ *
+ * @param startRef 터치 시작점을 담아둘 ref
+ * @param onMove 넘길 방향(-1 이전 / 1 다음)을 받는 콜백
  */
-const SAMPLE_STAMPS = [
-  ['Portugal', 'Croatia', 'Italy', 'Spain'],
-  ['France', 'Austria', null, null],
-]
+const createSwipeHandlers = (startRef, onMove) => ({
+  onTouchStart: (event) => {
+    const [touch] = event.touches
+    startRef.current = { x: touch.clientX, y: touch.clientY }
+  },
+
+  onTouchEnd: (event) => {
+    const start = startRef.current
+    if (!start) return
+    startRef.current = null
+
+    const [touch] = event.changedTouches
+    const movedX = touch.clientX - start.x
+    const movedY = touch.clientY - start.y
+
+    // 세로로 더 많이 움직였으면 페이지를 스크롤한 것이지 넘긴 게 아니다.
+    if (Math.abs(movedX) < SWIPE_THRESHOLD) return
+    if (Math.abs(movedX) <= Math.abs(movedY)) return
+
+    onMove(movedX < 0 ? 1 : -1)
+  },
+
+  onTouchCancel: () => {
+    startRef.current = null
+  },
+})
+
+/** 진행 중인 여정 영역에서 좌우로 넘길 수 있는 카드 */
+const JOURNEY_CARD = 'journey'
+const LAST_TAGGED_CARD = 'lastTagged'
+
+/**
+ * 도장을 여권 펼침 단위로 나눈다. 한 펼침은 [왼쪽 면, 오른쪽 면] 이고
+ * 각 면은 4칸이다. 남는 칸은 null 로 채워 빈 도장이 찍힌다.
+ * 도장이 하나도 없어도 빈 면 한 장은 보여준다.
+ */
+const toStampSpreads = (stamps) => {
+  const spreadCount = Math.max(1, Math.ceil(stamps.length / STAMPS_PER_SPREAD))
+
+  return Array.from({ length: spreadCount }, (_, spreadIndex) => {
+    const slots = Array.from(
+      { length: STAMPS_PER_SPREAD },
+      (_, slotIndex) => stamps[spreadIndex * STAMPS_PER_SPREAD + slotIndex] ?? null,
+    )
+
+    return [slots.slice(0, STAMPS_PER_SIDE), slots.slice(STAMPS_PER_SIDE)]
+  })
+}
+
+const pad2 = (value) => String(value).padStart(2, '0')
+
+const formatStartedAt = (startedAt) => {
+  if (!startedAt) return ''
+
+  const date = new Date(startedAt)
+
+  return `${date.getFullYear()}.${pad2(date.getMonth() + 1)}.${pad2(date.getDate())}`
+}
+
+const formatCounts = (trip) =>
+  [
+    `${trip.pin_count} PIN`,
+    `${trip.photo_count} PHOTO`,
+    `${trip.voice_memo_count} VOICE`,
+  ].join(' · ')
 
 /**
  * 3 홈 화면
  *
- * TODO: 아직 시안 값을 그대로 넣어둔 상태다. 진행 중인 여정은 3.1 GET /trips/current,
- * 여권 요약은 마이페이지 통계 API 로 채운다.
+ * TODO: 여권 요약과 스탬프는 아직 시안 값이다. 마이페이지 통계와
+ * 3.3 GET /users/me/country-stamps 로 채운다.
+ * TODO: 여정 이름 수정 버튼은 명세가 나오는 대로 카드에 추가한다.
  * TODO: 여권은 펼쳐진 상태만 구현했다. 덮인 상태(passport-closed.png)에서 펼쳐지는
  * 애니메이션은 다음 작업이다.
  */
 const Home = () => {
+  const [currentTrip, setCurrentTrip] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [tripError, setTripError] = useState('')
+  const [stamps, setStamps] = useState([])
+  const [spreadIndex, setSpreadIndex] = useState(0)
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [nameDraft, setNameDraft] = useState('')
+  const [isSavingName, setIsSavingName] = useState(false)
+  const [nameError, setNameError] = useState('')
+  const [journeyIndex, setJourneyIndex] = useState(0)
+  const [isEndingTrip, setIsEndingTrip] = useState(false)
+  const [isConfirmingEnd, setIsConfirmingEnd] = useState(false)
+  const [endError, setEndError] = useState('')
+  const passportSwipeStart = useRef(null)
+  const journeySwipeStart = useRef(null)
+
+  useEffect(() => {
+    let ignore = false
+
+    const load = async () => {
+      try {
+        const trip = await getCurrentTrip()
+        if (!ignore) setCurrentTrip(trip)
+      } catch (error) {
+        if (!ignore) setTripError(error.message)
+      } finally {
+        if (!ignore) setIsLoading(false)
+      }
+    }
+
+    load()
+
+    return () => {
+      ignore = true
+    }
+  }, [])
+
+  useEffect(() => {
+    let ignore = false
+
+    const load = async () => {
+      try {
+        const { stamps: visited } = await getCountryStamps()
+        if (!ignore) setStamps(visited)
+      } catch {
+        // 도장은 부가 정보라 실패해도 빈 여권으로 둔다.
+        if (!ignore) setStamps([])
+      }
+    }
+
+    load()
+
+    return () => {
+      ignore = true
+    }
+  }, [])
+
+  const hasPins = currentTrip?.has_pins === true
+  const stampSpreads = toStampSpreads(stamps)
+  const currentSpread = stampSpreads[spreadIndex] ?? stampSpreads[0]
+
+  // 진행 중인 여정이 없으면 최근 태깅한 제품 카드 한 장뿐이다.
+  const journeyCards = hasPins
+    ? [JOURNEY_CARD, LAST_TAGGED_CARD]
+    : [LAST_TAGGED_CARD]
+  const currentJourneyCard = journeyCards[journeyIndex] ?? journeyCards[0]
+
+  const moveWithin = (setIndex, length) => (step) =>
+    setIndex((current) => Math.min(Math.max(current + step, 0), length - 1))
+
+  const passportSwipe = createSwipeHandlers(
+    passportSwipeStart,
+    moveWithin(setSpreadIndex, stampSpreads.length),
+  )
+
+  const journeySwipe = createSwipeHandlers(
+    journeySwipeStart,
+    moveWithin(setJourneyIndex, journeyCards.length),
+  )
+
+  const handleEndTrip = async () => {
+    setIsEndingTrip(true)
+    setEndError('')
+
+    try {
+      // 이름·종료일은 보내지 않는다. 서버가 3.4 로 지어둔 이름과
+      // 마지막 핀 시각으로 채운다.
+      await endCurrentTrip()
+
+      // 여정이 끝나면 진행 중인 핀이 사라지고 나라 도장이 하나 늘 수 있다.
+      const [trip, { stamps: visited }] = await Promise.all([
+        getCurrentTrip(),
+        getCountryStamps(),
+      ])
+
+      setCurrentTrip(trip)
+      setStamps(visited)
+      setJourneyIndex(0)
+      setIsConfirmingEnd(false)
+    } catch (error) {
+      setEndError(error.message)
+    } finally {
+      setIsEndingTrip(false)
+    }
+  }
+
+  const openNameEditor = () => {
+    setNameDraft(currentTrip?.name ?? '')
+    setNameError('')
+    setIsEditingName(true)
+  }
+
+  const handleSaveName = async () => {
+    const name = nameDraft.trim()
+
+    if (!name) {
+      setNameError('여정 이름을 입력해주세요.')
+      return
+    }
+
+    setIsSavingName(true)
+    setNameError('')
+
+    try {
+      // 3.4 는 3.1 과 같은 형태를 돌려주므로 그대로 갈아끼운다.
+      setCurrentTrip(await updateCurrentTripName(name))
+      setIsEditingName(false)
+    } catch (error) {
+      setNameError(error.message)
+    } finally {
+      setIsSavingName(false)
+    }
+  }
+
   return (
     <Page>
       <Brand>
@@ -66,33 +288,107 @@ const Home = () => {
         진행 중인 여정
       </SectionLabel>
 
-      <JourneyBlock>
-        <JourneyBand>JOURNEY IN PROGRESS</JourneyBand>
+      {isLoading || tripError ? (
+        <JourneyPlaceholder role={tripError ? 'alert' : undefined}>
+          {tripError || '불러오는 중...'}
+        </JourneyPlaceholder>
+      ) : (
+        <>
+          <JourneyCarousel {...journeySwipe}>
+            {currentJourneyCard === JOURNEY_CARD ? (
+              <JourneyBlock>
+                <JourneyBand>JOURNEY IN PROGRESS</JourneyBand>
 
-        <JourneyCard>
-          <JourneyImage src={journeyCardImage} alt="" aria-hidden="true" />
+                <JourneyCard>
+                  <JourneyImage src={journeyCardImage} alt="" aria-hidden="true" />
 
-          <JourneyBody>
-            <JourneyInfo>
-              <CityName>PARIS</CityName>
-              <JourneyDetails>
-                <CountryName>FRANCE</CountryName>
-                <JourneyMeta>
-                  <MetaLine>2024.09.12 — 진행중</MetaLine>
-                  <MetaLine>12 PIN ·138 PHOTO · 6 VOICE</MetaLine>
-                </JourneyMeta>
-              </JourneyDetails>
-            </JourneyInfo>
+                  <JourneyBody>
+                    <JourneyInfo>
+                      <TripNameRow>
+                        <TripName>{currentTrip.name}</TripName>
+                        <EditNameButton
+                          type="button"
+                          aria-label="여정 이름 수정"
+                          onClick={openNameEditor}
+                        >
+                          <EditNameIcon src={noteEditIcon} alt="" aria-hidden="true" />
+                        </EditNameButton>
+                      </TripNameRow>
+                      <JourneyMeta>
+                        <MetaLine>
+                          {formatStartedAt(currentTrip.started_at)} — 진행중
+                        </MetaLine>
+                        <MetaLine>{formatCounts(currentTrip)}</MetaLine>
+                      </JourneyMeta>
+                    </JourneyInfo>
 
-            <JourneyActions>
-              <EndJourneyButton type="button">여정 종료하기</EndJourneyButton>
-              <ContinueJourneyLink to="/record/multi-capture">
-                여정 계속하기
-              </ContinueJourneyLink>
-            </JourneyActions>
-          </JourneyBody>
-        </JourneyCard>
-      </JourneyBlock>
+                    <JourneyActions>
+                      <EndJourneyButton
+                        type="button"
+                        onClick={() => {
+                          setEndError('')
+                          setIsConfirmingEnd(true)
+                        }}
+                      >
+                        여정 종료하기
+                      </EndJourneyButton>
+                      <ContinueJourneyLink to="/record/multi-capture">
+                        여정 계속하기
+                      </ContinueJourneyLink>
+                    </JourneyActions>
+                  </JourneyBody>
+                </JourneyCard>
+              </JourneyBlock>
+            ) : (
+              /*
+               * 시안 `3 홈 화면 - 2`. 진행 중인 여정이 없을 때는 이 카드만 뜨고,
+               * 있을 때는 오른쪽으로 넘겨서 볼 수 있다.
+               */
+              <LastTaggedCard>
+                <CardEmblem src={cardEmblemImage} alt="" aria-hidden="true" />
+                <LastTaggedLabel>LAST TAGGED</LastTaggedLabel>
+
+                <LastTaggedBody>
+                  <LastTaggedProduct>
+                    <LastTaggedCaption>최근 태깅한 제품</LastTaggedCaption>
+                    {/* 보여주기용 고정 값이다. 연동할 API 를 두지 않기로 했다. */}
+                    <ProductIdentity>
+                      <ProductName>비세토스 백팩</ProductName>
+                      <ProductTaggedAt>2024.03.15 태깅</ProductTaggedAt>
+                    </ProductIdentity>
+                  </LastTaggedProduct>
+
+                  <CardDivider aria-hidden="true" />
+
+                  <StartJourneyLink to="/record/multi-capture">
+                    <StartJourneyIcon src={nfcTagImage} alt="" aria-hidden="true" />
+                    태그해서 여정 시작하기
+                  </StartJourneyLink>
+                </LastTaggedBody>
+              </LastTaggedCard>
+            )}
+          </JourneyCarousel>
+
+          {journeyCards.length > 1 && (
+            <JourneyDots>
+              {journeyCards.map((card, index) => (
+                <Dot
+                  key={card}
+                  type="button"
+                  $active={index === journeyIndex}
+                  aria-label={
+                    card === JOURNEY_CARD
+                      ? '진행 중인 여정'
+                      : '최근 태깅한 제품'
+                  }
+                  aria-current={index === journeyIndex}
+                  onClick={() => setJourneyIndex(index)}
+                />
+              ))}
+            </JourneyDots>
+          )}
+        </>
+      )}
 
       <PassportBlock>
         <PassportHead>
@@ -109,20 +405,20 @@ const Home = () => {
           </ResultCard>
         </PassportHead>
 
-        <PassportSpread>
+        <PassportSpread {...passportSwipe}>
           <PassportImage src={passportOpenImage} alt="" aria-hidden="true" />
 
           <StampPages>
-            {SAMPLE_STAMPS.map((page, pageIndex) => (
+            {currentSpread.map((side, sideIndex) => (
               <StampGrid
-                key={pageIndex}
-                $side={pageIndex === 0 ? 'left' : 'right'}
+                key={sideIndex}
+                $side={sideIndex === 0 ? 'left' : 'right'}
               >
-                {page.map((country, slotIndex) => (
+                {side.map((stamp, slotIndex) => (
                   <Stamp
                     key={slotIndex}
-                    src={getStampSrc(country)}
-                    alt={country ?? ''}
+                    src={getStampSrc(stamp?.country_code)}
+                    alt={stamp?.country_name ?? ''}
                   />
                 ))}
               </StampGrid>
@@ -130,12 +426,72 @@ const Home = () => {
           </StampPages>
         </PassportSpread>
 
-        <PageDots aria-hidden="true">
-          <Dot $active />
-          <Dot />
-          <Dot />
+        <PageDots>
+          {stampSpreads.map((_, index) => (
+            <Dot
+              key={index}
+              type="button"
+              $active={index === spreadIndex}
+              aria-label={`여권 ${index + 1}번째 면`}
+              aria-current={index === spreadIndex}
+              onClick={() => setSpreadIndex(index)}
+            />
+          ))}
         </PageDots>
       </PassportBlock>
+
+      {/* TODO: 종료 확인 시안이 없어 공통 확인 모달로 만들었다. */}
+      <ConfirmationModal
+        open={hasPins && isConfirmingEnd}
+        title="여정을 종료할까요?"
+        confirmLabel={isEndingTrip ? '종료하는 중...' : '여정 종료하기'}
+        onConfirm={() => void handleEndTrip()}
+        onCancel={() => setIsConfirmingEnd(false)}
+        confirmDisabled={isEndingTrip}
+        cancelDisabled={isEndingTrip}
+        ariaDescribedBy="trip-end-notice"
+      >
+        {hasPins && (
+          <EndTripContent>
+            <EndTripCard>
+              <EndTripName>{currentTrip.name}</EndTripName>
+              <EndTripMeta>
+                {formatStartedAt(currentTrip.started_at)} ·{' '}
+                {formatCounts(currentTrip)}
+              </EndTripMeta>
+            </EndTripCard>
+            <EndTripNotice id="trip-end-notice">
+              지금까지 남긴 핀이 하나의 여정으로 묶이고 포토북이 만들어져요.
+            </EndTripNotice>
+            {endError && <EndTripError role="alert">{endError}</EndTripError>}
+          </EndTripContent>
+        )}
+      </ConfirmationModal>
+
+      {/* TODO: 이름 수정 시안이 없어 공통 확인 모달에 입력란을 얹어 만들었다. */}
+      <ConfirmationModal
+        open={isEditingName}
+        title="여정 이름을 정해주세요"
+        confirmLabel={isSavingName ? '저장 중...' : '저장'}
+        onConfirm={() => void handleSaveName()}
+        onCancel={() => setIsEditingName(false)}
+        confirmDisabled={isSavingName}
+        cancelDisabled={isSavingName}
+      >
+        <NameEditor>
+          <NameInput
+            value={nameDraft}
+            onChange={(event) => setNameDraft(event.target.value)}
+            placeholder="예) 여름 남해 여행"
+            aria-label="여정 이름"
+            disabled={isSavingName}
+          />
+          <NameHint>
+            비워두면 방문한 도시 이름이 자동으로 붙습니다.
+          </NameHint>
+          {nameError && <NameError role="alert">{nameError}</NameError>}
+        </NameEditor>
+      </ConfirmationModal>
 
       <NavBar />
     </Page>
@@ -265,33 +621,278 @@ const JourneyBody = styled.div`
     ${journeyScale(27)};
   display: flex;
   flex-direction: column;
-  gap: ${journeyScale(18)};
+  gap: ${journeyScale(32)};
   align-items: flex-start;
 `
 
-const JourneyInfo = styled.div`
+/* 진행 중인 여정과 최근 태깅한 제품을 좌우로 넘겨 본다. */
+const JourneyCarousel = styled.div`
+  /* 가로 제스처는 카드 넘기기로 쓰고 세로 스크롤은 그대로 둔다. */
+  touch-action: pan-y;
+`
+
+const JourneyDots = styled.div`
+  height: 7px;
+  margin-top: 10px;
   display: flex;
-  flex-direction: column;
-  gap: ${journeyScale(3)};
-  align-items: flex-start;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 `
 
-const CityName = styled.p`
-  color: var(--Text-Primary);
-  font: 600 ${journeyScale(35)}/${journeyScale(40)} var(--font-serif);
-  letter-spacing: ${journeyScale(1.05)};
-`
-
-const JourneyDetails = styled.div`
+/* 카드 자리를 미리 잡아둬야 불러오는 동안 아래 내용이 밀리지 않는다. */
+const JourneyPlaceholder = styled.p`
+  margin: 15px 2px 0;
+  aspect-ratio: 350 / 228;
   display: flex;
-  flex-direction: column;
-  gap: ${journeyScale(5)};
-  align-items: flex-start;
-`
-
-const CountryName = styled.p`
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  background: rgb(48 38 28 / 5%);
   color: var(--Text-Secondary);
-  font: 400 ${journeyScale(12)}/${journeyScale(18)} var(--font-sans);
+  font: var(--text-ui-body-m);
+  text-align: center;
+  word-break: keep-all;
+`
+
+/* 시안 `3 홈 화면 - 2` 의 Card / Active Journey. 350 × 228, 좌우 26 여백. */
+const LastTaggedCard = styled.section`
+  position: relative;
+  margin: 15px 2px 0;
+  aspect-ratio: 350 / 228;
+  overflow: hidden;
+  border-radius: ${lastTaggedScale(13)};
+  background: linear-gradient(
+    145.79deg,
+    rgb(69 50 36) 0%,
+    rgb(49 35 26) 39.007%,
+    rgb(34 24 16) 70.922%
+  );
+  box-shadow: 0 8px 20px 0 rgb(36 26 18 / 30%);
+  container-type: inline-size;
+`
+
+/* 카드 오른쪽 위로 걸쳐 나가는 장식. 넘치는 부분은 카드가 잘라낸다. */
+const CardEmblem = styled.img`
+  position: absolute;
+  top: ${lastTaggedScale(-44)};
+  left: ${lastTaggedScale(130)};
+  width: ${lastTaggedScale(293)};
+  height: ${lastTaggedScale(195)};
+  max-width: none;
+  object-fit: cover;
+  opacity: 0.3;
+  pointer-events: none;
+`
+
+const LastTaggedLabel = styled.p`
+  position: absolute;
+  top: ${lastTaggedScale(10)};
+  left: ${lastTaggedScale(17)};
+  color: var(--Accent-Gold);
+  font: 600 ${lastTaggedScale(9)}/normal var(--font-serif);
+  letter-spacing: ${lastTaggedScale(1.8)};
+`
+
+const LastTaggedBody = styled.div`
+  position: absolute;
+  top: ${lastTaggedScale(40)};
+  left: ${lastTaggedScale(23)};
+  width: ${lastTaggedScale(303)};
+  display: flex;
+  flex-direction: column;
+  gap: ${lastTaggedScale(19)};
+  align-items: flex-start;
+`
+
+const LastTaggedProduct = styled.div`
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: ${lastTaggedScale(10)};
+`
+
+const LastTaggedCaption = styled.p`
+  color: var(--Text-Secondary);
+  font: 500 ${lastTaggedScale(13)}/${lastTaggedScale(18)} var(--font-sans);
+`
+
+const ProductIdentity = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${lastTaggedScale(6)};
+`
+
+const ProductName = styled.p`
+  overflow: hidden;
+  color: #f5eee4;
+  font: 700 ${lastTaggedScale(22)}/${lastTaggedScale(30)} var(--font-sans);
+  letter-spacing: ${lastTaggedScale(-0.22)};
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`
+
+const ProductTaggedAt = styled.p`
+  color: rgb(245 238 228 / 60%);
+  font: 400 ${lastTaggedScale(11)}/normal var(--font-sans);
+`
+
+const CardDivider = styled.div`
+  width: 100%;
+  height: 1px;
+  background: rgb(245 238 228 / 20%);
+`
+
+const StartJourneyLink = styled(Link)`
+  width: 100%;
+  height: ${lastTaggedScale(44)};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: ${lastTaggedScale(9)};
+  border-radius: ${lastTaggedScale(22)};
+  background: #f5eee4;
+  color: var(--Text-Primary);
+  font: 500 ${lastTaggedScale(13)}/normal var(--font-sans);
+  text-decoration: none;
+  white-space: nowrap;
+`
+
+const StartJourneyIcon = styled.img`
+  width: ${lastTaggedScale(28)};
+  height: ${lastTaggedScale(28)};
+  flex: none;
+  display: block;
+  object-fit: cover;
+`
+
+/* 시안의 도시명 자리에 여정 이름이 들어간다. 나라 줄은 없다. */
+const JourneyInfo = styled.div`
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: ${journeyScale(12)};
+  align-items: flex-start;
+`
+
+/* 수정 버튼은 이름 바로 뒤에 붙는다. 이름 길이가 데이터마다 달라 시안의
+   고정 좌표 대신 인라인으로 둔다. */
+const TripNameRow = styled.div`
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  gap: ${journeyScale(8)};
+`
+
+/*
+ * 시안은 Cormorant Garamond 지만 여정 이름은 한글이라 본문과 같은 산세리프로
+ * 맞춘다. 세리프에는 한글 글리프가 없어 시스템 명조로 대체돼 버린다.
+ * 자간도 라틴 대문자용이라 한글에서는 빼고 크기만 시안대로 둔다.
+ *
+ * 서버가 도시명을 이어 붙여 이름을 짓기도 해서 길어질 수 있다.
+ */
+const TripName = styled.p`
+  min-width: 0;
+  overflow: hidden;
+  color: var(--Text-Primary);
+  font: 600 ${journeyScale(25)}/${journeyScale(40)} var(--font-sans);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`
+
+const EditNameButton = styled.button`
+  width: ${journeyScale(17)};
+  height: ${journeyScale(16)};
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+`
+
+const EditNameIcon = styled.img`
+  width: 100%;
+  height: 100%;
+  display: block;
+`
+
+const EndTripContent = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+`
+
+const EndTripCard = styled.div`
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--Background-Base);
+`
+
+const EndTripName = styled.p`
+  overflow: hidden;
+  color: var(--Text-Primary);
+  font: var(--text-ui-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`
+
+const EndTripMeta = styled.p`
+  color: var(--Text-Secondary);
+  font: var(--text-ui-nav);
+`
+
+const EndTripNotice = styled.p`
+  color: var(--Text-Secondary);
+  font: var(--text-ui-caption);
+  word-break: keep-all;
+`
+
+const EndTripError = styled.p`
+  color: var(--Primary-Cognac);
+  font: var(--text-ui-caption);
+  word-break: keep-all;
+`
+
+const NameEditor = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+`
+
+const NameInput = styled.input`
+  width: 100%;
+  height: 45px;
+  padding: 0 14px;
+  border: 1px solid var(--Border-Default);
+  border-radius: 12px;
+  background: var(--Surface-Base);
+  color: var(--Text-Primary);
+  font: var(--text-ui-body-m);
+
+  &::placeholder {
+    color: var(--State-Disabled-Text);
+  }
+
+  &:focus {
+    border-color: var(--Primary-Cognac);
+    outline: none;
+  }
+`
+
+const NameHint = styled.p`
+  color: var(--Text-Secondary);
+  font: var(--text-ui-caption);
+  word-break: keep-all;
+`
+
+const NameError = styled.p`
+  color: var(--Primary-Cognac);
+  font: var(--text-ui-caption);
+  word-break: keep-all;
 `
 
 const JourneyMeta = styled.div`
@@ -384,6 +985,8 @@ const PassportSpread = styled.div`
   width: 100%;
   aspect-ratio: 376 / 261;
   overflow: hidden;
+  /* 가로 제스처는 면 넘기기로 쓰고 세로 스크롤은 그대로 둔다. */
+  touch-action: pan-y;
   container-type: inline-size;
 `
 
@@ -432,10 +1035,13 @@ const PageDots = styled.div`
   gap: 6px;
 `
 
-const Dot = styled.span`
+const Dot = styled.button`
   width: ${({ $active }) => ($active ? '7px' : '5px')};
   height: ${({ $active }) => ($active ? '7px' : '5px')};
+  padding: 0;
+  border: 0;
   border-radius: 50%;
   background: ${({ $active }) =>
     $active ? 'var(--Primary-Cognac)' : 'rgb(181 161 140 / 45%)'};
+  cursor: pointer;
 `
