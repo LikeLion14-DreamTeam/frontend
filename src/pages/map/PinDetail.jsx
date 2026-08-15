@@ -8,6 +8,8 @@ import backIcon from '../../assets/map/detail-back.svg'
 import openMapIcon from '../../assets/map/open-map.svg'
 import refreshIcon from '../../assets/map/refresh.svg'
 import voicePlayIcon from '../../assets/map/voice-play.svg'
+import voicePauseIcon from '../../assets/map/voice-pause.png'
+import photoAddIcon from '../../assets/map/photo-add-round.svg'
 import { MAP_STYLES } from './mapStyles'
 import {
   deletePin,
@@ -17,6 +19,10 @@ import {
   refreshRepresentativePhotos,
   updatePin,
 } from '../../features/pins/pinApi'
+import {
+  addNearbyPhotos,
+  describeRejected,
+} from '../../features/pins/nearbyPhotos'
 import { getTrip, getTripPins } from '../../features/trips/tripApi'
 
 // 지도에서 넘어오는 경로가 아직 없어 pinID 가 비면 이 값을 쓴다.
@@ -76,6 +82,10 @@ const PinDetail = () => {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+
+  const fileInputRef = useRef(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const [addMessage, setAddMessage] = useState('')
 
   useEffect(() => {
     let ignore = false
@@ -237,6 +247,37 @@ const PinDetail = () => {
     }
   }
 
+  /** 5.5. 전체 사진 보기의 `주변 사진 추가` 와 같은 흐름이다. */
+  const handleFilesSelected = async (event) => {
+    const files = Array.from(event.target.files ?? [])
+    event.target.value = ''
+
+    if (files.length === 0) return
+
+    setIsUploading(true)
+    setAddMessage('')
+
+    try {
+      const { added, rejected } = await addNearbyPhotos(pinID, files)
+
+      const lines = []
+      if (added.length > 0) lines.push(`사진 ${added.length}장을 추가했어요.`)
+      if (rejected.length > 0) {
+        lines.push(
+          `${rejected.length}장은 추가하지 못했어요 · ${describeRejected(rejected)}`,
+        )
+      }
+      setAddMessage(lines.join(' '))
+
+      const photoList = await getPinPhotos(pinID)
+      setPhotos(photoList.photos)
+    } catch (error) {
+      setAddMessage(error.message)
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
   const handleRefreshSuggested = async () => {
     setIsRefreshing(true)
 
@@ -279,6 +320,8 @@ const PinDetail = () => {
   const hiddenPhotoCount = Math.max(photos.length - previewPhotos.length, 0)
   // 5.3: 여정에 배정되기 전(진행 중)인 핀만 삭제할 수 있다.
   const isDeletable = pin.segment_id === null
+  // 5.5: 이미 종료된 여행의 핀에는 사진을 추가할 수 없다.
+  const canAddPhotos = pin.segment_id === null
   const hasMemo =
     Boolean(pin.text_note) || Boolean(pin.voice_memo) || isEditingNote
 
@@ -391,7 +434,10 @@ const PinDetail = () => {
                           onClick={handleTogglePlay}
                           disabled={!audioSrc}
                         >
-                          <img src={voicePlayIcon} alt="" />
+                          <img
+                            src={isPlaying ? voicePauseIcon : voicePlayIcon}
+                            alt=""
+                          />
                         </PlayButton>
                         <Waveform aria-hidden="true">
                           {waveHeights.map((height, index) => (
@@ -476,15 +522,39 @@ const PinDetail = () => {
                   )}
                 </Photo>
               </PhotoStack>
+
+              <HiddenFileInput
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleFilesSelected}
+              />
+
+              <AddPhotoButton
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={!canAddPhotos || isUploading}
+                aria-label={
+                  canAddPhotos
+                    ? '주변 사진 추가'
+                    : '종료된 여행의 핀에는 사진을 추가할 수 없습니다'
+                }
+              >
+                <img src={photoAddIcon} alt="" />
+              </AddPhotoButton>
             </PhotoGrid>
+
+            {(isUploading || addMessage) && (
+              <AddMessage role="status">
+                {isUploading ? '사진을 추가하는 중...' : addMessage}
+              </AddMessage>
+            )}
           </PhotosSection>
 
           <SuggestedSection>
             <SuggestedHeading>
-              <SuggestedTitle>
-                <EditorialTitle>SUGGESTED</EditorialTitle>
-                <SuggestedCount>{representativePhotos.length}</SuggestedCount>
-              </SuggestedTitle>
+              <EditorialTitle>SUGGESTED</EditorialTitle>
               <HeadingLine />
               <RefreshButton
                 type="button"
@@ -1001,6 +1071,7 @@ const TextAction = styled.button`
 `
 
 const PhotoGrid = styled.div`
+  position: relative;
   width: 100%;
   height: 164px;
   display: grid;
@@ -1034,6 +1105,48 @@ const PhotoImage = styled.img`
   height: 100%;
   display: block;
   object-fit: cover;
+`
+
+const HiddenFileInput = styled.input`
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+`
+
+/* 시안에서 그리드 오른쪽 아래 모서리에 걸쳐 있다. 원은 28 이지만 내려받은
+   아이콘은 그림자 여백까지 38 이라, 원 위치를 기준으로 잡고 이미지를 밀어 넣는다. */
+const AddPhotoButton = styled.button`
+  position: absolute;
+  right: -11px;
+  bottom: -8px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+
+  img {
+    position: absolute;
+    top: -3px;
+    left: -5px;
+    width: 38px;
+    height: 38px;
+    display: block;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+  }
+`
+
+const AddMessage = styled.p`
+  color: var(--Text-Secondary);
+  font: var(--text-ui-caption);
+  word-break: keep-all;
 `
 
 const PhotoStack = styled.div`
@@ -1071,18 +1184,6 @@ const SuggestedHeading = styled.div`
   display: flex;
   align-items: center;
   gap: 11px;
-`
-
-const SuggestedTitle = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 11px;
-`
-
-const SuggestedCount = styled.span`
-  color: var(--Accent-Gold);
-  font: var(--text-editorial-brand);
-  letter-spacing: 0.24px;
 `
 
 const RefreshButton = styled.button`

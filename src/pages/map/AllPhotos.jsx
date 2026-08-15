@@ -1,42 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import styled from 'styled-components'
-import exifr from 'exifr'
 import Tile from '../../components/common/Tile'
 import backIcon from '../../assets/icons/Back.svg'
-import { uploadPhoto } from '../../api/uploads'
 import {
-  addPinPhotos,
   deletePhoto,
   getPin,
   getPinPhotos,
 } from '../../features/pins/pinApi'
-
-const REJECT_REASONS = {
-  OUT_OF_RADIUS: '1km 밖에서 촬영됨',
-  MISSING_COORDINATES: '위치 정보 없음',
-}
-
-/**
- * 갤러리 사진의 촬영 좌표·시각을 EXIF 에서 읽는다.
- *
- * 공유·메신저를 거친 사진은 위치 정보가 지워진 경우가 많다. 그런 사진은
- * 좌표 없이 보내고 서버가 MISSING_COORDINATES 로 걸러낸다.
- */
-const readPhotoMeta = async (file) => {
-  const [gps, exif] = await Promise.all([
-    exifr.gps(file).catch(() => null),
-    exifr.parse(file, ['DateTimeOriginal']).catch(() => null),
-  ])
-
-  const capturedAt = exif?.DateTimeOriginal ?? new Date(file.lastModified)
-
-  return {
-    latitude: gps?.latitude ?? null,
-    longitude: gps?.longitude ?? null,
-    captured_at: capturedAt.toISOString(),
-  }
-}
+import {
+  addNearbyPhotos,
+  describeRejected,
+} from '../../features/pins/nearbyPhotos'
 
 // 핀 상세를 거치지 않고 들어왔을 때를 위한 기본값.
 const FALLBACK_PIN_ID = 101
@@ -159,19 +134,7 @@ const AllPhotos = () => {
     setAddResult(null)
 
     try {
-      // 파일마다 사전 서명 URL 을 받아 올리고, EXIF 에서 좌표·시각을 읽어 붙인다.
-      const uploaded = await Promise.all(
-        files.map(async (file) => {
-          const [fileId, meta] = await Promise.all([
-            uploadPhoto(file),
-            readPhotoMeta(file),
-          ])
-
-          return { file_id: fileId, ...meta }
-        }),
-      )
-
-      const result = await addPinPhotos(pinID, uploaded)
+      const result = await addNearbyPhotos(pinID, files)
       setAddResult(result)
 
       const photoList = await getPinPhotos(pinID)
@@ -253,13 +216,7 @@ const AllPhotos = () => {
           {addResult.rejected.length > 0 && (
             <ResultLine>
               {addResult.rejected.length}장은 추가하지 못했어요 ·{' '}
-              {[
-                ...new Set(
-                  addResult.rejected.map(
-                    ({ reason }) => REJECT_REASONS[reason] ?? reason,
-                  ),
-                ),
-              ].join(', ')}
+              {describeRejected(addResult.rejected)}
             </ResultLine>
           )}
         </AddResult>
