@@ -186,6 +186,7 @@ export const addPinPhotos = async (pinId, photos) => {
  *
  * 5.1 은 음성 메모의 존재 여부와 길이만 준다. 재생용 파일 주소(`audio_file`)는
  * 이 API 로만 받을 수 있어, 재생 버튼을 붙이려면 한 번 더 호출해야 한다.
+ * 핀당 음성 메모는 하나라 배열이 아니라 `voice_memo` 객체 하나가 온다.
  */
 export const getPinVoiceMemos = async (pinId) => {
   if (USE_MOCK) {
@@ -193,7 +194,15 @@ export const getPinVoiceMemos = async (pinId) => {
 
     const voiceMemo = mockPinStore.voiceMemos[pinId]
 
-    return { voice_memos: voiceMemo ? [voiceMemo] : [] }
+    return {
+      voice_memo: voiceMemo
+        ? {
+            voice_memo_id: voiceMemo.voice_memo_id,
+            audio_file: voiceMemo.audio_file,
+            saved_at: voiceMemo.saved_at,
+          }
+        : null,
+    }
   }
 
   return apiClient.get(`/pins/${pinId}/voice-memos`)

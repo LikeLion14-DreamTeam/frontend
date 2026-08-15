@@ -126,10 +126,7 @@ const PinDetail = () => {
 
     const loadVoiceMemo = async () => {
       try {
-        const { voice_memos: voiceMemos } = await getPinVoiceMemos(pinID)
-        const memo = voiceMemos.find(
-          (item) => item.voice_memo_id === voiceMemoId,
-        )
+        const { voice_memo: memo } = await getPinVoiceMemos(pinID)
 
         if (!ignore) setAudioSrc(memo?.audio_file ?? null)
       } catch {
