@@ -30,12 +30,6 @@ import unlinkPreservedIcon from '../../assets/icons/mypage/unlink-preserved.svg'
 import unlinkWarningIcon from '../../assets/icons/mypage/unlink-warning.svg'
 import userIcon from '../../assets/icons/mypage/user.svg'
 
-const stats = [
-  { label: '태깅 횟수', value: 12 },
-  { label: '완료 여정', value: 2 },
-  { label: '방문 도시', value: 4 },
-]
-
 const TASTE_AXIS_PRESENTATION = [
   { axisCode: 'brightness', left: '어두운', right: '밝은' },
   { axisCode: 'vividness', left: '차분한', right: '선명한' },
@@ -149,6 +143,11 @@ const MyPage = () => {
       ? RELEARNING_COMPLETED_MESSAGE
       : '',
   )
+  const stats = [
+    { label: '핀 개수', value: account?.pin_count ?? 0 },
+    { label: '완료 여정', value: account?.completed_trip_count ?? 0 },
+    { label: '방문 도시', value: account?.visited_city_count ?? 0 },
+  ]
 
   useEffect(() => {
     let ignore = false
@@ -639,7 +638,7 @@ const MyPage = () => {
                       </ProductIdentity>
                       <ProductMeta>
                         <ProductCount>
-                          {product.tagging_count}회 태깅
+                          핀 {product.pin_count}개
                         </ProductCount>
                         <RemoveButton
                           type="button"

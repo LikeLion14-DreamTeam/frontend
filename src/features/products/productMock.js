@@ -8,14 +8,14 @@ const DEFAULT_MOCK_PRODUCTS = [
     product_type: 'BAG',
     product_name: '비세토스 백팩',
     registered_at: '2026-08-13T09:00:00.000000Z',
-    tagging_count: 9,
+    pin_count: 9,
   },
   {
     tag_id: 'tag_charm_logo',
     product_type: 'CHARM',
     product_name: '로고 참 키링',
     registered_at: '2026-08-01T09:00:00.000000Z',
-    tagging_count: 3,
+    pin_count: 0,
   },
 ]
 
@@ -37,7 +37,15 @@ const loadMockProducts = () => {
         (product) =>
           typeof product?.tag_id === 'string' && product.tag_id !== '',
       )
-      .map((product) => ({ ...product }))
+      .map((product) => {
+        const { tagging_count: legacyTaggingCount, ...normalizedProduct } =
+          product
+
+        return {
+          ...normalizedProduct,
+          pin_count: normalizedProduct.pin_count ?? legacyTaggingCount ?? 0,
+        }
+      })
   } catch {
     return cloneDefaultProducts()
   }
@@ -58,7 +66,7 @@ const persistMockProducts = () => {
 
 const MOCK_PRODUCTS = loadMockProducts()
 
-/** API 명세 7.1 응답과 동일한 등록 제품 목록을 반환한다. */
+/** 화면에서 사용하는 pin_count가 포함된 등록 제품 목록을 반환한다. */
 export const getMockProducts = () => ({
   products: MOCK_PRODUCTS.map((product) => ({ ...product })),
 })
