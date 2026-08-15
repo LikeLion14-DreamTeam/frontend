@@ -252,7 +252,12 @@ const MapPage = () => {
         <Chevron src={tripSelectChevron} alt="" />
       </TripSelector>
 
-      <LocationButton type="button" aria-label="내 위치로 이동" onClick={handleLocate}>
+      <LocationButton
+        type="button"
+        aria-label="내 위치로 이동"
+        $raised={Boolean(selectedPin)}
+        onClick={handleLocate}
+      >
         <img src={myLocationIcon} alt="" />
       </LocationButton>
 
@@ -422,17 +427,20 @@ const Chevron = styled.img`
   margin-left: -5px;
 `
 
+/* 핀 시트가 올라오면 그 위로 함께 올라간다. 시트 위 여백(29)은 접힌 상태와 같다.
+   접힘: 시트 윗변 100 + 29 = 129 / 펼침: 시트 윗변 356 + 29 = 385 */
 const LocationButton = styled.button`
   position: absolute;
   z-index: 9;
   right: 13px;
-  bottom: 129px;
+  bottom: ${({ $raised }) => ($raised ? '385px' : '129px')};
   width: 76px;
   height: 76px;
   padding: 0;
   border: 0;
   background: transparent;
   cursor: pointer;
+  transition: bottom 220ms ease;
 
   img {
     width: 76px;
