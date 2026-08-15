@@ -13,6 +13,7 @@ import cardEmblemImage from '../../assets/home/card-emblem.png'
 import journeyCardImage from '../../assets/home/journey-card.png'
 import nfcTagImage from '../../assets/home/nfc-tag.png'
 import noteEditIcon from '../../assets/map/note-edit.svg'
+import passportClosedImage from '../../assets/home/passport-closed.png'
 import passportOpenImage from '../../assets/home/passport-open.png'
 
 /**
@@ -95,6 +96,13 @@ const JOURNEY_CARD = 'journey'
 const LAST_TAGGED_CARD = 'lastTagged'
 
 /**
+ * 여권의 첫 장은 덮인 표지다. 도장 면은 그 뒤로 이어진다.
+ *
+ * 표지를 한 장으로 세어 두면 넘기기와 아래 점이 도장 면과 똑같이 동작한다.
+ */
+const PASSPORT_COVER = 'cover'
+
+/**
  * 도장을 여권 펼침 단위로 나눈다. 한 펼침은 [왼쪽 면, 오른쪽 면] 이고
  * 각 면은 4칸이다. 남는 칸은 null 로 채워 빈 도장이 찍힌다.
  * 도장이 하나도 없어도 빈 면 한 장은 보여준다.
@@ -143,7 +151,7 @@ const Home = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [tripError, setTripError] = useState('')
   const [stamps, setStamps] = useState([])
-  const [spreadIndex, setSpreadIndex] = useState(0)
+  const [pageIndex, setPageIndex] = useState(0)
   const [isEditingName, setIsEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
   const [isSavingName, setIsSavingName] = useState(false)
@@ -198,7 +206,8 @@ const Home = () => {
 
   const hasPins = currentTrip?.has_pins === true
   const stampSpreads = toStampSpreads(stamps)
-  const currentSpread = stampSpreads[spreadIndex] ?? stampSpreads[0]
+  const passportPages = [PASSPORT_COVER, ...stampSpreads]
+  const currentPage = passportPages[pageIndex] ?? passportPages[0]
 
   // 진행 중인 여정이 없으면 최근 태깅한 제품 카드 한 장뿐이다.
   const journeyCards = hasPins
@@ -211,7 +220,7 @@ const Home = () => {
 
   const passportSwipe = createSwipeHandlers(
     passportSwipeStart,
-    moveWithin(setSpreadIndex, stampSpreads.length),
+    moveWithin(setPageIndex, passportPages.length),
   )
 
   const journeySwipe = createSwipeHandlers(
@@ -405,36 +414,55 @@ const Home = () => {
           </ResultCard>
         </PassportHead>
 
-        <PassportSpread {...passportSwipe}>
-          <PassportImage src={passportOpenImage} alt="" aria-hidden="true" />
+        <PassportStage {...passportSwipe}>
+          {currentPage === PASSPORT_COVER ? (
+            /* 눌러도 스와이프해도 첫 도장 면으로 넘어간다. */
+            <PassportCover
+              type="button"
+              aria-label="여권 펼치기"
+              onClick={() => setPageIndex(1)}
+            >
+              <PassportCoverImage
+                src={passportClosedImage}
+                alt=""
+                aria-hidden="true"
+              />
+            </PassportCover>
+          ) : (
+            <PassportSpread>
+              <PassportImage src={passportOpenImage} alt="" aria-hidden="true" />
 
-          <StampPages>
-            {currentSpread.map((side, sideIndex) => (
-              <StampGrid
-                key={sideIndex}
-                $side={sideIndex === 0 ? 'left' : 'right'}
-              >
-                {side.map((stamp, slotIndex) => (
-                  <Stamp
-                    key={slotIndex}
-                    src={getStampSrc(stamp?.country_code)}
-                    alt={stamp?.country_name ?? ''}
-                  />
+              <StampPages>
+                {currentPage.map((side, sideIndex) => (
+                  <StampGrid
+                    key={sideIndex}
+                    $side={sideIndex === 0 ? 'left' : 'right'}
+                  >
+                    {side.map((stamp, slotIndex) => (
+                      <Stamp
+                        key={slotIndex}
+                        src={getStampSrc(stamp?.country_code)}
+                        alt={stamp?.country_name ?? ''}
+                      />
+                    ))}
+                  </StampGrid>
                 ))}
-              </StampGrid>
-            ))}
-          </StampPages>
-        </PassportSpread>
+              </StampPages>
+            </PassportSpread>
+          )}
+        </PassportStage>
 
         <PageDots>
-          {stampSpreads.map((_, index) => (
+          {passportPages.map((page, index) => (
             <Dot
               key={index}
               type="button"
-              $active={index === spreadIndex}
-              aria-label={`여권 ${index + 1}번째 면`}
-              aria-current={index === spreadIndex}
-              onClick={() => setSpreadIndex(index)}
+              $active={index === pageIndex}
+              aria-label={
+                page === PASSPORT_COVER ? '여권 표지' : `여권 ${index}번째 면`
+              }
+              aria-current={index === pageIndex}
+              onClick={() => setPageIndex(index)}
             />
           ))}
         </PageDots>
@@ -978,15 +1006,44 @@ const ResultDescription = styled.p`
   font: 400 11px/normal var(--font-sans);
 `
 
+/* 표지와 도장 면이 같은 자리를 쓴다. 넘겨도 아래 내용이 밀리지 않는다. */
+const PassportStage = styled.div`
+  width: 100%;
+  aspect-ratio: 376 / 261;
+  /* 가로 제스처는 면 넘기기로 쓰고 세로 스크롤은 그대로 둔다. */
+  touch-action: pan-y;
+`
+
+/*
+ * 덮인 여권은 펼친 면의 오른쪽 페이지 자리에 세운다.
+ *
+ * 책을 덮으면 앞표지가 오른쪽 면 위로 포개지고, 펼치면 왼쪽으로 넘어간다.
+ */
+const PassportCover = styled.button`
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  border: 0;
+  background: none;
+  cursor: pointer;
+`
+
+const PassportCoverImage = styled.img`
+  width: auto;
+  height: 100%;
+  object-fit: contain;
+`
+
 /* 시안 376 × 261. 안쪽 cqw 값의 기준점이라 자신에게는 cqw 를 쓰지 못한다.
    (컨테이너 단위는 조상 컨테이너를 기준으로 해 여기선 뷰포트로 잡힌다) */
 const PassportSpread = styled.div`
   position: relative;
   width: 100%;
-  aspect-ratio: 376 / 261;
+  height: 100%;
   overflow: hidden;
-  /* 가로 제스처는 면 넘기기로 쓰고 세로 스크롤은 그대로 둔다. */
-  touch-action: pan-y;
   container-type: inline-size;
 `
 
