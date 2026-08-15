@@ -17,6 +17,8 @@ const createInitialState = () => ({
       start_at: '2024-11-03T01:24:00.000000Z',
       end_at: '2024-11-10T09:12:00.000000Z',
       status: true,
+      cities: ['파리', '베르사유'],
+      countries: ['프랑스'],
     },
     11: {
       segment_id: 11,
@@ -25,6 +27,8 @@ const createInitialState = () => ({
       start_at: '2024-08-01T00:00:00.000000Z',
       end_at: '2024-08-03T15:00:00.000000Z',
       status: true,
+      cities: ['도쿄', '요코하마'],
+      countries: ['일본'],
     },
   },
 

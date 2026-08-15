@@ -13,29 +13,34 @@ import myLocationIcon from '../../assets/map/my-location.svg'
 import recordPlusIcon from '../../assets/map/record-plus.png'
 import tripAvatar from '../../assets/map/trip-avatar.svg'
 import tripSelectChevron from '../../assets/icons/trip-select-chevron.svg'
-import { getPin, getPinPhotos } from '../../features/pins/pinApi'
-import { getTripPins, getTrips } from '../../features/trips/tripApi'
+import {
+  getOngoingPins,
+  getPin,
+  getPinPhotos,
+} from '../../features/pins/pinApi'
+import { getTrip, getTripPins, getTrips } from '../../features/trips/tripApi'
 import { MAP_STYLES } from './mapStyles'
 
 // 여정을 아직 못 받았을 때 잠깐 보여줄 위치.
 const DEFAULT_CENTER = { lat: 48.8569, lng: 2.3376 }
+
+/* 진행 중인 여행은 TRAVEL_SEGMENT 가 없어 segment_id 로 못 고른다.
+   목록에서 구분하려고 쓰는 프론트 전용 값이다. */
+const ONGOING_TRIP_ID = 'ongoing'
 
 // 아이콘 파일의 원본 크기. 정중앙을 좌표에 맞추는 데 쓴다.
 const PIN_SIZE = { width: 38, height: 38 }
 const ACTIVE_PIN_SIZE = { width: 48, height: 48 }
 const CURRENT_POSITION_SIZE = { width: 68, height: 56 }
 
-const rangeFormatter = new Intl.DateTimeFormat('ko-KR', {
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-})
-
-const formatRange = (startAt, endAt) =>
-  [startAt, endAt]
+/** 여정 목록 부제. 아직 못 받은 값은 빼고 잇는다. */
+const formatCounts = ({ pin_count, photo_count }) =>
+  [
+    pin_count == null ? null : `핀 ${pin_count}`,
+    photo_count == null ? null : `사진 ${photo_count}`,
+  ]
     .filter(Boolean)
-    .map((value) => rangeFormatter.format(new Date(value)).replace(/\.$/, ''))
-    .join(' ~ ')
+    .join(' · ')
 
 const sheetDateFormatter = new Intl.DateTimeFormat('ko-KR', {
   year: 'numeric',
@@ -80,18 +85,54 @@ const MapPage = () => {
   const [tripPins, setTripPins] = useState([])
   const [tripError, setTripError] = useState('')
 
-  /** 4.1. 첫 여정을 기본 선택으로 잡는다. */
+  /**
+   * 4.1 로 종료된 여정을 받고, 진행 중인 여행이 있으면 목록 맨 앞에 얹는다.
+   * 진행 중인 여행이 있으면 그쪽을, 없으면 가장 최근 여정을 기본으로 고른다.
+   */
   useEffect(() => {
     let ignore = false
 
     const load = async () => {
       try {
-        const { trips: list } = await getTrips()
+        const [{ trips: list }, ongoing] = await Promise.all([
+          getTrips(),
+          getOngoingPins(),
+        ])
 
         if (ignore) return
 
-        setTrips(list)
-        setSelectedTripId((current) => current ?? list[0]?.segment_id ?? null)
+        // TODO: 4.1 에 pin_count · photo_count 가 없어 여정마다 4.2 를 더 부른다.
+        // 목록 응답에 개수가 들어오면 이 호출을 지운다.
+        const summaries = await Promise.all(
+          list.map((trip) =>
+            getTrip(trip.segment_id).catch(() => null),
+          ),
+        )
+
+        if (ignore) return
+
+        const ended = list.map((trip, index) => ({
+          ...trip,
+          pin_count: summaries[index]?.pin_count,
+          photo_count: summaries[index]?.photo_count,
+        }))
+
+        const options =
+          ongoing.pins.length > 0
+            ? [
+                {
+                  segment_id: ONGOING_TRIP_ID,
+                  name: '진행 중인 여행',
+                  pin_count: ongoing.pins.length,
+                },
+                ...ended,
+              ]
+            : ended
+
+        setTrips(options)
+        setSelectedTripId(
+          (current) => current ?? options[0]?.segment_id ?? null,
+        )
       } catch (error) {
         if (!ignore) setTripError(error.message)
       }
@@ -104,7 +145,7 @@ const MapPage = () => {
     }
   }, [])
 
-  /** 4.5. 고른 여정의 핀만 받아 지도에 올린다. */
+  /** 고른 여정의 핀만 받아 지도에 올린다(종료된 여정은 4.5). */
   useEffect(() => {
     if (!selectedTripId) return undefined
 
@@ -113,7 +154,10 @@ const MapPage = () => {
 
     const load = async () => {
       try {
-        const { pins } = await getTripPins(selectedTripId)
+        const { pins } =
+          selectedTripId === ONGOING_TRIP_ID
+            ? await getOngoingPins()
+            : await getTripPins(selectedTripId)
 
         if (ignore) return
 
@@ -391,11 +435,10 @@ const MapPage = () => {
 
       {dropdownOpen && (
         <TripDropdown id="trip-dropdown">
-          {/* TODO: 국가별 묶음은 4.1 응답에 국가 정보가 없어 붙이지 못했다. */}
           <TripGroup>
             {trips.length === 0 && (
               <DropdownMessage>
-                {tripError || '종료된 여정이 없습니다.'}
+                {tripError || '여정이 없습니다.'}
               </DropdownMessage>
             )}
 
@@ -413,7 +456,7 @@ const MapPage = () => {
                   <CityText>
                     <CityName $selected={isSelected}>{trip.name}</CityName>
                     <CityStats>
-                      {formatRange(trip.start_at, trip.end_at)}
+                      {formatCounts(trip)}
                     </CityStats>
                   </CityText>
                   {isSelected && <CheckIcon src={dropdownCheckIcon} alt="" />}

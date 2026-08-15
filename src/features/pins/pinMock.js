@@ -116,6 +116,28 @@ const createInitialState = () => ({
       tagged_at: '2025-08-14T02:10:00.000000Z',
       text_note: '퇴근길에 잠깐 들렀다.',
     },
+
+    // tripMock 의 구간 11(도쿄, 요코하마)
+    201: {
+      pin_id: 201,
+      segment_id: 11,
+      latitude: 35.6595,
+      longitude: 139.7004,
+      address: '일본 도쿄도 시부야구 시부야 2초메',
+      place_name: '시부야 스카이',
+      tagged_at: '2024-08-01T00:00:00.000000Z',
+      text_note: '해가 지는 쪽만 사람이 몰려 있었다.',
+    },
+    202: {
+      pin_id: 202,
+      segment_id: 11,
+      latitude: 35.4563,
+      longitude: 139.6317,
+      address: '일본 가나가와현 요코하마시 니시구',
+      place_name: '요코하마 미나토미라이',
+      tagged_at: '2024-08-03T09:20:00.000000Z',
+      text_note: '',
+    },
   },
 
   /** 5.4 GET /pins/{pinId}/photos. is_pin_cover 가 대표사진 표시다. */
@@ -240,6 +262,46 @@ const createInitialState = () => ({
         is_pin_cover: true,
       },
     ],
+    201: [
+      {
+        photo_id: 970,
+        captured_at: '2024-08-01T00:02:31.000000Z',
+        file_path: photoUrl('orte-970'),
+        is_pin_cover: true,
+      },
+      {
+        photo_id: 971,
+        captured_at: '2024-08-01T00:05:47.000000Z',
+        file_path: photoUrl('orte-971'),
+        is_pin_cover: true,
+      },
+      {
+        photo_id: 972,
+        captured_at: '2024-08-01T00:09:12.000000Z',
+        file_path: photoUrl('orte-972'),
+        is_pin_cover: true,
+      },
+      {
+        photo_id: 973,
+        captured_at: '2024-08-01T00:14:03.000000Z',
+        file_path: photoUrl('orte-973'),
+        is_pin_cover: false,
+      },
+    ],
+    202: [
+      {
+        photo_id: 980,
+        captured_at: '2024-08-03T09:21:08.000000Z',
+        file_path: photoUrl('orte-980'),
+        is_pin_cover: true,
+      },
+      {
+        photo_id: 981,
+        captured_at: '2024-08-03T09:24:55.000000Z',
+        file_path: photoUrl('orte-981'),
+        is_pin_cover: false,
+      },
+    ],
   },
 
   /** 5.8 GET /pins/{pinId}/voice-memos. 없으면 null 이 온다. */
@@ -260,6 +322,13 @@ const createInitialState = () => ({
     104: null,
     105: null,
     106: null,
+    201: {
+      voice_memo_id: 57,
+      audio_file: createMockAudioUrl(24),
+      duration_sec: 24,
+      saved_at: '2024-08-01T00:03:10.000000Z',
+    },
+    202: null,
   },
 })
 

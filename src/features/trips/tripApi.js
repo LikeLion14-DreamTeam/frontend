@@ -42,11 +42,13 @@ export const getTrips = async ({ cursor = null, limit = 20 } = {}) => {
   if (USE_MOCK) {
     return {
       trips: Object.values(mockTripStore.trips).map(
-        ({ segment_id, name, start_at, end_at }) => ({
+        ({ segment_id, name, start_at, end_at, cities, countries }) => ({
           segment_id,
           name,
           start_at,
           end_at,
+          cities,
+          countries,
         }),
       ),
       next_cursor: null,

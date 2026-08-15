@@ -36,6 +36,35 @@ const buildMockPinDetail = (pinId) => {
 }
 
 /**
+ * 진행 중인 여행의 핀 목록.
+ *
+ * 명세 0-1 에 따르면 진행 중인 여행은 TRAVEL_SEGMENT 가 없고 `segment_id` 가
+ * NULL 인 핀들의 묶음이다. 계정당 하나뿐이라 파라미터가 필요 없다.
+ *
+ * TODO: 대응하는 엔드포인트가 아직 없다(백엔드 문의 중). 4.5 는 segment_id 를
+ * 요구해서 쓸 수 없다. 실제 API 로 붙기 전까지 mock 이 아닐 때는 빈 목록을
+ * 돌려주고, 응답 형태는 4.5 와 같게 맞춰둔다.
+ */
+export const getOngoingPins = async () => {
+  if (USE_MOCK) {
+    return {
+      pins: Object.values(mockPinStore.pins)
+        .filter((pin) => pin.segment_id === null)
+        .map((pin) => ({
+          pin_id: pin.pin_id,
+          place_name: pin.place_name,
+          latitude: pin.latitude,
+          longitude: pin.longitude,
+          tagged_at: pin.tagged_at,
+          included_in_segment: true,
+        })),
+    }
+  }
+
+  return { pins: [] }
+}
+
+/**
  * 5.1 핀 상세 조회
  *
  * `address` 는 좌표를 역지오코딩해 저장한 값이라 수정할 수 없고,
