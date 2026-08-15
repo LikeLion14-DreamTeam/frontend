@@ -8,7 +8,9 @@ import {
   getCurrentTrip,
   updateCurrentTripName,
 } from '../../features/trips/tripApi'
+import cardEmblemImage from '../../assets/home/card-emblem.png'
 import journeyCardImage from '../../assets/home/journey-card.png'
+import nfcTagImage from '../../assets/home/nfc-tag.png'
 import noteEditIcon from '../../assets/map/note-edit.svg'
 import passportOpenImage from '../../assets/home/passport-open.png'
 
@@ -20,6 +22,9 @@ const journeyScale = (px) => `${((px / 362) * 100).toFixed(4)}cqw`
 
 /** 여권 면(시안 폭 376px)용. 위에 얹는 스탬프도 같은 단위로 배치한다. */
 const passportScale = (px) => `${((px / 376) * 100).toFixed(4)}cqw`
+
+/** 진행 중인 여정이 없을 때 뜨는 카드(시안 폭 350px)용. */
+const lastTaggedScale = (px) => `${((px / 350) * 100).toFixed(4)}cqw`
 
 /**
  * 파일명이 곧 ISO 3166-1 alpha-2 국가 코드다. 구글 역지오코딩의
@@ -48,8 +53,45 @@ const getStampSrc = (countryCode) => {
 const STAMPS_PER_SIDE = 4
 const STAMPS_PER_SPREAD = STAMPS_PER_SIDE * 2
 
-/** 이만큼 가로로 움직여야 면을 넘긴 것으로 본다. */
+/** 이만큼 가로로 움직여야 넘긴 것으로 본다. */
 const SWIPE_THRESHOLD = 40
+
+/**
+ * 좌우 스와이프 핸들러를 만든다. 여정 카드와 여권이 같은 방식으로 넘어간다.
+ *
+ * @param startRef 터치 시작점을 담아둘 ref
+ * @param onMove 넘길 방향(-1 이전 / 1 다음)을 받는 콜백
+ */
+const createSwipeHandlers = (startRef, onMove) => ({
+  onTouchStart: (event) => {
+    const [touch] = event.touches
+    startRef.current = { x: touch.clientX, y: touch.clientY }
+  },
+
+  onTouchEnd: (event) => {
+    const start = startRef.current
+    if (!start) return
+    startRef.current = null
+
+    const [touch] = event.changedTouches
+    const movedX = touch.clientX - start.x
+    const movedY = touch.clientY - start.y
+
+    // 세로로 더 많이 움직였으면 페이지를 스크롤한 것이지 넘긴 게 아니다.
+    if (Math.abs(movedX) < SWIPE_THRESHOLD) return
+    if (Math.abs(movedX) <= Math.abs(movedY)) return
+
+    onMove(movedX < 0 ? 1 : -1)
+  },
+
+  onTouchCancel: () => {
+    startRef.current = null
+  },
+})
+
+/** 진행 중인 여정 영역에서 좌우로 넘길 수 있는 카드 */
+const JOURNEY_CARD = 'journey'
+const LAST_TAGGED_CARD = 'lastTagged'
 
 /**
  * 도장을 여권 펼침 단위로 나눈다. 한 펼침은 [왼쪽 면, 오른쪽 면] 이고
@@ -105,7 +147,9 @@ const Home = () => {
   const [nameDraft, setNameDraft] = useState('')
   const [isSavingName, setIsSavingName] = useState(false)
   const [nameError, setNameError] = useState('')
-  const swipeStart = useRef(null)
+  const [journeyIndex, setJourneyIndex] = useState(0)
+  const passportSwipeStart = useRef(null)
+  const journeySwipeStart = useRef(null)
 
   useEffect(() => {
     let ignore = false
@@ -152,31 +196,24 @@ const Home = () => {
   const stampSpreads = toStampSpreads(stamps)
   const currentSpread = stampSpreads[spreadIndex] ?? stampSpreads[0]
 
-  const moveSpread = (step) =>
-    setSpreadIndex((current) =>
-      Math.min(Math.max(current + step, 0), stampSpreads.length - 1),
-    )
+  // 진행 중인 여정이 없으면 최근 태깅한 제품 카드 한 장뿐이다.
+  const journeyCards = hasPins
+    ? [JOURNEY_CARD, LAST_TAGGED_CARD]
+    : [LAST_TAGGED_CARD]
+  const currentJourneyCard = journeyCards[journeyIndex] ?? journeyCards[0]
 
-  const handleTouchStart = (event) => {
-    const [touch] = event.touches
-    swipeStart.current = { x: touch.clientX, y: touch.clientY }
-  }
+  const moveWithin = (setIndex, length) => (step) =>
+    setIndex((current) => Math.min(Math.max(current + step, 0), length - 1))
 
-  const handleTouchEnd = (event) => {
-    const start = swipeStart.current
-    if (!start) return
-    swipeStart.current = null
+  const passportSwipe = createSwipeHandlers(
+    passportSwipeStart,
+    moveWithin(setSpreadIndex, stampSpreads.length),
+  )
 
-    const [touch] = event.changedTouches
-    const movedX = touch.clientX - start.x
-    const movedY = touch.clientY - start.y
-
-    // 세로로 더 많이 움직였으면 페이지를 스크롤한 것이지 넘긴 게 아니다.
-    if (Math.abs(movedX) < SWIPE_THRESHOLD) return
-    if (Math.abs(movedX) <= Math.abs(movedY)) return
-
-    moveSpread(movedX < 0 ? 1 : -1)
-  }
+  const journeySwipe = createSwipeHandlers(
+    journeySwipeStart,
+    moveWithin(setJourneyIndex, journeyCards.length),
+  )
 
   const openNameEditor = () => {
     setNameDraft(currentTrip?.name ?? '')
@@ -221,62 +258,99 @@ const Home = () => {
         진행 중인 여정
       </SectionLabel>
 
-      <JourneyBlock>
-        <JourneyBand>JOURNEY IN PROGRESS</JourneyBand>
+      {isLoading || tripError ? (
+        <JourneyPlaceholder role={tripError ? 'alert' : undefined}>
+          {tripError || '불러오는 중...'}
+        </JourneyPlaceholder>
+      ) : (
+        <>
+          <JourneyCarousel {...journeySwipe}>
+            {currentJourneyCard === JOURNEY_CARD ? (
+              <JourneyBlock>
+                <JourneyBand>JOURNEY IN PROGRESS</JourneyBand>
 
-        <JourneyCard>
-          <JourneyImage src={journeyCardImage} alt="" aria-hidden="true" />
+                <JourneyCard>
+                  <JourneyImage src={journeyCardImage} alt="" aria-hidden="true" />
 
-          <JourneyBody>
-            {isLoading && <JourneyStatus>불러오는 중...</JourneyStatus>}
+                  <JourneyBody>
+                    <JourneyInfo>
+                      <TripNameRow>
+                        <TripName>{currentTrip.name}</TripName>
+                        <EditNameButton
+                          type="button"
+                          aria-label="여정 이름 수정"
+                          onClick={openNameEditor}
+                        >
+                          <EditNameIcon src={noteEditIcon} alt="" aria-hidden="true" />
+                        </EditNameButton>
+                      </TripNameRow>
+                      <JourneyMeta>
+                        <MetaLine>
+                          {formatStartedAt(currentTrip.started_at)} — 진행중
+                        </MetaLine>
+                        <MetaLine>{formatCounts(currentTrip)}</MetaLine>
+                      </JourneyMeta>
+                    </JourneyInfo>
 
-            {!isLoading && tripError && (
-              <JourneyStatus role="alert">{tripError}</JourneyStatus>
+                    <JourneyActions>
+                      <EndJourneyButton type="button">여정 종료하기</EndJourneyButton>
+                      <ContinueJourneyLink to="/record/multi-capture">
+                        여정 계속하기
+                      </ContinueJourneyLink>
+                    </JourneyActions>
+                  </JourneyBody>
+                </JourneyCard>
+              </JourneyBlock>
+            ) : (
+              /*
+               * 시안 `3 홈 화면 - 2`. 진행 중인 여정이 없을 때는 이 카드만 뜨고,
+               * 있을 때는 오른쪽으로 넘겨서 볼 수 있다.
+               */
+              <LastTaggedCard>
+                <CardEmblem src={cardEmblemImage} alt="" aria-hidden="true" />
+                <LastTaggedLabel>LAST TAGGED</LastTaggedLabel>
+
+                <LastTaggedBody>
+                  <LastTaggedProduct>
+                    <LastTaggedCaption>최근 태깅한 제품</LastTaggedCaption>
+                    {/* 보여주기용 고정 값이다. 연동할 API 를 두지 않기로 했다. */}
+                    <ProductIdentity>
+                      <ProductName>비세토스 백팩</ProductName>
+                      <ProductTaggedAt>2024.03.15 태깅</ProductTaggedAt>
+                    </ProductIdentity>
+                  </LastTaggedProduct>
+
+                  <CardDivider aria-hidden="true" />
+
+                  <StartJourneyLink to="/record/multi-capture">
+                    <StartJourneyIcon src={nfcTagImage} alt="" aria-hidden="true" />
+                    태그해서 여정 시작하기
+                  </StartJourneyLink>
+                </LastTaggedBody>
+              </LastTaggedCard>
             )}
+          </JourneyCarousel>
 
-            {/* has_pins: false 는 아직 태깅을 한 번도 안 한 상태다. */}
-            {!isLoading && !tripError && !hasPins && (
-              <JourneyInfo>
-                <TripName>여정을 시작해보세요</TripName>
-                <JourneyMeta>
-                  <MetaLine>태그를 인식하면 첫 핀이 저장돼요</MetaLine>
-                </JourneyMeta>
-              </JourneyInfo>
-            )}
-
-            {!isLoading && !tripError && hasPins && (
-              <JourneyInfo>
-                <TripNameRow>
-                  <TripName>{currentTrip.name}</TripName>
-                  <EditNameButton
-                    type="button"
-                    aria-label="여정 이름 수정"
-                    onClick={openNameEditor}
-                  >
-                    <EditNameIcon src={noteEditIcon} alt="" aria-hidden="true" />
-                  </EditNameButton>
-                </TripNameRow>
-                <JourneyMeta>
-                  <MetaLine>
-                    {formatStartedAt(currentTrip.started_at)} — 진행중
-                  </MetaLine>
-                  <MetaLine>{formatCounts(currentTrip)}</MetaLine>
-                </JourneyMeta>
-              </JourneyInfo>
-            )}
-
-            <JourneyActions>
-              {/* 배정할 핀이 없으면 3.2 가 409 EMPTY_TRIP 이라 아예 감춘다. */}
-              {hasPins && (
-                <EndJourneyButton type="button">여정 종료하기</EndJourneyButton>
-              )}
-              <ContinueJourneyLink to="/record/multi-capture">
-                여정 계속하기
-              </ContinueJourneyLink>
-            </JourneyActions>
-          </JourneyBody>
-        </JourneyCard>
-      </JourneyBlock>
+          {journeyCards.length > 1 && (
+            <JourneyDots>
+              {journeyCards.map((card, index) => (
+                <Dot
+                  key={card}
+                  type="button"
+                  $active={index === journeyIndex}
+                  aria-label={
+                    card === JOURNEY_CARD
+                      ? '진행 중인 여정'
+                      : '최근 태깅한 제품'
+                  }
+                  aria-current={index === journeyIndex}
+                  onClick={() => setJourneyIndex(index)}
+                />
+              ))}
+            </JourneyDots>
+          )}
+        </>
+      )}
 
       <PassportBlock>
         <PassportHead>
@@ -293,13 +367,7 @@ const Home = () => {
           </ResultCard>
         </PassportHead>
 
-        <PassportSpread
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
-          onTouchCancel={() => {
-            swipeStart.current = null
-          }}
-        >
+        <PassportSpread {...passportSwipe}>
           <PassportImage src={passportOpenImage} alt="" aria-hidden="true" />
 
           <StampPages>
@@ -491,9 +559,145 @@ const JourneyBody = styled.div`
   align-items: flex-start;
 `
 
-const JourneyStatus = styled.p`
+/* 진행 중인 여정과 최근 태깅한 제품을 좌우로 넘겨 본다. */
+const JourneyCarousel = styled.div`
+  /* 가로 제스처는 카드 넘기기로 쓰고 세로 스크롤은 그대로 둔다. */
+  touch-action: pan-y;
+`
+
+const JourneyDots = styled.div`
+  height: 7px;
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+`
+
+/* 카드 자리를 미리 잡아둬야 불러오는 동안 아래 내용이 밀리지 않는다. */
+const JourneyPlaceholder = styled.p`
+  margin: 15px 2px 0;
+  aspect-ratio: 350 / 228;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  background: rgb(48 38 28 / 5%);
   color: var(--Text-Secondary);
-  font: 400 ${journeyScale(12)}/${journeyScale(18)} var(--font-sans);
+  font: var(--text-ui-body-m);
+  text-align: center;
+  word-break: keep-all;
+`
+
+/* 시안 `3 홈 화면 - 2` 의 Card / Active Journey. 350 × 228, 좌우 26 여백. */
+const LastTaggedCard = styled.section`
+  position: relative;
+  margin: 15px 2px 0;
+  aspect-ratio: 350 / 228;
+  overflow: hidden;
+  border-radius: ${lastTaggedScale(13)};
+  background: linear-gradient(
+    145.79deg,
+    rgb(69 50 36) 0%,
+    rgb(49 35 26) 39.007%,
+    rgb(34 24 16) 70.922%
+  );
+  box-shadow: 0 8px 20px 0 rgb(36 26 18 / 30%);
+  container-type: inline-size;
+`
+
+/* 카드 오른쪽 위로 걸쳐 나가는 장식. 넘치는 부분은 카드가 잘라낸다. */
+const CardEmblem = styled.img`
+  position: absolute;
+  top: ${lastTaggedScale(-44)};
+  left: ${lastTaggedScale(130)};
+  width: ${lastTaggedScale(293)};
+  height: ${lastTaggedScale(195)};
+  max-width: none;
+  object-fit: cover;
+  opacity: 0.3;
+  pointer-events: none;
+`
+
+const LastTaggedLabel = styled.p`
+  position: absolute;
+  top: ${lastTaggedScale(10)};
+  left: ${lastTaggedScale(17)};
+  color: var(--Accent-Gold);
+  font: 600 ${lastTaggedScale(9)}/normal var(--font-serif);
+  letter-spacing: ${lastTaggedScale(1.8)};
+`
+
+const LastTaggedBody = styled.div`
+  position: absolute;
+  top: ${lastTaggedScale(40)};
+  left: ${lastTaggedScale(23)};
+  width: ${lastTaggedScale(303)};
+  display: flex;
+  flex-direction: column;
+  gap: ${lastTaggedScale(19)};
+  align-items: flex-start;
+`
+
+const LastTaggedProduct = styled.div`
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: ${lastTaggedScale(10)};
+`
+
+const LastTaggedCaption = styled.p`
+  color: var(--Text-Secondary);
+  font: 500 ${lastTaggedScale(13)}/${lastTaggedScale(18)} var(--font-sans);
+`
+
+const ProductIdentity = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${lastTaggedScale(6)};
+`
+
+const ProductName = styled.p`
+  overflow: hidden;
+  color: #f5eee4;
+  font: 700 ${lastTaggedScale(22)}/${lastTaggedScale(30)} var(--font-sans);
+  letter-spacing: ${lastTaggedScale(-0.22)};
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`
+
+const ProductTaggedAt = styled.p`
+  color: rgb(245 238 228 / 60%);
+  font: 400 ${lastTaggedScale(11)}/normal var(--font-sans);
+`
+
+const CardDivider = styled.div`
+  width: 100%;
+  height: 1px;
+  background: rgb(245 238 228 / 20%);
+`
+
+const StartJourneyLink = styled(Link)`
+  width: 100%;
+  height: ${lastTaggedScale(44)};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: ${lastTaggedScale(9)};
+  border-radius: ${lastTaggedScale(22)};
+  background: #f5eee4;
+  color: var(--Text-Primary);
+  font: 500 ${lastTaggedScale(13)}/normal var(--font-sans);
+  text-decoration: none;
+  white-space: nowrap;
+`
+
+const StartJourneyIcon = styled.img`
+  width: ${lastTaggedScale(28)};
+  height: ${lastTaggedScale(28)};
+  flex: none;
+  display: block;
+  object-fit: cover;
 `
 
 /* 시안의 도시명 자리에 여정 이름이 들어간다. 나라 줄은 없다. */
