@@ -518,6 +518,12 @@ const TripArchive = () => {
                           onOpenDetail={() =>
                             navigate(`/map/pin/${pin.id}`)
                           }
+                          onShare={() =>
+                            navigate(
+                              `/archive/trip/${photobookId}/pin/${pin.id}/share`,
+                              { state: { pin, tripTitle: archive.title } },
+                            )
+                          }
                         />
                       )
                     })}
