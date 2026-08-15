@@ -6,7 +6,6 @@ import GoogleMap from '../../components/common/GoogleMap'
 import activePinIcon from '../../assets/map/map-pin-active.svg'
 import backIcon from '../../assets/map/detail-back.svg'
 import openMapIcon from '../../assets/map/open-map.svg'
-import photoAddIcon from '../../assets/map/photo-add.svg'
 import refreshIcon from '../../assets/map/refresh.svg'
 import voicePlayIcon from '../../assets/map/voice-play.svg'
 import { MAP_STYLES } from './mapStyles'
@@ -507,16 +506,6 @@ const PinDetail = () => {
                   $tone={['soft', 'warm', 'main'][index] ?? 'main'}
                 >
                   <PhotoImage src={photo.url} alt="" />
-                  {/* TODO: 기능명세 5.2.2(추천 사진 추가·제외)에 해당하는 엔드포인트가
-                      API 명세서에 없어 동작을 붙이지 못했다. 누르면 아무 일도 없는
-                      상태로 두면 오해를 사서 비활성으로 표시한다. */}
-                  <AddButton
-                    type="button"
-                    disabled
-                    aria-label="추천 사진 추가 (준비 중)"
-                  >
-                    <img src={photoAddIcon} alt="" />
-                  </AddButton>
                 </SuggestedPhoto>
               ))}
             </SuggestedGrid>
@@ -1136,20 +1125,3 @@ const SuggestedPhoto = styled.div`
   background: ${({ $tone }) => toneBackgrounds[$tone]};
 `
 
-const AddButton = styled.button`
-  position: absolute;
-  right: 1px;
-  bottom: -1px;
-  width: 38px;
-  height: 38px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-
-  img {
-    width: 38px;
-    height: 38px;
-    display: block;
-  }
-`
