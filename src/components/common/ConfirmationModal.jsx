@@ -168,11 +168,12 @@ function ConfirmationModal({
 
 export default ConfirmationModal
 
+/* 페이지들이 max-width: 450px 이라 시트도 같은 폭까지 채운다. */
 const ModalLayer = styled.div`
   position: fixed;
   z-index: 100;
   inset: 0 auto 0 50%;
-  width: min(100%, 402px);
+  width: min(100%, 450px);
   transform: translateX(-50%);
 `
 

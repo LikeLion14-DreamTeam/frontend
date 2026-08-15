@@ -11,6 +11,12 @@
 import { mockPinStore } from '../pins/pinMock'
 
 const createInitialState = () => ({
+  /**
+   * 3.4 로 사용자가 직접 지정한 진행 중인 여행 이름. 지정 전에는 null 이고,
+   * 3.1 은 이 값이 있으면 도시명을 이어 붙인 자동 이름 대신 이걸 돌려준다.
+   */
+  currentTripName: null,
+
   trips: {
     12: {
       segment_id: 12,

@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
+import ConfirmationModal from '../../components/common/ConfirmationModal'
 import NavBar from '../../components/layout/NavBar'
 import {
   getCountryStamps,
   getCurrentTrip,
+  updateCurrentTripName,
 } from '../../features/trips/tripApi'
 import journeyCardImage from '../../assets/home/journey-card.png'
 import noteEditIcon from '../../assets/map/note-edit.svg'
@@ -99,6 +101,10 @@ const Home = () => {
   const [tripError, setTripError] = useState('')
   const [stamps, setStamps] = useState([])
   const [spreadIndex, setSpreadIndex] = useState(0)
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [nameDraft, setNameDraft] = useState('')
+  const [isSavingName, setIsSavingName] = useState(false)
+  const [nameError, setNameError] = useState('')
   const swipeStart = useRef(null)
 
   useEffect(() => {
@@ -172,6 +178,34 @@ const Home = () => {
     moveSpread(movedX < 0 ? 1 : -1)
   }
 
+  const openNameEditor = () => {
+    setNameDraft(currentTrip?.name ?? '')
+    setNameError('')
+    setIsEditingName(true)
+  }
+
+  const handleSaveName = async () => {
+    const name = nameDraft.trim()
+
+    if (!name) {
+      setNameError('여정 이름을 입력해주세요.')
+      return
+    }
+
+    setIsSavingName(true)
+    setNameError('')
+
+    try {
+      // 3.4 는 3.1 과 같은 형태를 돌려주므로 그대로 갈아끼운다.
+      setCurrentTrip(await updateCurrentTripName(name))
+      setIsEditingName(false)
+    } catch (error) {
+      setNameError(error.message)
+    } finally {
+      setIsSavingName(false)
+    }
+  }
+
   return (
     <Page>
       <Brand>
@@ -214,8 +248,11 @@ const Home = () => {
               <JourneyInfo>
                 <TripNameRow>
                   <TripName>{currentTrip.name}</TripName>
-                  {/* TODO: 여정 이름 수정 API 명세가 나오면 연결한다. */}
-                  <EditNameButton type="button" aria-label="여정 이름 수정">
+                  <EditNameButton
+                    type="button"
+                    aria-label="여정 이름 수정"
+                    onClick={openNameEditor}
+                  >
                     <EditNameIcon src={noteEditIcon} alt="" aria-hidden="true" />
                   </EditNameButton>
                 </TripNameRow>
@@ -296,6 +333,31 @@ const Home = () => {
           ))}
         </PageDots>
       </PassportBlock>
+
+      {/* TODO: 이름 수정 시안이 없어 공통 확인 모달에 입력란을 얹어 만들었다. */}
+      <ConfirmationModal
+        open={isEditingName}
+        title="여정 이름을 정해주세요"
+        confirmLabel={isSavingName ? '저장 중...' : '저장'}
+        onConfirm={() => void handleSaveName()}
+        onCancel={() => setIsEditingName(false)}
+        confirmDisabled={isSavingName}
+        cancelDisabled={isSavingName}
+      >
+        <NameEditor>
+          <NameInput
+            value={nameDraft}
+            onChange={(event) => setNameDraft(event.target.value)}
+            placeholder="예) 여름 남해 여행"
+            aria-label="여정 이름"
+            disabled={isSavingName}
+          />
+          <NameHint>
+            비워두면 방문한 도시 이름이 자동으로 붙습니다.
+          </NameHint>
+          {nameError && <NameError role="alert">{nameError}</NameError>}
+        </NameEditor>
+      </ConfirmationModal>
 
       <NavBar />
     </Page>
@@ -482,6 +544,44 @@ const EditNameIcon = styled.img`
   width: 100%;
   height: 100%;
   display: block;
+`
+
+const NameEditor = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+`
+
+const NameInput = styled.input`
+  width: 100%;
+  height: 45px;
+  padding: 0 14px;
+  border: 1px solid var(--Border-Default);
+  border-radius: 12px;
+  background: var(--Surface-Base);
+  color: var(--Text-Primary);
+  font: var(--text-ui-body-m);
+
+  &::placeholder {
+    color: var(--State-Disabled-Text);
+  }
+
+  &:focus {
+    border-color: var(--Primary-Cognac);
+    outline: none;
+  }
+`
+
+const NameHint = styled.p`
+  color: var(--Text-Secondary);
+  font: var(--text-ui-caption);
+  word-break: keep-all;
+`
+
+const NameError = styled.p`
+  color: var(--Primary-Cognac);
+  font: var(--text-ui-caption);
+  word-break: keep-all;
 `
 
 const JourneyMeta = styled.div`

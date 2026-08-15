@@ -57,47 +57,68 @@ const getMockOngoingPins = () =>
     .filter((pin) => pin.segment_id === null)
     .sort((a, b) => new Date(a.tagged_at) - new Date(b.tagged_at))
 
-/** 3.1 진행 중인 여행 요약 조회 */
-export const getCurrentTrip = async () => {
-  if (USE_MOCK) {
-    const pins = getMockOngoingPins()
+/** mock 전용. 3.1 과 3.4 가 같은 형태를 돌려주므로 한 곳에서 만든다. */
+const buildMockCurrentTrip = () => {
+  const pins = getMockOngoingPins()
 
-    if (pins.length === 0) {
-      return {
-        has_pins: false,
-        pin_count: 0,
-        photo_count: 0,
-        voice_memo_count: 0,
-        name: '',
-        started_at: null,
-        cities: [],
-      }
-    }
-
-    // 이름 기본값은 방문 순서대로 이어 붙인 도시명이다(3.2 와 같은 규칙).
-    const citiesInVisitOrder = [
-      ...new Set(
-        pins.map((pin) => getMockPinLocation(pin.pin_id)?.city).filter(Boolean),
-      ),
-    ]
-
+  if (pins.length === 0) {
     return {
-      has_pins: true,
-      pin_count: pins.length,
-      photo_count: pins.reduce(
-        (total, pin) => total + (mockPinStore.photos[pin.pin_id]?.length ?? 0),
-        0,
-      ),
-      voice_memo_count: pins.filter(
-        (pin) => mockPinStore.voiceMemos[pin.pin_id],
-      ).length,
-      name: citiesInVisitOrder.join(', '),
-      started_at: pins[0].tagged_at,
-      cities: [...citiesInVisitOrder].sort((a, b) => a.localeCompare(b, 'ko')),
+      has_pins: false,
+      pin_count: 0,
+      photo_count: 0,
+      voice_memo_count: 0,
+      name: mockTripStore.currentTripName ?? '',
+      started_at: null,
+      cities: [],
     }
   }
 
+  // 이름을 직접 지정하지 않았으면 방문 순서대로 이어 붙인 도시명이 기본값이다.
+  const citiesInVisitOrder = [
+    ...new Set(
+      pins.map((pin) => getMockPinLocation(pin.pin_id)?.city).filter(Boolean),
+    ),
+  ]
+
+  return {
+    has_pins: true,
+    pin_count: pins.length,
+    photo_count: pins.reduce(
+      (total, pin) => total + (mockPinStore.photos[pin.pin_id]?.length ?? 0),
+      0,
+    ),
+    voice_memo_count: pins.filter((pin) => mockPinStore.voiceMemos[pin.pin_id])
+      .length,
+    name: mockTripStore.currentTripName ?? citiesInVisitOrder.join(', '),
+    started_at: pins[0].tagged_at,
+    cities: [...citiesInVisitOrder].sort((a, b) => a.localeCompare(b, 'ko')),
+  }
+}
+
+/** 3.1 진행 중인 여행 요약 조회 */
+export const getCurrentTrip = async () => {
+  if (USE_MOCK) {
+    return buildMockCurrentTrip()
+  }
+
   return apiClient.get('/trips/current')
+}
+
+/**
+ * 3.4 진행 중인 여행 이름 수정
+ *
+ * 지정한 이름은 3.1 조회 시 자동 생성 이름 대신 우선 반환되고, 3.2 로 여행을
+ * 종료할 때 `name` 을 따로 주지 않으면 그대로 최종 이름이 된다.
+ * 응답은 3.1 과 같은 형태다.
+ */
+export const updateCurrentTripName = async (name) => {
+  if (USE_MOCK) {
+    mockTripStore.currentTripName = name
+
+    return buildMockCurrentTrip()
+  }
+
+  return apiClient.patch('/trips/current', { name })
 }
 
 /**
