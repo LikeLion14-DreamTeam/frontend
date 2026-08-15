@@ -1,5 +1,6 @@
 import apiClient from '../../api/client'
 import { ApiError } from '../../api/errors'
+import { fetchAllPages } from '../../api/pagination'
 import {
   getMockPhotoCount,
   getMockVoiceMemoCount,
@@ -45,8 +46,8 @@ const buildMockTripSummary = (segmentId) => {
   }
 }
 
-/** 4.1 여행 구간 목록 조회 */
-export const getTrips = async ({ cursor = null, limit = 20 } = {}) => {
+/** 4.1 여행 구간 목록 조회. 마지막 페이지까지 이어 받는다. */
+export const getTrips = async ({ limit = 20 } = {}) => {
   if (USE_MOCK) {
     return {
       trips: Object.values(mockTripStore.trips).map(
@@ -62,7 +63,10 @@ export const getTrips = async ({ cursor = null, limit = 20 } = {}) => {
     }
   }
 
-  return apiClient.get('/trips', { params: { cursor, limit } })
+  return fetchAllPages(
+    (cursor) => apiClient.get('/trips', { params: { cursor, limit } }),
+    'trips',
+  )
 }
 
 /** 4.2 여행 구간 상세(요약) 조회 */
@@ -75,20 +79,22 @@ export const getTrip = async (segmentId) => {
 }
 
 /**
- * 4.3 여행 구간 수정 (이름, 포함 핀 제외/재포함)
+ * 4.3 여행 구간 수정 (이름, 기간, 포함 핀 제외/재포함)
  *
  * `pinInclusions` 는 `[{ pin_id, included_in_segment }]` 형태로, 제외(false)와
  * 재포함(true) 양쪽 다 보낼 수 있다.
- *
- * TODO: 기능명세 4.2 의 기간(시작일·종료일) 수정은 이 API 로 보낼 수 없다.
- * Body 에 start_at / end_at 이 없어 백엔드에 추가 요청이 필요하다.
  */
-export const updateTrip = async (segmentId, { name, pinInclusions }) => {
+export const updateTrip = async (
+  segmentId,
+  { name, startAt, endAt, pinInclusions },
+) => {
   if (USE_MOCK) {
     const trip = mockTripStore.trips[segmentId]
     if (!trip) throw mockNotFound()
 
     trip.name = name
+    if (startAt) trip.start_at = startAt
+    if (endAt) trip.end_at = endAt
 
     const pins = mockTripStore.pins[segmentId] ?? []
     pinInclusions.forEach(({ pin_id, included_in_segment }) => {
@@ -101,45 +107,32 @@ export const updateTrip = async (segmentId, { name, pinInclusions }) => {
 
   return apiClient.patch(`/trips/${segmentId}`, {
     name,
+    start_at: startAt,
+    end_at: endAt,
     pin_exclusions: pinInclusions,
   })
 }
 
 /**
- * 4.4 여행 구간 삭제
- *
- * 구간에 속한 핀·사진·음성메모와 포토북까지 함께 삭제된다(DB cascade).
- * 되돌릴 수 없으므로 호출 전에 반드시 사용자 확인을 받는다.
- * 204 No Content 라 반환값이 없다.
+ * 4.5 구간 내 핀 목록 조회. 마지막 페이지까지 이어 받는다.
+ * 제외된 핀도 included_in_segment: false 로 함께 온다.
  */
-export const deleteTrip = async (segmentId) => {
-  if (USE_MOCK) {
-    if (!mockTripStore.trips[segmentId]) throw mockNotFound()
-
-    delete mockTripStore.trips[segmentId]
-    delete mockTripStore.pins[segmentId]
-
-    return null
-  }
-
-  return apiClient.delete(`/trips/${segmentId}`)
-}
-
-/** 4.5 구간 내 핀 목록 조회. 제외된 핀도 included_in_segment: false 로 함께 온다. */
-export const getTripPins = async (
-  segmentId,
-  { cursor = null, limit = 20 } = {},
-) => {
+export const getTripPins = async (segmentId, { limit = 20 } = {}) => {
   if (USE_MOCK) {
     if (!mockTripStore.trips[segmentId]) throw mockNotFound()
 
     return {
-      pins: mockTripStore.pins[segmentId] ?? [],
+      pins: (mockTripStore.pins[segmentId] ?? []).map((pin) => ({
+        ...pin,
+        photo_count: getMockPhotoCount(pin.pin_id),
+      })),
       next_cursor: null,
     }
   }
 
-  return apiClient.get(`/trips/${segmentId}/pins`, {
-    params: { cursor, limit },
-  })
+  return fetchAllPages(
+    (cursor) =>
+      apiClient.get(`/trips/${segmentId}/pins`, { params: { cursor, limit } }),
+    'pins',
+  )
 }
