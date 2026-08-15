@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { googleLogout } from '@react-oauth/google'
 import { useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
+import ConfirmationModal from '../../components/common/ConfirmationModal'
 import NavBar from '../../components/layout/NavBar'
 import {
   clearSessionToken,
@@ -23,6 +24,8 @@ import chevronRightIcon from '../../assets/icons/mypage/chevron-right.svg'
 import closeIcon from '../../assets/icons/mypage/close.png'
 import keyIcon from '../../assets/icons/mypage/key.svg'
 import refreshIcon from '../../assets/icons/mypage/refresh.svg'
+import unlinkPreservedIcon from '../../assets/icons/mypage/unlink-preserved.svg'
+import unlinkWarningIcon from '../../assets/icons/mypage/unlink-warning.svg'
 import userIcon from '../../assets/icons/mypage/user.svg'
 
 const stats = [
@@ -87,6 +90,14 @@ const getProductIcon = (productType) =>
 const getProductName = ({ product_name: productName, tag_id: tagId }) =>
   productName?.trim() || `미확인 제품 (${tagId})`
 
+const getProductRegisteredDate = (registeredAt) => {
+  const dateParts = /^(\d{4})-(\d{2})-(\d{2})/.exec(registeredAt ?? '')
+
+  if (!dateParts) return '등록일 미확인'
+
+  return `${dateParts[1]}.${dateParts[2]}.${dateParts[3]} 태깅`
+}
+
 const settings = [
   { label: '위치 권한', state: '허용됨' },
   { label: '카메라 권한', state: '허용됨' },
@@ -114,6 +125,7 @@ const MyPage = () => {
   const [productsError, setProductsError] = useState('')
   const [productsRequestKey, setProductsRequestKey] = useState(0)
   const [unlinkingProductTagId, setUnlinkingProductTagId] = useState(null)
+  const [productPendingUnlink, setProductPendingUnlink] = useState(null)
   const [productUnlinkError, setProductUnlinkError] = useState('')
   const savedTasteAxisValuesRef = useRef(new Map())
   const savingTasteAxisCodesRef = useRef(new Set())
@@ -342,15 +354,23 @@ const MyPage = () => {
     )
   }
 
-  const handleUnlinkProduct = async (product) => {
+  const handleOpenProductUnlink = (product) => {
     if (unlinkingProductTagId !== null) return
 
-    const productName = getProductName(product)
-    const shouldUnlink = window.confirm(
-      `${productName}의 연결을 해제할까요?\n\n기존 핀·사진·포토북은 삭제되지 않으며, 이 태그는 다시 자동 등록되지 않습니다.`,
-    )
+    setProductUnlinkError('')
+    setProductPendingUnlink(product)
+  }
 
-    if (!shouldUnlink) return
+  const handleCancelProductUnlink = () => {
+    if (unlinkingProductTagId !== null) return
+
+    setProductPendingUnlink(null)
+  }
+
+  const handleConfirmProductUnlink = async () => {
+    if (!productPendingUnlink || unlinkingProductTagId !== null) return
+
+    const product = productPendingUnlink
 
     setUnlinkingProductTagId(product.tag_id)
     setProductUnlinkError('')
@@ -364,6 +384,7 @@ const MyPage = () => {
             currentProduct.tag_id !== unlinkedProduct.tag_id,
         ),
       )
+      setProductPendingUnlink(null)
     } catch (error) {
       if (error.code === 'UNAUTHENTICATED') {
         clearSessionToken()
@@ -375,6 +396,7 @@ const MyPage = () => {
       setProductUnlinkError(
         error.message ?? '제품 연결을 해제하지 못했습니다.',
       )
+      setProductPendingUnlink(null)
     } finally {
       setUnlinkingProductTagId(null)
     }
@@ -591,7 +613,7 @@ const MyPage = () => {
                               : '연결 해제'
                           }`}
                           disabled={unlinkingProductTagId !== null}
-                          onClick={() => void handleUnlinkProduct(product)}
+                          onClick={() => handleOpenProductUnlink(product)}
                         >
                           <RemoveIcon
                             src={closeIcon}
@@ -634,6 +656,66 @@ const MyPage = () => {
       <NavigationBoundary>
         <NavBar />
       </NavigationBoundary>
+
+      <ConfirmationModal
+        open={productPendingUnlink !== null}
+        title="이 제품의 연결을 해제할까요?"
+        confirmLabel={
+          unlinkingProductTagId === null
+            ? '연결 해제하기'
+            : '연결 해제 중...'
+        }
+        onConfirm={() => void handleConfirmProductUnlink()}
+        onCancel={handleCancelProductUnlink}
+        confirmDisabled={unlinkingProductTagId !== null}
+        cancelDisabled={unlinkingProductTagId !== null}
+        ariaDescribedBy="product-unlink-notice"
+      >
+        {productPendingUnlink && (
+          <ProductUnlinkContent>
+            <ProductUnlinkSummary>
+              <ProductIdentity>
+                <ProductIcon
+                  src={getProductIcon(productPendingUnlink.product_type)}
+                  alt=""
+                  aria-hidden="true"
+                />
+                <ProductName>
+                  {getProductName(productPendingUnlink)}
+                </ProductName>
+              </ProductIdentity>
+              <ProductUnlinkDate>
+                {getProductRegisteredDate(
+                  productPendingUnlink.registered_at,
+                )}
+              </ProductUnlinkDate>
+            </ProductUnlinkSummary>
+            <ProductUnlinkNotice id="product-unlink-notice">
+              <ProductUnlinkNoticeRow>
+                <ProductUnlinkNoticeIcon
+                  src={unlinkPreservedIcon}
+                  alt=""
+                  aria-hidden="true"
+                />
+                <span>
+                  이 제품으로 남긴 핀·사진·포토북은 그대로 유지돼요.
+                </span>
+              </ProductUnlinkNoticeRow>
+              <ProductUnlinkNoticeRow>
+                <ProductUnlinkNoticeIcon
+                  src={unlinkWarningIcon}
+                  alt=""
+                  aria-hidden="true"
+                />
+                <span>
+                  해제하면 이 태그는 자동으로 다시 등록되지 않아요. 다시
+                  쓰려면 직접 태깅해야 합니다.
+                </span>
+              </ProductUnlinkNoticeRow>
+            </ProductUnlinkNotice>
+          </ProductUnlinkContent>
+        )}
+      </ConfirmationModal>
     </PageShell>
   )
 }
@@ -994,6 +1076,52 @@ const ProductItem = styled.article`
   gap: 12px;
   border-radius: 8px;
   background: var(--Background-Base);
+`
+
+const ProductUnlinkContent = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+`
+
+const ProductUnlinkSummary = styled(ProductItem)`
+  flex: none;
+`
+
+const ProductUnlinkDate = styled.span`
+  flex: 0 0 auto;
+  color: #6b7280;
+  font: var(--text-ui-nav);
+  white-space: nowrap;
+`
+
+const ProductUnlinkNotice = styled.div`
+  min-height: 90px;
+  padding: 12px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 12px;
+  background: rgb(181 118 59 / 10%);
+`
+
+const ProductUnlinkNoticeRow = styled.p`
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 5px;
+  color: var(--Primary-Cognac);
+  font: 400 11px/18px var(--font-sans);
+  word-break: keep-all;
+`
+
+const ProductUnlinkNoticeIcon = styled.img`
+  width: 13px;
+  height: 12px;
+  flex: 0 0 13px;
+  display: block;
+  object-fit: contain;
 `
 
 const ProductIdentity = styled.div`
