@@ -9,9 +9,8 @@ import {
   getCurrentTrip,
   updateCurrentTripName,
 } from '../../features/trips/tripApi'
-import cardEmblemImage from '../../assets/home/card-emblem.png'
 import journeyCardImage from '../../assets/home/journey-card.png'
-import nfcTagImage from '../../assets/home/nfc-tag.png'
+import lastTaggedProductImage from '../../assets/home/last-tagged-product.webp'
 import noteEditIcon from '../../assets/map/note-edit.svg'
 import passportClosedImage from '../../assets/home/passport-closed.png'
 import passportOpenImage from '../../assets/home/passport-open.png'
@@ -334,9 +333,10 @@ const Home = () => {
         <Hairline aria-hidden="true" />
       </Brand>
 
+      {/* 라벨은 지금 보고 있는 카드를 따라간다. */}
       <SectionLabel>
         <LabelTick aria-hidden="true" />
-        진행 중인 여정
+        {currentJourneyCard === JOURNEY_CARD ? '진행 중인 여정' : '최근 태깅한 제품'}
       </SectionLabel>
 
       {isLoading || tripError ? (
@@ -396,24 +396,28 @@ const Home = () => {
                * 있을 때는 오른쪽으로 넘겨서 볼 수 있다.
                */
               <LastTaggedCard>
-                <CardEmblem src={cardEmblemImage} alt="" aria-hidden="true" />
+                {/* 카드 오른쪽에 겹쳐 깔리는 장식. 광원 하나에 테두리 두 겹이다. */}
+                <CardGlow aria-hidden="true" />
+                <CardRing $variant="outer" aria-hidden="true" />
+                <CardRing $variant="inner" aria-hidden="true" />
+
+                <ProductImage
+                  src={lastTaggedProductImage}
+                  alt=""
+                  aria-hidden="true"
+                />
+
                 <LastTaggedLabel>LAST TAGGED</LastTaggedLabel>
 
                 <LastTaggedBody>
-                  <LastTaggedProduct>
-                    <LastTaggedCaption>최근 태깅한 제품</LastTaggedCaption>
-                    {/* 보여주기용 고정 값이다. 연동할 API 를 두지 않기로 했다. */}
-                    <ProductIdentity>
-                      <ProductName>비세토스 백팩</ProductName>
-                      <ProductTaggedAt>2024.03.15 태깅</ProductTaggedAt>
-                    </ProductIdentity>
-                  </LastTaggedProduct>
-
-                  <CardDivider aria-hidden="true" />
+                  {/* 보여주기용 고정 값이다. 연동할 API 를 두지 않기로 했다. */}
+                  <ProductIdentity>
+                    <ProductName>Ottomar 비세토스 위켄더</ProductName>
+                    <ProductTaggedAt>2024.03.15 태깅</ProductTaggedAt>
+                  </ProductIdentity>
 
                   <StartJourneyLink to="/record/multi-capture">
-                    <StartJourneyIcon src={nfcTagImage} alt="" aria-hidden="true" />
-                    태그해서 여정 시작하기
+                    눌러서 여정 시작하기
                   </StartJourneyLink>
                 </LastTaggedBody>
               </LastTaggedCard>
@@ -761,13 +765,13 @@ const JourneyPlaceholder = styled.p`
   word-break: keep-all;
 `
 
-/* 시안 `3 홈 화면 - 2` 의 Card / Active Journey. 350 × 228, 좌우 26 여백. */
+/* 시안 `3 홈 화면 - 2` 의 Card. 350 × 228, 좌우 26 여백. */
 const LastTaggedCard = styled.section`
   position: relative;
   margin: 15px 2px 0;
   aspect-ratio: 350 / 228;
   overflow: hidden;
-  border-radius: ${lastTaggedScale(13)};
+  border-radius: ${lastTaggedScale(16)};
   background: linear-gradient(
     145.79deg,
     rgb(69 50 36) 0%,
@@ -778,16 +782,45 @@ const LastTaggedCard = styled.section`
   container-type: inline-size;
 `
 
-/* 카드 오른쪽 위로 걸쳐 나가는 장식. 넘치는 부분은 카드가 잘라낸다. */
-const CardEmblem = styled.img`
+/* 제품 뒤에서 은은하게 퍼지는 광원. 시안의 채워진 타원이다. */
+const CardGlow = styled.div`
   position: absolute;
-  top: ${lastTaggedScale(-44)};
-  left: ${lastTaggedScale(130)};
-  width: ${lastTaggedScale(293)};
-  height: ${lastTaggedScale(195)};
+  top: ${lastTaggedScale(8)};
+  left: ${lastTaggedScale(87)};
+  width: ${lastTaggedScale(280)};
+  height: ${lastTaggedScale(214)};
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    rgb(197 161 91 / 24%),
+    rgb(197 161 91 / 0%)
+  );
+  pointer-events: none;
+`
+
+/* 광원을 감싸는 테두리 두 겹. 바깥이 더 옅다. */
+const CardRing = styled.div`
+  position: absolute;
+  top: ${({ $variant }) => lastTaggedScale($variant === 'outer' ? 2 : 14)};
+  left: ${({ $variant }) => lastTaggedScale($variant === 'outer' ? 79 : 95)};
+  width: ${({ $variant }) => lastTaggedScale($variant === 'outer' ? 296 : 264)};
+  height: ${({ $variant }) => lastTaggedScale($variant === 'outer' ? 226 : 202)};
+  border: 1px solid
+    ${({ $variant }) =>
+      $variant === 'outer' ? 'rgb(197 161 91 / 30%)' : 'rgb(197 161 91 / 50%)'};
+  border-radius: 50%;
+  pointer-events: none;
+`
+
+/* 카드 위로 넘치게 놓인다. 넘치는 부분은 카드가 잘라낸다. */
+const ProductImage = styled.img`
+  position: absolute;
+  top: ${lastTaggedScale(-21)};
+  left: ${lastTaggedScale(139)};
+  width: ${lastTaggedScale(209)};
+  height: ${lastTaggedScale(226)};
   max-width: none;
-  object-fit: cover;
-  opacity: 0.3;
+  object-fit: contain;
   pointer-events: none;
 `
 
@@ -802,28 +835,17 @@ const LastTaggedLabel = styled.p`
 
 const LastTaggedBody = styled.div`
   position: absolute;
-  top: ${lastTaggedScale(40)};
-  left: ${lastTaggedScale(23)};
-  width: ${lastTaggedScale(303)};
+  top: ${lastTaggedScale(33)};
+  left: ${lastTaggedScale(19)};
+  width: ${lastTaggedScale(307)};
   display: flex;
   flex-direction: column;
-  gap: ${lastTaggedScale(19)};
+  gap: ${lastTaggedScale(85)};
   align-items: flex-start;
 `
 
-const LastTaggedProduct = styled.div`
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: ${lastTaggedScale(10)};
-`
-
-const LastTaggedCaption = styled.p`
-  color: var(--Text-Secondary);
-  font: 500 ${lastTaggedScale(13)}/${lastTaggedScale(18)} var(--font-sans);
-`
-
 const ProductIdentity = styled.div`
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: ${lastTaggedScale(6)};
@@ -843,33 +865,19 @@ const ProductTaggedAt = styled.p`
   font: 400 ${lastTaggedScale(11)}/normal var(--font-sans);
 `
 
-const CardDivider = styled.div`
-  width: 100%;
-  height: 1px;
-  background: rgb(245 238 228 / 20%);
-`
-
+/* 시안에서 카드 폭을 다 쓰지 않는 작은 알약 모양이다. */
 const StartJourneyLink = styled(Link)`
-  width: 100%;
-  height: ${lastTaggedScale(44)};
+  width: ${lastTaggedScale(136)};
+  height: ${lastTaggedScale(37)};
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: ${lastTaggedScale(9)};
   border-radius: ${lastTaggedScale(22)};
   background: #f5eee4;
   color: var(--Text-Primary);
-  font: 500 ${lastTaggedScale(13)}/normal var(--font-sans);
+  font: 500 ${lastTaggedScale(12)}/normal var(--font-sans);
   text-decoration: none;
   white-space: nowrap;
-`
-
-const StartJourneyIcon = styled.img`
-  width: ${lastTaggedScale(28)};
-  height: ${lastTaggedScale(28)};
-  flex: none;
-  display: block;
-  object-fit: cover;
 `
 
 /* 시안의 도시명 자리에 여정 이름이 들어간다. 나라 줄은 없다. */
