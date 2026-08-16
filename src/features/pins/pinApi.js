@@ -2,6 +2,11 @@ import apiClient from '../../api/client'
 import { ApiError } from '../../api/errors'
 import { fetchAllPages } from '../../api/pagination'
 import { getMockUploadedUrl } from '../../api/uploads'
+import {
+  removeMockCountryStampIfEmpty,
+  upsertMockCountryStamp,
+} from '../trips/tripApi'
+import { getMockPinLocation } from '../trips/tripMock'
 import { mockPinStore } from './pinMock'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK_API === 'true'
@@ -50,6 +55,7 @@ const createMockPin = (pinPayload) => {
     longitude: pinPayload.longitude ?? null,
     address: pinPayload.address ?? '',
     city: pinPayload.city ?? '',
+    country_code: pinPayload.country_code ?? '',
     country_name: pinPayload.country_name ?? '',
     place_name: pinPayload.place_name ?? '',
     tagged_at: taggedAt,
@@ -81,6 +87,8 @@ const createMockPin = (pinPayload) => {
 
   mockPinStore.pins[pinId] = pin
   mockPinStore.photos[pinId] = []
+  // 좌표가 없거나 국가를 도출하지 못한 핀은 도장을 만들지 않는다.
+  if (pin.latitude != null && pin.longitude != null) upsertMockCountryStamp(pin)
 
   return {
     pin_id: pin.pin_id,
@@ -108,6 +116,7 @@ export const createPin = async ({
   longitude,
   address,
   city,
+  countryCode,
   countryName,
   placeName = '',
   textNote = '',
@@ -119,6 +128,7 @@ export const createPin = async ({
     longitude,
     address,
     city,
+    country_code: countryCode,
     country_name: countryName,
     place_name: placeName,
     text_note: textNote,
@@ -130,6 +140,67 @@ export const createPin = async ({
   }
 
   return apiClient.post('/pins', pinPayload)
+}
+
+/**
+ * 3.3.1 국가 도장 탭 → 국가별 핀 목록.
+ *
+ * `country_code` 는 필수이며, 같은 경로의 `/pins` 를 메서드로만 구분한다.
+ * 응답은 커서 기반 페이지네이션을 따르며, 핀은 국가를 기준으로만 필터링한다.
+ */
+export const getPinsByCountry = async ({
+  countryCode,
+  cursor = null,
+  limit = 20,
+} = {}) => {
+  const normalizedCountryCode = countryCode?.toUpperCase()
+
+  if (!normalizedCountryCode) {
+    throw new ApiError({
+      status: 400,
+      code: 'VALIDATION_ERROR',
+      message: 'country_code는 필수입니다.',
+    })
+  }
+
+  if (USE_MOCK) {
+    const pins = Object.values(mockPinStore.pins)
+      .filter((pin) => {
+        const location = getMockPinLocation(pin.pin_id)
+        return (
+          location &&
+          location.country_code?.toUpperCase() === normalizedCountryCode
+        )
+      })
+      .sort((left, right) =>
+        new Date(left.tagged_at) - new Date(right.tagged_at),
+      )
+      .map((pin) => ({
+        pin_id: pin.pin_id,
+        latitude: pin.latitude,
+        longitude: pin.longitude,
+        place_name: pin.place_name,
+        photo_count: mockPinStore.photos[pin.pin_id]?.length ?? 0,
+        tagged_at: pin.tagged_at,
+      }))
+
+    return {
+      pins: pins.slice(0, limit),
+      next_cursor: null,
+    }
+  }
+
+  return fetchAllPages(
+    (pageCursor) =>
+      apiClient.get('/pins', {
+        params: {
+          country_code: normalizedCountryCode,
+          cursor: pageCursor,
+          limit,
+        },
+      }),
+    'pins',
+  )
 }
 
 /**
@@ -444,9 +515,11 @@ export const deletePin = async (pinId) => {
       })
     }
 
+    const countryCode = getMockPinLocation(pin.pin_id)?.country_code
     delete mockPinStore.pins[pinId]
     delete mockPinStore.photos[pinId]
     delete mockPinStore.voiceMemos[pinId]
+    removeMockCountryStampIfEmpty(countryCode)
 
     return null
   }

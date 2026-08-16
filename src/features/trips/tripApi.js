@@ -26,6 +26,83 @@ const mockNotFound = () =>
     message: '여행 구간을 찾을 수 없습니다.',
   })
 
+const getMockStampImageId = (countryCode) => {
+  const code = countryCode?.toUpperCase()
+  return code ? `stamp-${code}` : 'stamp-default'
+}
+
+const getMockStampSummary = (stamp) => {
+  const cityCounts = new Map()
+  let pinCount = 0
+
+  Object.values(mockPinStore.pins).forEach((pin) => {
+    const location = getMockPinLocation(pin.pin_id)
+    if (location?.country_code?.toUpperCase() !== stamp.country_code) return
+
+    pinCount += 1
+    const city = location.city || '기타'
+    cityCounts.set(city, (cityCounts.get(city) ?? 0) + 1)
+  })
+
+  const rankedCities = [...cityCounts.entries()].sort(
+    ([cityA, countA], [cityB, countB]) =>
+      countB - countA || cityA.localeCompare(cityB, 'ko'),
+  )
+
+  return {
+    ...stamp,
+    pin_count: pinCount,
+    cities: rankedCities.slice(0, 3).map(([city]) => city),
+    city_counts: rankedCities.map(([city, pin_count]) => ({ city, pin_count })),
+    extra_city_count: Math.max(0, rankedCities.length - 3),
+  }
+}
+
+/** mock 전용: 첫 핀 시점에 도장을 만들고, 이후에는 도시·핀 수만 갱신한다. */
+export const upsertMockCountryStamp = (pin, { isNew = true } = {}) => {
+  const location = getMockPinLocation(pin.pin_id)
+  const countryCode = location?.country_code?.toUpperCase()
+  if (!countryCode) return null
+
+  const existing = mockPinStore.countryStamps[countryCode]
+  const stamp = existing ?? {
+    user_id: 1,
+    country_code: countryCode,
+    country_name: location.country_name || countryCode,
+    stamp_image_id: getMockStampImageId(countryCode),
+    created_at: pin.tagged_at,
+    is_new: isNew,
+  }
+
+  mockPinStore.countryStamps[countryCode] = getMockStampSummary(stamp)
+  if (!existing && isNew && typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent('orte:passport-event', {
+        detail: { name: 'country_stamp_created', country_code: countryCode },
+      }),
+    )
+  }
+  return mockPinStore.countryStamps[countryCode]
+}
+
+/** mock 초기 데이터도 서비스 시작 시 한 번만 도장 레코드로 이관한다. */
+const ensureMockCountryStamps = () => {
+  Object.values(mockPinStore.pins)
+    .sort((left, right) => new Date(left.tagged_at) - new Date(right.tagged_at))
+    .forEach((pin) => upsertMockCountryStamp(pin, { isNew: false }))
+}
+
+/** 국가의 마지막 핀이 없어지면 그 국가 도장도 제거한다. */
+export const removeMockCountryStampIfEmpty = (countryCode) => {
+  const normalizedCode = countryCode?.toUpperCase()
+  if (!normalizedCode) return
+
+  const hasPins = Object.values(mockPinStore.pins).some(
+    (pin) => getMockPinLocation(pin.pin_id)?.country_code?.toUpperCase() === normalizedCode,
+  )
+  if (!hasPins) delete mockPinStore.countryStamps[normalizedCode]
+}
+
 /** mock 전용. 수록된 핀을 기준으로 구간 요약을 계산한다. */
 const buildMockTripSummary = (segmentId) => {
   const trip = mockTripStore.trips[segmentId]
@@ -233,26 +310,42 @@ export const endCurrentTrip = async ({ name, endAt } = {}) => {
  */
 export const getCountryStamps = async () => {
   if (USE_MOCK) {
-    // 방문한 나라는 핀의 위치에서 중복 없이 모은다.
-    const stamps = [
-      ...new Map(
-        Object.values(mockPinStore.pins)
-          .map((pin) => getMockPinLocation(pin.pin_id))
-          .filter(Boolean)
-          .map((place) => [
-            place.country_code,
-            {
-              country_code: place.country_code,
-              country_name: place.country_name,
-            },
-          ]),
-      ).values(),
-    ]
+    ensureMockCountryStamps()
+    const stamps = Object.values(mockPinStore.countryStamps)
+      .sort(
+        (left, right) =>
+          new Date(left.created_at) - new Date(right.created_at) ||
+          left.country_name.localeCompare(right.country_name, 'ko'),
+      )
+      .map((stamp) => ({ ...stamp, cities: [...(stamp.cities ?? [])] }))
+
+    // 새 도장 연출은 생성 직후의 첫 여권 조회에서만 쓴다.
+    Object.values(mockPinStore.countryStamps).forEach((stamp) => {
+      if (stamp.is_new) stamp.is_new = false
+    })
 
     return { stamps }
   }
 
-  return apiClient.get('/users/me/country-stamps')
+  const response = await apiClient.get('/users/me/country-stamps')
+
+  if (!Array.isArray(response?.stamps)) {
+    return response
+  }
+
+  return {
+    ...response,
+    stamps: [...response.stamps].sort((left, right) => {
+      const leftTime = left?.created_at ? new Date(left.created_at).getTime() : null
+      const rightTime = right?.created_at
+        ? new Date(right.created_at).getTime()
+        : null
+
+      if (leftTime == null || Number.isNaN(leftTime)) return 1
+      if (rightTime == null || Number.isNaN(rightTime)) return -1
+      return leftTime - rightTime
+    }),
+  }
 }
 
 /** 4.1 여행 구간 목록 조회. 마지막 페이지까지 이어 받는다. */

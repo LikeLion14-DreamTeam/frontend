@@ -8,6 +8,7 @@ const INITIAL_DRAFT = {
   hasResolvedLocation: false,
   address: '',
   city: '',
+  countryCode: '',
   countryName: '',
   placeName: '',
   textNote: '',
@@ -26,8 +27,8 @@ const useRecordDraftStore = create((set, get) => ({
   setPhotos: (photos) => set({ photos }),
   setCoordinates: ({ latitude, longitude }) =>
     set({ latitude, longitude, hasResolvedLocation: true }),
-  setLocationDetails: ({ address, city, countryName }) =>
-    set({ address, city, countryName }),
+  setLocationDetails: ({ address, city, countryCode, countryName }) =>
+    set({ address, city, countryCode, countryName }),
   setContext: ({ placeName, textNote }) => set({ placeName, textNote }),
 
   clearDraft: () => {

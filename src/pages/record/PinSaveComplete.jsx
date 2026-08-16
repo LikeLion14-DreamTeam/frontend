@@ -48,6 +48,7 @@ const PinSaveComplete = () => {
   const longitude = useRecordDraftStore((draft) => draft.longitude)
   const address = useRecordDraftStore((draft) => draft.address)
   const city = useRecordDraftStore((draft) => draft.city)
+  const countryCode = useRecordDraftStore((draft) => draft.countryCode)
   const countryName = useRecordDraftStore((draft) => draft.countryName)
   const storedPlaceName = useRecordDraftStore((draft) => draft.placeName)
   const storedTextNote = useRecordDraftStore((draft) => draft.textNote)
@@ -116,6 +117,7 @@ const PinSaveComplete = () => {
         // 주소는 이미 있으면 그대로 둔다.
         address: address || place.address,
         city: place.city,
+        countryCode: place.countryCode,
         countryName: place.countryName,
       })
     })
@@ -212,6 +214,7 @@ const PinSaveComplete = () => {
           longitude,
           address: address || (place?.address ?? ''),
           city: city || (place?.city ?? ''),
+          countryCode: countryCode || (place?.countryCode ?? ''),
           countryName: countryName || (place?.countryName ?? ''),
           placeName,
           textNote: memo,

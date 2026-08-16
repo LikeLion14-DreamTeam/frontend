@@ -21,11 +21,17 @@ import recordPlusIcon from '../../assets/map/record-plus.png'
 import tripAvatar from '../../assets/map/trip-avatar.svg'
 import tripSelectChevron from '../../assets/icons/trip-select-chevron.svg'
 import {
+  getPinsByCountry,
   getOngoingPins,
   getPin,
   getPinPhotos,
 } from '../../features/pins/pinApi'
-import { getTrip, getTripPins, getTrips } from '../../features/trips/tripApi'
+import {
+  getCountryStamps,
+  getTrip,
+  getTripPins,
+  getTrips,
+} from '../../features/trips/tripApi'
 
 // 여정을 아직 못 받았을 때 잠깐 보여줄 위치.
 const DEFAULT_CENTER = { lat: 48.8569, lng: 2.3376 }
@@ -242,7 +248,11 @@ const formatTaggedAt = (taggedAt) =>
 
 const MapPage = () => {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const apiLoaded = useApiIsLoaded()
+  const countryCode = (searchParams.get('country_code') ?? '').trim().toUpperCase()
+  const countryName = (searchParams.get('country_name') ?? '').trim()
+  const isCountryFilterMode = countryCode.length > 0
 
   /**
    * 구글 지도는 아이콘의 아래 가운데를 좌표에 맞춘다. 그래서 핀 그림이 좌표보다
@@ -307,8 +317,8 @@ const MapPage = () => {
     }
   }, [handleOrientation, startCompass])
   const [trips, setTrips] = useState([])
+  const [countryStamps, setCountryStamps] = useState([])
   const [selectedTripId, setSelectedTripId] = useState(null)
-  const [searchParams] = useSearchParams()
   /**
    * 들어올 때 주소에 적혀 있던 여정과 핀.
    *
@@ -359,9 +369,10 @@ const MapPage = () => {
 
     const load = async () => {
       try {
-        const [{ trips: list }, ongoing] = await Promise.all([
+        const [{ trips: list }, ongoing, { stamps }] = await Promise.all([
           getTrips(),
           getOngoingPins(),
+          getCountryStamps(),
         ])
 
         if (ignore) return
@@ -395,16 +406,21 @@ const MapPage = () => {
             : ended
 
         setTrips(options)
-        setSelectedTripId((current) => {
-          if (current) return current
+        setCountryStamps(stamps ?? [])
 
-          // 주소에 적힌 여정이 아직 있으면 그걸 고른다. 없으면 목록 첫 번째.
-          const fromUrl = options.find(
-            ({ segment_id }) => String(segment_id) === initialParams.trip,
-          )
+        // 국가별로 보는 중이면 여정을 고르지 않는다.
+        if (!isCountryFilterMode) {
+          setSelectedTripId((current) => {
+            if (current) return current
 
-          return fromUrl?.segment_id ?? options[0]?.segment_id ?? null
-        })
+            // 주소에 적힌 여정이 아직 있으면 그걸 고른다. 없으면 목록 첫 번째.
+            const fromUrl = options.find(
+              ({ segment_id }) => String(segment_id) === initialParams.trip,
+            )
+
+            return fromUrl?.segment_id ?? options[0]?.segment_id ?? null
+          })
+        }
       } catch (error) {
         if (!ignore) setTripError(error.message)
       }
@@ -415,10 +431,11 @@ const MapPage = () => {
     return () => {
       ignore = true
     }
-  }, [initialParams.trip])
+  }, [initialParams.trip, isCountryFilterMode])
 
   /** 고른 여정의 핀만 받아 지도에 올린다(종료된 여정은 4.5). */
   useEffect(() => {
+    if (isCountryFilterMode) return undefined
     if (!selectedTripId) return undefined
 
     let ignore = false
@@ -448,7 +465,38 @@ const MapPage = () => {
     return () => {
       ignore = true
     }
-  }, [selectedTripId])
+  }, [isCountryFilterMode, selectedTripId])
+
+  /** 국가 도장 탭에서 들어오면 그 나라의 핀만 보여준다(구간 배정 여부 무관). */
+  useEffect(() => {
+    if (!isCountryFilterMode) return undefined
+
+    let ignore = false
+    setTripError('')
+    setDropdownOpen(false)
+
+    const load = async () => {
+      try {
+        const { pins } = await getPinsByCountry({ countryCode })
+        if (ignore) return
+
+        setTripPins(pins)
+        setSelectedPinId(null)
+        setSelectedTripId(null)
+      } catch (error) {
+        if (ignore) return
+
+        setTripPins([])
+        setTripError(error.message)
+      }
+    }
+
+    load()
+
+    return () => {
+      ignore = true
+    }
+  }, [countryCode, isCountryFilterMode])
 
   /**
    * 구간에서 제외한 핀은 지도에 올리지 않는다. 좌표가 없는 핀도 그릴 수 없다.
@@ -459,19 +507,23 @@ const MapPage = () => {
       tripPins
         .filter(
           ({ latitude, longitude, included_in_segment }) =>
-            included_in_segment && latitude != null && longitude != null,
+            (isCountryFilterMode || included_in_segment) &&
+            latitude != null &&
+            longitude != null,
         )
         .sort((a, b) => a.tagged_at.localeCompare(b.tagged_at)),
-    [tripPins],
+    [isCountryFilterMode, tripPins],
   )
 
   const routePath = useMemo(
     () =>
-      mapPins.map(({ latitude, longitude }) => ({
-        lat: latitude,
-        lng: longitude,
-      })),
-    [mapPins],
+      (isCountryFilterMode
+        ? []
+        : mapPins.map(({ latitude, longitude }) => ({
+            lat: latitude,
+            lng: longitude,
+          }))),
+    [isCountryFilterMode, mapPins],
   )
 
   // 여정을 바꾸면 그 여정의 핀과 동선이 한눈에 들어오도록 지도를 다시 잡는다.
@@ -511,13 +563,14 @@ const MapPage = () => {
    * 지도 안에서 맴돌지 않고 직전 화면으로 나가야 맞다.
    */
   useEffect(() => {
-    if (!selectedTripId) return
+    // 국가별로 보는 중에는 주소가 country_code 를 담고 있다. 덮어쓰면 안 된다.
+    if (isCountryFilterMode || !selectedTripId) return
 
     const params = new URLSearchParams({ trip: String(selectedTripId) })
     if (selectedPinId) params.set('pin', String(selectedPinId))
 
     navigate(`/map?${params}`, { replace: true })
-  }, [navigate, selectedPinId, selectedTripId])
+  }, [isCountryFilterMode, navigate, selectedPinId, selectedTripId])
 
   const selectedTrip = trips.find(
     ({ segment_id }) => segment_id === selectedTripId,
@@ -639,6 +692,21 @@ const MapPage = () => {
   const selectTrip = (segmentId) => {
     setSelectedTripId(segmentId)
     setDropdownOpen(false)
+    if (isCountryFilterMode) navigate('/map')
+  }
+
+  const selectCountry = (stamp) => {
+    const nextCountryCode = stamp?.country_code?.toUpperCase()
+    if (!nextCountryCode) return
+
+    setDropdownOpen(false)
+    if (nextCountryCode === countryCode) return
+
+    const query = new URLSearchParams({
+      country_code: nextCountryCode,
+      country_name: stamp.country_name ?? '',
+    })
+    navigate(`/map?${query.toString()}`)
   }
 
   return (
@@ -724,7 +792,11 @@ const MapPage = () => {
         }}
       >
         <TripAvatar src={tripAvatar} alt="" />
-        <TripName>{selectedTrip?.name ?? '여정 선택'}</TripName>
+        <TripName>
+          {isCountryFilterMode
+            ? countryName || countryCode
+            : selectedTrip?.name ?? '여정 선택'}
+        </TripName>
         <Chevron src={tripSelectChevron} alt="" />
       </TripSelector>
 
@@ -761,7 +833,7 @@ const MapPage = () => {
             <SheetMessage>불러오는 중...</SheetMessage>
           ) : (
             <>
-              <PinSummary>
+                <PinSummary>
                 <PinPhoto>
                   {coverPhoto && <PinPhotoImage src={coverPhoto.file_path} alt="" />}
                 </PinPhoto>
@@ -791,11 +863,13 @@ const MapPage = () => {
                 이 핀 기록 자세히 보기
               </DetailButton>
 
-              <Pagination aria-label={`${selectedIndex + 1} / ${mapPins.length}`}>
-                {mapPins.map((pin, index) => (
-                  <Dot key={pin.pin_id} $active={index === selectedIndex} />
-                ))}
-              </Pagination>
+              {!isCountryFilterMode && (
+                <Pagination aria-label={`${selectedIndex + 1} / ${mapPins.length}`}>
+                  {mapPins.map((pin, index) => (
+                    <Dot key={pin.pin_id} $active={index === selectedIndex} />
+                  ))}
+                </Pagination>
+              )}
             </>
           )}
           </PinSheetContent>
@@ -807,6 +881,7 @@ const MapPage = () => {
       {dropdownOpen && (
         <TripDropdown id="trip-dropdown">
           <TripGroup>
+            <DropdownSectionTitle>여정별</DropdownSectionTitle>
             {trips.length === 0 && (
               <DropdownMessage>
                 {tripError || '여정이 없습니다.'}
@@ -835,6 +910,37 @@ const MapPage = () => {
               )
             })}
           </TripGroup>
+          <DropdownDivider aria-hidden="true" />
+          <CountryGroup>
+            <DropdownSectionTitle>국가별</DropdownSectionTitle>
+            {countryStamps.length === 0 && (
+              <DropdownMessage>방문한 국가가 없습니다.</DropdownMessage>
+            )}
+
+            {countryStamps.map((stamp) => {
+              const isSelected =
+                isCountryFilterMode &&
+                stamp.country_code?.toUpperCase() === countryCode
+
+              return (
+                <CityButton
+                  key={stamp.country_code}
+                  type="button"
+                  $selected={isSelected}
+                  aria-pressed={isSelected}
+                  onClick={() => selectCountry(stamp)}
+                >
+                  <CityText>
+                    <CityName $selected={isSelected}>
+                      {stamp.country_name}
+                    </CityName>
+                    <CityStats>핀 {stamp.pin_count ?? 0}</CityStats>
+                  </CityText>
+                  {isSelected && <CheckIcon src={dropdownCheckIcon} alt="" />}
+                </CityButton>
+              )
+            })}
+          </CountryGroup>
         </TripDropdown>
       )}
     </Page>
@@ -1081,6 +1187,23 @@ const TripDropdown = styled.section`
 `
 
 const TripGroup = styled.div`
+  display: flex;
+  flex-direction: column;
+`
+
+const DropdownSectionTitle = styled.p`
+  padding: 4px 15px 6px;
+  color: var(--Text-Secondary);
+  font: var(--text-ui-nav);
+`
+
+const DropdownDivider = styled.div`
+  height: 1px;
+  margin: 10px 15px;
+  background: var(--Border-Default);
+`
+
+const CountryGroup = styled.div`
   display: flex;
   flex-direction: column;
 `

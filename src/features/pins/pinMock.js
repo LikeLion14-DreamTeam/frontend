@@ -262,6 +262,13 @@ const createInitialState = () => ({
     },
   },
 
+  /*
+   * 3.2 국가 도장 저장소. 실제 서비스에서는 계정별 COUNTRY_STAMP 테이블이며,
+   * 목업에서는 tripApi가 첫 핀을 만날 때 한 번만 채운다. 핀 목록을 매 조회마다
+   * 도장으로 환산하지 않도록 생성 시각과 이미지 식별자를 별도 보관한다.
+   */
+  countryStamps: {},
+
   /** 5.4 GET /pins/{pinId}/photos. is_pin_cover 가 대표사진 표시다. */
   photos: {
     101: [
