@@ -36,7 +36,7 @@ const formatDuration = (startAt, endAt) => {
   const days =
     Math.floor((new Date(endAt) - new Date(startAt)) / 86400000) + 1
 
-  return `${days}일간의 구간`
+  return `${days}일간의 여정`
 }
 
 const pinTimeFormatter = new Intl.DateTimeFormat('ko-KR', {
@@ -104,7 +104,7 @@ const TripManagement = () => {
 
   const settings = trip
     ? [
-        { label: '구간 이름', value: trip.name },
+        { label: '여정 이름', value: trip.name },
         {
           label: '여행 기간',
           value: formatShortRange(trip.start_at, trip.end_at),
@@ -128,7 +128,7 @@ const TripManagement = () => {
         topPadding="58px"
         barHeight="24px"
         rightContent={
-          <EditLink to={`/trip-management/${segmentId}/edit`}>구간 편집</EditLink>
+          <EditLink to={`/trip-management/${segmentId}/edit`}>여정 편집</EditLink>
         }
       />
 

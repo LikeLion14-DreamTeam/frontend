@@ -3,8 +3,10 @@ import { useNavigate, useParams } from 'react-router-dom'
 import styled from 'styled-components'
 import Button from '../../components/common/Button'
 import Card from '../../components/common/Card'
+import ConfirmationModal from '../../components/common/ConfirmationModal'
 import Header from '../../components/layout/Header'
 import checkboxCheckedIcon from '../../assets/icons/trip-checkbox-checked.svg'
+import deleteWarningIcon from '../../assets/icons/delete-warning.svg'
 import editBackIcon from '../../assets/icons/trip-edit-back.svg'
 import selectChevronIcon from '../../assets/icons/trip-select-chevron.svg'
 import {
@@ -29,7 +31,7 @@ const toDateInputValue = (isoString) => {
 
 /**
  * 입력한 날짜에 원래 시각을 그대로 얹는다.
- * 날짜만 고쳤는데 시각이 자정으로 밀려 구간 범위가 달라지는 걸 막는다.
+ * 날짜만 고쳤는데 시각이 자정으로 밀려 여정 범위가 달라지는 걸 막는다.
  */
 const toIsoWithOriginalTime = (dateValue, originalIso) => {
   if (!dateValue) return undefined
@@ -53,6 +55,38 @@ const pinTimeFormatter = new Intl.DateTimeFormat('ko-KR', {
 const formatPinTime = (taggedAt) =>
   taggedAt ? pinTimeFormatter.format(new Date(taggedAt)) : ''
 
+const formatDateValue = (isoString) => {
+  if (!isoString) return ''
+
+  const date = new Date(isoString)
+
+  return `${date.getFullYear()}.${pad2(date.getMonth() + 1)}.${pad2(date.getDate())}`
+}
+
+/** 같은 해면 끝 날짜의 연도를 뺀다. 시안의 `2024.11.03 – 11.10` 형태다. */
+const formatDateRange = (startAt, endAt) => {
+  const start = formatDateValue(startAt)
+  const end = formatDateValue(endAt)
+
+  if (!start) return end
+  if (!end) return start
+
+  return `${start} – ${start.slice(0, 4) === end.slice(0, 4) ? end.slice(5) : end}`
+}
+
+/** 삭제 확인 시트에 띄우는 한 줄 요약. 없는 값은 빼고 이어 붙인다. */
+const getTripDeleteMeta = (trip) =>
+  [
+    formatDateRange(trip.start_at, trip.end_at),
+    typeof trip.pin_count === 'number' ? `핀 ${trip.pin_count}개` : '',
+    typeof trip.photo_count === 'number' ? `사진 ${trip.photo_count}장` : '',
+    typeof trip.voice_memo_count === 'number'
+      ? `음성 ${trip.voice_memo_count}개`
+      : '',
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
 const TripSegmentEdit = () => {
   const navigate = useNavigate()
   const { segmentId = FALLBACK_SEGMENT_ID } = useParams()
@@ -65,6 +99,7 @@ const TripSegmentEdit = () => {
   const [includedIds, setIncludedIds] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
   useEffect(() => {
@@ -214,7 +249,7 @@ const TripSegmentEdit = () => {
     <PageSurface>
       <Header
         to={`/trip-management/${segmentId}`}
-        title="구간 편집"
+        title="여정 편집"
         height="136px"
         topPadding="58px"
         barHeight="50px"
@@ -234,14 +269,14 @@ const TripSegmentEdit = () => {
         {!isLoading && trip && (
           <>
             <InfoSection>
-              <SectionTitle>구간 정보</SectionTitle>
+              <SectionTitle>여정 정보</SectionTitle>
 
               <FieldGroup>
-                <FieldLabel htmlFor="segmentName">구간 이름</FieldLabel>
+                <FieldLabel htmlFor="segmentName">여정 이름</FieldLabel>
                 <TextInput
                   id="segmentName"
                   type="text"
-                  aria-label="구간 이름"
+                  aria-label="여정 이름"
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                 />
@@ -418,10 +453,50 @@ const TripSegmentEdit = () => {
               >
                 {isSaving ? '저장 중...' : '변경사항 저장'}
               </SaveButton>
+              <DeleteTrigger
+                type="button"
+                $variant="ghost"
+                onClick={() => setIsConfirmingDelete(true)}
+                disabled={isSaving}
+              >
+                여정 삭제하기
+              </DeleteTrigger>
             </Footer>
           </>
         )}
       </TripSegmentEditWrapper>
+
+      {/* TODO: 확인을 누르면 삭제 API 를 호출한다. 명세를 받는 대로 잇는다. */}
+      <ConfirmationModal
+        open={trip !== null && isConfirmingDelete}
+        title="이 여정을 삭제할까요?"
+        confirmLabel="여정 삭제하기"
+        onConfirm={() => setIsConfirmingDelete(false)}
+        onCancel={() => setIsConfirmingDelete(false)}
+        ariaDescribedBy="trip-delete-warning"
+      >
+        {trip && (
+          <TripDeleteContent>
+            <TripDeleteTargetCard>
+              <TripDeleteTargetName>{trip.name}</TripDeleteTargetName>
+              <TripDeleteTargetMeta>
+                {getTripDeleteMeta(trip)}
+              </TripDeleteTargetMeta>
+            </TripDeleteTargetCard>
+            <TripDeleteWarning id="trip-delete-warning">
+              <TripDeleteWarningIcon
+                src={deleteWarningIcon}
+                alt=""
+                aria-hidden="true"
+              />
+              <span>
+                여정에 담긴 핀과 사진, 음성 메모가 모두 함께 삭제돼요. 되돌릴 수
+                없습니다.
+              </span>
+            </TripDeleteWarning>
+          </TripDeleteContent>
+        )}
+      </ConfirmationModal>
     </PageSurface>
   )
 }
@@ -528,7 +603,7 @@ const TextInput = styled.input`
 `
 
 /* 기간은 시안에서 셀렉트 모양이었지만 값이 날짜라 date 입력을 쓴다.
-   테두리·높이는 구간 이름 입력과 맞춘다. */
+   테두리·높이는 여정 이름 입력과 맞춘다. */
 const DateInput = styled(TextInput)`
   padding: 0 12px;
 
@@ -780,4 +855,68 @@ const SaveButton = styled(Button)`
   background: var(--Primary-Cognac);
   font: var(--text-ui-button);
   text-decoration: none;
+`
+
+const DeleteTrigger = styled(Button)`
+  height: 52px;
+  flex: none;
+  font: var(--text-ui-button);
+
+  &:disabled {
+    cursor: not-allowed;
+  }
+`
+
+/* 삭제 확인 시트 안쪽. 시트 자체는 공통 ConfirmationModal 이 그린다. */
+const TripDeleteContent = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+`
+
+const TripDeleteTargetCard = styled.div`
+  height: 74px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--Background-Base);
+`
+
+const TripDeleteTargetName = styled.p`
+  overflow: hidden;
+  color: var(--Text-Primary);
+  font: var(--text-ui-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`
+
+const TripDeleteTargetMeta = styled.p`
+  overflow: hidden;
+  color: var(--Text-Secondary);
+  font: var(--text-ui-nav);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`
+
+const TripDeleteWarning = styled.p`
+  min-height: 66px;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  border-radius: 12px;
+  background: rgb(181 118 59 / 10%);
+  color: var(--Primary-Cognac);
+  font: 400 11px/18px var(--font-sans);
+  word-break: keep-all;
+`
+
+const TripDeleteWarningIcon = styled.img`
+  width: 18px;
+  height: 17px;
+  flex: 0 0 18px;
+  display: block;
 `

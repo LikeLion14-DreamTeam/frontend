@@ -438,7 +438,7 @@ const TripArchive = () => {
                           : '/trip-management'
                       }
                     >
-                      여행 구간 관리
+                      여정 관리
                     </ManageLink>
                   </TitleRow>
                   {nameError ? (
