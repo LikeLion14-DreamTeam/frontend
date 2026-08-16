@@ -615,8 +615,11 @@ const JourneyBlock = styled.section`
 const JourneyBand = styled.p`
   position: absolute;
   top: 0;
-  right: ${journeyScale(6)};
-  left: ${journeyScale(6)};
+  /* Figma 기준(402px 화면): 카드 362px, 띠 350px.
+     폭과 좌우 기준을 분리하지 않고 가운데 기준으로 배치한다. */
+  left: 50%;
+  width: calc(100% - ${journeyScale(12)});
+  transform: translateX(-50%);
   aspect-ratio: 350 / 77;
   padding: ${journeyScale(10)} 0 0 ${journeyScale(17)};
   border-radius: ${journeyScale(16)};
@@ -660,12 +663,12 @@ const JourneyImage = styled.img`
 const JourneyBody = styled.div`
   position: relative;
   height: 100%;
-  padding: ${journeyScale(27)} ${journeyScale(40)} ${journeyScale(16)}
-    ${journeyScale(27)};
+  padding: ${journeyScale(27)} ${journeyScale(40)} ${journeyScale(16)} ${journeyScale(27)};
   display: flex;
   flex-direction: column;
   gap: ${journeyScale(32)};
   align-items: flex-start;
+  justify-content: space-around;
 `
 
 /* 진행 중인 여정과 최근 태깅한 제품을 좌우로 넘겨 본다. */
@@ -1069,6 +1072,7 @@ const PassportCoverImage = styled.img`
   width: 45.6%;
   height: auto;
   flex: none;
+  margin-bottom: 13px;
   aspect-ratio: 173 / 249;
   display: block;
   transform-origin: left center;
@@ -1118,8 +1122,7 @@ const PassportImage = styled.img`
 const StampPages = styled.div`
   position: absolute;
   inset: 0;
-  padding: ${passportScale(40)} ${passportScale(20)} ${passportScale(52)}
-    ${passportScale(19)};
+  padding: ${passportScale(40)} ${passportScale(20)} ${passportScale(52)} ${passportScale(19)};
   display: flex;
   align-items: center;
   gap: ${passportScale(17)};
