@@ -42,3 +42,9 @@ export const saveMockBasicQuestionResponse = (
 
   return { ...basicQuestionResponse }
 }
+
+/** 2.6 진행 상태에 실어 보낼 지금까지의 응답. 라운드 순으로 준다. */
+export const getMockBasicQuestionResponses = () =>
+  [...mockBasicQuestionResponses.values()]
+    .map((response) => ({ ...response }))
+    .sort((a, b) => a.round_no - b.round_no)

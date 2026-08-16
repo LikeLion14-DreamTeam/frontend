@@ -35,3 +35,9 @@ export const saveMockSelectionPhoto = ({ photo_id, round_no, status }) => {
   return { ...selectionPhoto }
 }
 
+
+/** 2.6 진행 상태에 실어 보낼 지금까지의 선택. 라운드 순으로 준다. */
+export const getMockSelectionPhotos = () =>
+  [...mockSelectionPhotos.values()]
+    .map((selection) => ({ ...selection }))
+    .sort((a, b) => a.round_no - b.round_no || a.photo_id - b.photo_id)

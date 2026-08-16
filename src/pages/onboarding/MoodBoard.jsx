@@ -8,10 +8,7 @@ import Header from '../../components/layout/Header'
 import { updateMyAccount } from '../../features/auth/authApi'
 import { getAuthenticatedEntryPath } from '../../features/auth/authRoutes'
 import useAuthStore from '../../features/auth/useAuthStore'
-import {
-  replaceSelectionPhotos,
-  syncSelectionPhotos,
-} from '../../features/onboarding/selectionPhotoApi'
+import { saveSelectionRound } from '../../features/onboarding/selectionPhotoApi'
 import {
   MOODBOARD_PHOTO_ROUNDS,
   selectRandomPhotoSets,
@@ -37,7 +34,6 @@ const MoodBoard = () => {
   const [answers, setAnswers] = useState(() =>
     Array.from({ length: TOTAL_ROUND }, () => []),
   )
-  const [savedPhotoIds, setSavedPhotoIds] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -74,24 +70,11 @@ const MoodBoard = () => {
     setErrorMessage('')
 
     try {
-      if (isRelearning) {
-        await replaceSelectionPhotos({
-          roundNo: photoRound.roundNo,
-          candidatePhotoIds: photoRound.photos.map((photo) => photo.photoId),
-          selectedPhotoIds,
-        })
-      } else {
-        await syncSelectionPhotos({
-          roundNo: photoRound.roundNo,
-          previousPhotoIds: savedPhotoIds[photoRound.roundNo] ?? [],
-          selectedPhotoIds,
-        })
-      }
-
-      setSavedPhotoIds((currentPhotoIds) => ({
-        ...currentPhotoIds,
-        [photoRound.roundNo]: [...selectedPhotoIds],
-      }))
+      await saveSelectionRound({
+        roundNo: photoRound.roundNo,
+        candidatePhotoIds: photoRound.photos.map((photo) => photo.photoId),
+        selectedPhotoIds,
+      })
 
       if (!isLastRound) {
         setRound((currentRound) => currentRound + 1)

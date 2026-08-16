@@ -5,10 +5,7 @@ import Button from '../../components/common/Button'
 import Choice from '../../components/common/Choice'
 import Progress from '../../components/common/Progress'
 import Header from '../../components/layout/Header'
-import {
-  replaceSelectionPhotos,
-  syncSelectionPhotos,
-} from '../../features/onboarding/selectionPhotoApi'
+import { saveSelectionRound } from '../../features/onboarding/selectionPhotoApi'
 import {
   AB_PHOTO_ROUNDS,
   selectRandomPhotoSets,
@@ -36,7 +33,6 @@ const AbPreference = () => {
   const [answers, setAnswers] = useState(() =>
     Array(TOTAL_ROUND).fill(null),
   )
-  const [savedPhotoIds, setSavedPhotoIds] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -62,26 +58,11 @@ const AbPreference = () => {
     setErrorMessage('')
 
     try {
-      if (isRelearning) {
-        await replaceSelectionPhotos({
-          roundNo: photoRound.roundNo,
-          candidatePhotoIds: photoRound.photos.map((photo) => photo.photoId),
-          selectedPhotoIds: [selectedPhotoId],
-        })
-      } else {
-        await syncSelectionPhotos({
-          roundNo: photoRound.roundNo,
-          previousPhotoIds: savedPhotoIds[photoRound.roundNo]
-            ? [savedPhotoIds[photoRound.roundNo]]
-            : [],
-          selectedPhotoIds: [selectedPhotoId],
-        })
-      }
-
-      setSavedPhotoIds((currentPhotoIds) => ({
-        ...currentPhotoIds,
-        [photoRound.roundNo]: selectedPhotoId,
-      }))
+      await saveSelectionRound({
+        roundNo: photoRound.roundNo,
+        candidatePhotoIds: photoRound.photos.map((photo) => photo.photoId),
+        selectedPhotoIds: [selectedPhotoId],
+      })
 
       if (!isLastRound) {
         setRound((currentRound) => currentRound + 1)

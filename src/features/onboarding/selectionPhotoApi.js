@@ -26,44 +26,15 @@ export const saveSelectionPhoto = async ({ photoId, roundNo, status }) => {
 }
 
 /**
- * 라운드의 기존 선택과 새 선택의 차이만 2.2 API로 반영한다.
- * 사진 단위 API이므로 해제(false) 후 선택(true)을 순차 요청한다.
+ * 한 라운드의 후보 사진 전체를 2.2 로 기록한다. 고른 것은 true, 나머지는 false.
+ *
+ * 고른 것만 보내면 안 된다. 서버는 그 라운드의 후보가 전부 저장되고(A/B 2장,
+ * 무드보드 9장) 그중 true 개수가 맞을 때(각각 1장, 3장) 다음 라운드로 넘어간다.
+ * 일부만 보내면 행 수가 안 차서 진행이 그 자리에 멈춘다.
+ *
+ * 사진 단위 API 라 순차로 보낸다. 같은 라운드를 여러 번 호출해도 문제없다.
  */
-export const syncSelectionPhotos = async ({
-  roundNo,
-  previousPhotoIds = [],
-  selectedPhotoIds,
-}) => {
-  const previousPhotoIdSet = new Set(previousPhotoIds)
-  const selectedPhotoIdSet = new Set(selectedPhotoIds)
-  const deselectedPhotoIds = previousPhotoIds.filter(
-    (photoId) => !selectedPhotoIdSet.has(photoId),
-  )
-  const newlySelectedPhotoIds = selectedPhotoIds.filter(
-    (photoId) => !previousPhotoIdSet.has(photoId),
-  )
-  const savedSelections = []
-
-  for (const photoId of deselectedPhotoIds) {
-    savedSelections.push(
-      await saveSelectionPhoto({ photoId, roundNo, status: false }),
-    )
-  }
-
-  for (const photoId of newlySelectedPhotoIds) {
-    savedSelections.push(
-      await saveSelectionPhoto({ photoId, roundNo, status: true }),
-    )
-  }
-
-  return savedSelections
-}
-
-/**
- * 재학습 라운드에서 후보 전체의 상태를 다시 기록한다.
- * 기존 선택 조회 API가 없으므로 알려진 후보를 false로 해제한 뒤 새 선택을 true로 저장한다.
- */
-export const replaceSelectionPhotos = async ({
+export const saveSelectionRound = async ({
   roundNo,
   candidatePhotoIds,
   selectedPhotoIds,
