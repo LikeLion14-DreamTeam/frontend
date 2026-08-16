@@ -15,6 +15,9 @@ export const loginWithGoogle = async (googleIdToken) => {
     }
   }
 
+  // 서버는 검증한 Google ID 토큰의 `picture` 클레임을
+  // `profile_image_url`로 저장하고, 기존 사용자 로그인 때도 갱신한다.
+  // 클라이언트가 보내는 프로필 사진 URL은 신뢰하지 않는다.
   return apiClient.post('/auth/google', {
     google_id_token: googleIdToken,
   })
