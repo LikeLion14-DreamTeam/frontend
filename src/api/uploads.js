@@ -74,7 +74,13 @@ export const uploadPhoto = async (file) => {
   return file_id
 }
 
-/** 음성 파일을 업로드하고 8.2의 audio_file에 전달할 공개 URL을 반환한다. */
+/**
+ * 음성 파일을 업로드하고 8.2 의 audio_file 에 넣을 file_id 를 반환한다.
+ *
+ * file_id 는 서버가 서명해 준 토큰이라 업로드 주소로 대체할 수 없다.
+ * S3 주소를 보내면 서명 검증에 실패해 `유효하지 않거나 만료된 audio_file` 이 된다.
+ * 사진(5.5)도 같은 방식으로 file_id 를 넘긴다.
+ */
 export const uploadAudio = async (file) => {
   const upload = await createUpload({
     // 명세 0-2 가 허용하는 값은 photo · voice 뿐이다.
@@ -88,13 +94,5 @@ export const uploadAudio = async (file) => {
     file,
   })
 
-  if (USE_MOCK) return getMockUploadedUrl(upload.file_id)
-
-  // 백엔드가 공개 URL을 별도 필드로 주는 경우를 우선 사용한다. 기존 presigned
-  // 응답과도 호환되도록 쿼리를 제외한 object URL을 fallback으로 둔다.
-  return (
-    upload.file_url ??
-    upload.public_url ??
-    upload.upload_url.split('?')[0]
-  )
+  return upload.file_id
 }
