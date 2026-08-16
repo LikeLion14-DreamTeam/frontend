@@ -67,27 +67,30 @@ const BasicQuestion = () => {
     setErrorMessage('')
   }
 
+  /**
+   * 라운드를 넘길 때마다 그 라운드의 응답을 저장한다.
+   *
+   * 명세 2.1 이 라운드 하나씩 받는 형태라 그에 맞춘다. 마지막에 5개를 한꺼번에
+   * 보내면 순서가 보장되지 않고, 하나만 실패해도 어디까지 저장됐는지 알 수 없다.
+   */
   const handleNext = async () => {
     if (!selected || isSubmitting) return
-
-    if (!isLastRound) {
-      setRound((currentRound) => currentRound + 1)
-      return
-    }
 
     setIsSubmitting(true)
     setErrorMessage('')
 
     try {
-      await Promise.all(
-        answers.map((response, index) =>
-          saveBasicQuestionResponse({
-            roundNo: index + 1,
-            response,
-            replaceExisting: isRelearning,
-          }),
-        ),
-      )
+      await saveBasicQuestionResponse({
+        roundNo: round,
+        response: selected,
+        replaceExisting: isRelearning,
+      })
+
+      if (!isLastRound) {
+        setRound((currentRound) => currentRound + 1)
+        return
+      }
+
       navigate(
         getOnboardingFlowPath('/onboarding/ab-preference', isRelearning),
       )
