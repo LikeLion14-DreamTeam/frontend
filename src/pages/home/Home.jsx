@@ -615,9 +615,9 @@ const JourneyBlock = styled.section`
 const JourneyBand = styled.p`
   position: absolute;
   top: 0;
-  /* PNG 자체의 투명 여백이 아니라 실제 가죽 외곽선과 같은 카드 폭을 쓴다. */
-  right: 0;
-  left: 0;
+  /* Figma 기준(402px 화면): 카드 362px, 띠 350px. */
+  right: ${journeyScale(6)};
+  left: ${journeyScale(6)};
   aspect-ratio: 350 / 77;
   padding: ${journeyScale(10)} 0 0 ${journeyScale(17)};
   border-radius: ${journeyScale(16)};
