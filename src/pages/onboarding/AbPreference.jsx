@@ -14,6 +14,8 @@ import {
   getOnboardingFlowPath,
   isRelearningFlow,
 } from '../../features/onboarding/onboardingFlow'
+import { AB_SELECTION_STAGE } from '../../features/onboarding/onboardingProgressApi'
+import useOnboardingStart from '../../features/onboarding/useOnboardingStart'
 
 const TOTAL_ROUND = AB_PHOTO_ROUNDS.length
 
@@ -29,7 +31,10 @@ const AbPreference = () => {
   const [photoRounds] = useState(() =>
     selectRandomPhotoSets(AB_PHOTO_ROUNDS),
   )
-  const [round, setRound] = useState(1)
+  const { isReady, round, setRound } = useOnboardingStart({
+    stage: AB_SELECTION_STAGE,
+    isRelearning,
+  })
   const [answers, setAnswers] = useState(() =>
     Array(TOTAL_ROUND).fill(null),
   )
@@ -84,6 +89,8 @@ const AbPreference = () => {
     setRound((currentRound) => currentRound - 1)
     setErrorMessage('')
   }
+
+  if (!isReady) return null
 
   return (
     <>

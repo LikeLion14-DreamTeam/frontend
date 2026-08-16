@@ -17,6 +17,8 @@ import {
   getOnboardingFlowPath,
   isRelearningFlow,
 } from '../../features/onboarding/onboardingFlow'
+import { MOODBOARD_STAGE } from '../../features/onboarding/onboardingProgressApi'
+import useOnboardingStart from '../../features/onboarding/useOnboardingStart'
 
 const TOTAL_ROUND = MOODBOARD_PHOTO_ROUNDS.length
 const SELECT_LIMIT = 3
@@ -30,7 +32,10 @@ const MoodBoard = () => {
   const [photoRounds] = useState(() =>
     selectRandomPhotoSets(MOODBOARD_PHOTO_ROUNDS),
   )
-  const [round, setRound] = useState(1)
+  const { isReady, round, setRound } = useOnboardingStart({
+    stage: MOODBOARD_STAGE,
+    isRelearning,
+  })
   const [answers, setAnswers] = useState(() =>
     Array.from({ length: TOTAL_ROUND }, () => []),
   )
@@ -111,6 +116,8 @@ const MoodBoard = () => {
     setRound((currentRound) => currentRound - 1)
     setErrorMessage('')
   }
+
+  if (!isReady) return null
 
   return (
     <>

@@ -8,12 +8,13 @@ const USE_MOCK = import.meta.env.VITE_USE_MOCK_API === 'true'
 /**
  * 온보딩 단계. 서버가 다음에 받기를 기대하는 자리를 가리킨다.
  *
- * `BASIC_QUESTION` 과 `AB_SELECTION` 은 2.6 명세에 나온 값이다.
- * TODO: 무드보드 단계와 완료 상태의 값은 명세에 없어 확인이 필요하다.
+ * 완주하면 `COMPLETED` 가 되고 `current_round` 는 1 로 되돌아간다. 그 값은
+ * 의미가 없으니 완료 판단은 단계만 본다.
  */
 export const BASIC_QUESTION_STAGE = 'BASIC_QUESTION'
 export const AB_SELECTION_STAGE = 'AB_SELECTION'
 export const MOODBOARD_STAGE = 'MOODBOARD'
+export const COMPLETED_STAGE = 'COMPLETED'
 
 /** 기본 질문 5라운드, A/B 5라운드(1~5), 무드보드 2라운드(6~7) */
 const BASIC_QUESTION_ROUNDS = 5
@@ -46,22 +47,23 @@ const buildMockProgress = () => {
     if (nextAbRound) {
       currentStage = AB_SELECTION_STAGE
       currentRound = nextAbRound
-    } else {
+    } else if (nextMoodboardRound) {
       currentStage = MOODBOARD_STAGE
-      currentRound = nextMoodboardRound ?? MOODBOARD_ROUNDS.at(-1)
+      // 무드보드는 라운드 번호가 6·7 이고 진행 상태는 1·2 로 센다.
+      currentRound = nextMoodboardRound - MOODBOARD_ROUNDS[0] + 1
+    } else {
+      // 완주하면 라운드는 1 로 되돌아간다. 그 값은 쓰지 않는다.
+      currentStage = COMPLETED_STAGE
+      currentRound = 1
     }
   }
-
-  const isCompleted =
-    basicQuestionResponses.length >= BASIC_QUESTION_ROUNDS &&
-    !nextAbRound &&
-    !nextMoodboardRound
 
   return {
     current_stage: currentStage,
     current_round: currentRound,
     is_retrain: false,
-    completed_at: isCompleted ? new Date().toISOString() : null,
+    completed_at:
+      currentStage === COMPLETED_STAGE ? new Date().toISOString() : null,
     basic_question_responses: basicQuestionResponses,
     selection_photos: selectionPhotos,
   }

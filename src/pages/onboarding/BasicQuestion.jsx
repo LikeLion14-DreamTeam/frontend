@@ -10,6 +10,8 @@ import {
   getOnboardingFlowPath,
   isRelearningFlow,
 } from '../../features/onboarding/onboardingFlow'
+import { BASIC_QUESTION_STAGE } from '../../features/onboarding/onboardingProgressApi'
+import useOnboardingStart from '../../features/onboarding/useOnboardingStart'
 
 const questions = [
   {
@@ -45,7 +47,10 @@ const BasicQuestion = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const isRelearning = isRelearningFlow(location.search)
-  const [round, setRound] = useState(1)
+  const { isReady, round, setRound } = useOnboardingStart({
+    stage: BASIC_QUESTION_STAGE,
+    isRelearning,
+  })
   const [answers, setAnswers] = useState(() =>
     Array(TOTAL_ROUND).fill(null),
   )
@@ -108,6 +113,8 @@ const BasicQuestion = () => {
     setRound((currentRound) => currentRound - 1)
     setErrorMessage('')
   }
+
+  if (!isReady) return null
 
   return (
     <>
