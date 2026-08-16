@@ -1,7 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
-import Header from '../../components/layout/Header'
 import NavBar from '../../components/layout/NavBar'
 import { PhotobookListItem } from '../../features/photobooks/components'
 import {
@@ -146,8 +145,6 @@ const Archive = () => {
 
   return (
     <PageSurface>
-      <Header to="/" />
-
       <ArchiveWrapper>
         <ArchiveHeader>
           <Intro>
@@ -245,11 +242,9 @@ const PageSurface = styled.div`
 const ArchiveWrapper = styled.main`
   width: 100%;
   max-width: 450px;
-  min-height: calc(
-    var(--app-viewport-height) - 116px + var(--design-safe-top)
-  );
+  min-height: var(--app-viewport-height);
   margin: 0 auto;
-  padding: 4px 24px 99px;
+  padding: 16px 24px 99px;
   display: flex;
   flex-direction: column;
   gap: 40px;
