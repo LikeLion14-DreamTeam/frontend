@@ -224,7 +224,19 @@ const LOCATION_BY_PIN = {
   307: { city: '암스테르담', country_code: 'NL', country_name: '네덜란드' },
 }
 
-export const getMockPinLocation = (pinId) => LOCATION_BY_PIN[pinId] ?? null
+export const getMockPinLocation = (pinId) => {
+  const seeded = LOCATION_BY_PIN[pinId]
+  if (seeded) return seeded
+
+  const pin = mockPinStore.pins[pinId]
+  if (!pin?.country_code) return null
+
+  return {
+    city: pin.city ?? '',
+    country_code: pin.country_code,
+    country_name: pin.country_name ?? '',
+  }
+}
 
 /** 세션 동안 유지되는 mock 상태. tripApi 의 mock 분기가 직접 읽고 쓴다. */
 export const mockTripStore = createInitialState()

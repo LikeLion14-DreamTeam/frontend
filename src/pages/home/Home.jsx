@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import ConfirmationModal from '../../components/common/ConfirmationModal'
 import NavBar from '../../components/layout/NavBar'
@@ -46,10 +46,26 @@ const stampByCountryCode = Object.fromEntries(
 )
 
 /** 빈 칸은 Empty, 스탬프가 없는 나라는 Country 로 대체한다. */
-const getStampSrc = (countryCode) => {
-  if (!countryCode) return stampByCountryCode.Empty
+const getStampSrc = (stampImageId, countryCode) => {
+  const mappedCode = stampImageId?.replace(/^stamp-/, '').toUpperCase()
+  const assetCode = mappedCode && stampByCountryCode[mappedCode] ? mappedCode : countryCode
+  if (!assetCode) return stampByCountryCode.Empty
 
-  return stampByCountryCode[countryCode] ?? stampByCountryCode.Country
+  return stampByCountryCode[assetCode] ?? stampByCountryCode.Country
+}
+
+const replaceBrokenStamp = (event) => {
+  // 개별 국가 에셋이 손상·누락돼도 슬롯은 남기고 기본 도장으로 바꾼다.
+  if (event.currentTarget.src !== stampByCountryCode.Country) {
+    event.currentTarget.src = stampByCountryCode.Country
+  }
+}
+
+/** 분석 SDK가 붙기 전에도 이벤트 계약을 유지한다. 앱 셸이 이 이벤트를 수집한다. */
+const recordPassportEvent = (name, payload = {}) => {
+  window.dispatchEvent(
+    new CustomEvent('orte:passport-event', { detail: { name, ...payload } }),
+  )
 }
 
 const STAMPS_PER_SIDE = 4
@@ -140,17 +156,15 @@ const formatCounts = (trip) =>
 /**
  * 3 홈 화면
  *
- * TODO: 여권 요약과 스탬프는 아직 시안 값이다. 마이페이지 통계와
- * 3.3 GET /users/me/country-stamps 로 채운다.
  * TODO: 여정 이름 수정 버튼은 명세가 나오는 대로 카드에 추가한다.
- * TODO: 여권은 펼쳐진 상태만 구현했다. 덮인 상태(passport-closed.png)에서 펼쳐지는
- * 애니메이션은 다음 작업이다.
  */
 const Home = () => {
+  const navigate = useNavigate()
   const [currentTrip, setCurrentTrip] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [tripError, setTripError] = useState('')
   const [stamps, setStamps] = useState([])
+  const [isStampsLoading, setIsStampsLoading] = useState(true)
   const [pageIndex, setPageIndex] = useState(0)
   const [isEditingName, setIsEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
@@ -188,12 +202,19 @@ const Home = () => {
     let ignore = false
 
     const load = async () => {
+      setIsStampsLoading(true)
+
       try {
         const { stamps: visited } = await getCountryStamps()
-        if (!ignore) setStamps(visited)
+        if (!ignore) {
+          setStamps(visited)
+          recordPassportEvent('passport_page_viewed', { stamp_count: visited.length })
+        }
       } catch {
         // 도장은 부가 정보라 실패해도 빈 여권으로 둔다.
         if (!ignore) setStamps([])
+      } finally {
+        if (!ignore) setIsStampsLoading(false)
       }
     }
 
@@ -206,6 +227,11 @@ const Home = () => {
 
   const hasPins = currentTrip?.has_pins === true
   const stampSpreads = toStampSpreads(stamps)
+  const countryCount = stamps.length
+  const cityCount = stamps.reduce(
+    (total, stamp) => total + (stamp?.cities?.length ?? 0) + (stamp?.extra_city_count ?? 0),
+    0,
+  )
   const passportPages = [PASSPORT_COVER, ...stampSpreads]
   const isCoverPage = pageIndex === 0
   // 표지가 넘어가는 동안 그 아래에 첫 도장 면이 미리 깔려 있어야 한다.
@@ -282,6 +308,20 @@ const Home = () => {
     } finally {
       setIsSavingName(false)
     }
+  }
+
+  const openCountryPins = (stamp) => {
+    const countryCode = stamp?.country_code?.toUpperCase()
+    if (!countryCode) return
+
+    const query = new URLSearchParams({
+      country_code: countryCode,
+      country_name: stamp?.country_name ?? '',
+    })
+
+    recordPassportEvent('country_stamp_selected', { country_code: countryCode })
+    // 5.1 지도 뷰를 재사용한다. 국가 필터일 때는 동선을 그리지 않는다.
+    navigate(`/map?${query.toString()}`)
   }
 
   return (
@@ -411,7 +451,11 @@ const Home = () => {
           <ResultCard>
             <ResultTitle>기록은 계속 쌓이고 있어요</ResultTitle>
             <ResultDescription>
-              지금까지 12개의 도시, 7개의 나라를 다녀왔어요.
+              {isStampsLoading
+                ? '도장을 불러오는 중입니다.'
+                : countryCount === 0
+                  ? '아직 방문 도장이 없어요. 첫 태깅을 시작해보세요.'
+                  : `지금까지 ${cityCount}개의 도시, ${countryCount}개의 나라를 다녀왔어요.`}
             </ResultDescription>
           </ResultCard>
         </PassportHead>
@@ -437,11 +481,27 @@ const Home = () => {
                     $side={sideIndex === 0 ? 'left' : 'right'}
                   >
                     {side.map((stamp, slotIndex) => (
-                      <Stamp
+                      <StampButton
                         key={slotIndex}
-                        src={getStampSrc(stamp?.country_code)}
-                        alt={stamp?.country_name ?? ''}
-                      />
+                        type="button"
+                        disabled={!stamp?.country_code}
+                        aria-label={
+                          stamp?.country_name
+                            ? `${stamp.country_name} 핀 보기`
+                            : '빈 도장'
+                        }
+                        onClick={() => openCountryPins(stamp)}
+                      >
+                        <Stamp
+                          $new={stamp?.is_new}
+                          src={getStampSrc(
+                            stamp?.stamp_image_id,
+                            stamp?.country_code,
+                          )}
+                          onError={replaceBrokenStamp}
+                          alt={stamp?.country_name ?? ''}
+                        />
+                      </StampButton>
                     ))}
                   </StampGrid>
                 ))}
@@ -1128,6 +1188,7 @@ const StampPages = styled.div`
   gap: ${passportScale(17)};
   /* 표지가 아닌 면끼리는 겹쳐 지며 바뀐다. */
   opacity: ${({ $visible }) => ($visible ? 1 : 0)};
+  pointer-events: ${({ $visible }) => ($visible ? 'auto' : 'none')};
   transition: opacity 260ms ease;
 
   @media (prefers-reduced-motion: reduce) {
@@ -1149,6 +1210,43 @@ const Stamp = styled.img`
   width: 100%;
   aspect-ratio: 1;
   object-fit: contain;
+
+  ${({ $new }) =>
+    $new &&
+    `
+      animation: stamp-in 560ms cubic-bezier(0.2, 0.85, 0.32, 1.2) both;
+    `}
+
+  @keyframes stamp-in {
+    from {
+      opacity: 0;
+      transform: scale(1.5) rotate(-8deg);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) rotate(0deg);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+`
+
+const StampButton = styled.button`
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: ${passportScale(3)};
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+
+  &:disabled {
+    cursor: default;
+  }
 `
 
 const PageDots = styled.div`

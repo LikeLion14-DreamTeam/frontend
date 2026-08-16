@@ -204,6 +204,7 @@ const ManualPinDetails = () => {
           // 검색창에 직접 적은 주소가 있으면 그쪽을 우선한다.
           address: address || (place?.address ?? ''),
           city: place?.city ?? '',
+          countryCode: place?.countryCode ?? '',
           countryName: place?.countryName ?? '',
           placeName,
           textNote: memo,
