@@ -886,7 +886,8 @@ const JourneyInfo = styled.div`
 const TripNameRow = styled.div`
   max-width: 100%;
   display: flex;
-  align-items: center;
+  /* 아이콘 아래끝을 여정 이름 글자 아래끝에 맞춘다. */
+  align-items: baseline;
   gap: ${journeyScale(8)};
 `
 

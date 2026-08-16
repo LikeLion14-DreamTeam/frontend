@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import styled from 'styled-components'
 import Card from '../../components/common/Card'
 import Header from '../../components/layout/Header'
@@ -36,7 +36,7 @@ const formatDuration = (startAt, endAt) => {
   const days =
     Math.floor((new Date(endAt) - new Date(startAt)) / 86400000) + 1
 
-  return `${days}일간의 구간`
+  return `${days}일간의 여정`
 }
 
 const pinTimeFormatter = new Intl.DateTimeFormat('ko-KR', {
@@ -64,6 +64,19 @@ const formatPinRange = (pins) => {
 
 const TripManagement = () => {
   const { segmentId = FALLBACK_SEGMENT_ID } = useParams()
+  const [searchParams] = useSearchParams()
+
+  /**
+   * 어느 포토북에서 들어왔는지. 뒤로 가기로 그 화면에 되돌려 보낸다.
+   * 주소를 직접 친 경우처럼 값이 없으면 아카이브 목록으로 보낸다.
+   */
+  const photobookId = searchParams.get('photobook')
+  const backTo = photobookId ? `/archive/trip/${photobookId}` : '/archive'
+
+  // 편집 화면에서도 이 포토북으로 되돌아올 수 있게 값을 이어 넘긴다.
+  const editTo = photobookId
+    ? `/trip-management/${segmentId}/edit?photobook=${photobookId}`
+    : `/trip-management/${segmentId}/edit`
 
   const [trip, setTrip] = useState(null)
   const [pins, setPins] = useState([])
@@ -104,7 +117,7 @@ const TripManagement = () => {
 
   const settings = trip
     ? [
-        { label: '구간 이름', value: trip.name },
+        { label: '여정 이름', value: trip.name },
         {
           label: '여행 기간',
           value: formatShortRange(trip.start_at, trip.end_at),
@@ -123,12 +136,12 @@ const TripManagement = () => {
   return (
     <PageSurface>
       <Header
-        to="/archive"
-        height="104px"
-        topPadding="58px"
+        to={backTo}
+        height="118px"
+        topPadding="72px"
         barHeight="24px"
         rightContent={
-          <EditLink to={`/trip-management/${segmentId}/edit`}>구간 편집</EditLink>
+          <EditLink to={editTo}>여정 편집</EditLink>
         }
       />
 

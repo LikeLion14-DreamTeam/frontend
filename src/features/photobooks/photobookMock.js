@@ -375,3 +375,21 @@ export const refreshMockPhotobookCover = (photobookId) => {
 
   return { cover_photo_url: nextCover }
 }
+
+/**
+ * mock 전용. 여행 구간이 지워질 때 딸린 포토북도 함께 없앤다.
+ *
+ * 명세 4.4 는 구간을 지우면 포토북까지 DB cascade 로 사라진다고 정한다.
+ * 여기서 지우지 않으면 목록에는 남아 있는데 열면 404 가 나는 상태가 된다.
+ */
+export const deleteMockPhotobookBySegment = (segmentId) => {
+  const id = Number(segmentId)
+  const index = MOCK_PHOTOBOOKS.findIndex(
+    (photobook) => photobook.segment_id === id,
+  )
+
+  if (index === -1) return
+
+  const [removed] = MOCK_PHOTOBOOKS.splice(index, 1)
+  delete MOCK_PHOTOBOOK_DETAILS[removed.photobook_id]
+}

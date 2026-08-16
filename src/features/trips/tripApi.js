@@ -1,6 +1,7 @@
 import apiClient from '../../api/client'
 import { ApiError } from '../../api/errors'
 import { fetchAllPages } from '../../api/pagination'
+import { deleteMockPhotobookBySegment } from '../photobooks/photobookMock'
 import { mockPinStore } from '../pins/pinMock'
 import {
   getMockPhotoCount,
@@ -412,6 +413,36 @@ export const updateTrip = async (
     end_at: endAt,
     pin_exclusions: pinInclusions,
   })
+}
+
+/**
+ * 4.4 여행 구간 삭제
+ *
+ * 구간에 속한 핀·사진·음성 메모와 포토북까지 함께 사라진다(DB cascade).
+ * 되돌릴 수 없으므로 호출 전에 반드시 사용자 확인을 받는다.
+ * 204 No Content 라 반환값이 없다.
+ */
+export const deleteTrip = async (segmentId) => {
+  if (USE_MOCK) {
+    if (!mockTripStore.trips[segmentId]) throw mockNotFound()
+
+    // 서버가 cascade 로 지우는 것들을 mock 에서도 똑같이 지운다.
+    // 안 지우면 지도와 포토북에 유령 데이터가 남는다.
+    ;(mockTripStore.pins[segmentId] ?? []).forEach(({ pin_id }) => {
+      delete mockPinStore.pins[pin_id]
+      delete mockPinStore.photos[pin_id]
+      delete mockPinStore.voiceMemos[pin_id]
+    })
+
+    deleteMockPhotobookBySegment(segmentId)
+
+    delete mockTripStore.trips[segmentId]
+    delete mockTripStore.pins[segmentId]
+
+    return null
+  }
+
+  return apiClient.delete(`/trips/${segmentId}`)
 }
 
 /**
