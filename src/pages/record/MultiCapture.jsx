@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import styled, { createGlobalStyle } from 'styled-components'
 import trashIcon from '../../assets/icons/capture-trash.svg'
+import cameraFlipIcon from '../../assets/icons/camera-flip.svg'
 import closeIcon from '../../assets/icons/capture-close.svg'
 import { linkProduct } from '../../features/products/productApi'
 import useRecordDraftStore from '../../features/pins/useRecordDraftStore'
@@ -19,10 +20,12 @@ import useRecordDraftStore from '../../features/pins/useRecordDraftStore'
 
 // 촬영 해상도 요청값. 기기가 지원하지 않으면 근접한 값으로 대체된다.
 const VIDEO_CONSTRAINTS = {
-  facingMode: { ideal: 'environment' },
   width: { ideal: 1920 },
   height: { ideal: 1080 },
 }
+
+const BACK_CAMERA = 'environment'
+const FRONT_CAMERA = 'user'
 
 const JPEG_QUALITY = 0.92
 
@@ -66,6 +69,11 @@ const MultiCapture = () => {
   const [previewId, setPreviewId] = useState(null)
   const [status, setStatus] = useState('starting')
   const [errorMessage, setErrorMessage] = useState('')
+  const [facingMode, setFacingMode] = useState(BACK_CAMERA)
+  /** 빠르게 여러 번 전환했을 때 늦게 도착한 스트림을 버리기 위한 표식 */
+  const streamRequestRef = useRef(0)
+
+  const isFrontCamera = facingMode === FRONT_CAMERA
 
   const previewIndex = shots.findIndex((shot) => shot.id === previewId)
   const previewShot = previewIndex === -1 ? null : shots[previewIndex]
@@ -76,6 +84,9 @@ const MultiCapture = () => {
   }, [])
 
   const startCamera = useCallback(async () => {
+    const requestId = streamRequestRef.current + 1
+    streamRequestRef.current = requestId
+
     setStatus('starting')
     setErrorMessage('')
 
@@ -89,9 +100,15 @@ const MultiCapture = () => {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: VIDEO_CONSTRAINTS,
+        video: { ...VIDEO_CONSTRAINTS, facingMode: { ideal: facingMode } },
         audio: false,
       })
+
+      // 여는 사이에 카메라를 또 바꿨으면 방금 연 것은 버린다.
+      if (requestId !== streamRequestRef.current) {
+        stream.getTracks().forEach((track) => track.stop())
+        return
+      }
 
       streamRef.current = stream
 
@@ -102,6 +119,8 @@ const MultiCapture = () => {
 
       setStatus('ready')
     } catch (error) {
+      if (requestId !== streamRequestRef.current) return
+
       setStatus('error')
 
       if (error.name === 'NotAllowedError') {
@@ -116,8 +135,9 @@ const MultiCapture = () => {
       }
       setErrorMessage(`카메라를 열지 못했습니다. (${error.name})`)
     }
-  }, [])
+  }, [facingMode])
 
+  /* 카메라를 바꾸면 정리 후 다시 열린다. 둘을 동시에 열어두지 않는다. */
   useEffect(() => {
     startCamera()
 
@@ -166,6 +186,12 @@ const MultiCapture = () => {
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
     )
   }, [hasResolvedLocation, setCoordinates])
+
+  const handleFlipCamera = () => {
+    setFacingMode((current) =>
+      current === BACK_CAMERA ? FRONT_CAMERA : BACK_CAMERA,
+    )
+  }
 
   const handleShutter = () => {
     const video = videoRef.current
@@ -268,7 +294,13 @@ const MultiCapture = () => {
 
       <ViewfinderArea>
         <Viewfinder>
-          <Preview ref={videoRef} playsInline muted autoPlay />
+          <Preview
+            ref={videoRef}
+            $mirrored={isFrontCamera}
+            playsInline
+            muted
+            autoPlay
+          />
           <ViewfinderTint aria-hidden="true" />
           <GridLine $vertical style={{ left: '33.333%' }} aria-hidden="true" />
           <GridLine $vertical style={{ left: '66.666%' }} aria-hidden="true" />
@@ -279,6 +311,17 @@ const MultiCapture = () => {
             {queryTagId ? 'NFC 태그 인식됨' : '태그 없이 촬영 중'}
           </TagChip>
           <CountChip>{shots.length} 장</CountChip>
+
+          <FlipButton
+            type="button"
+            aria-label={
+              isFrontCamera ? '후면 카메라로 전환' : '전면 카메라로 전환'
+            }
+            onClick={handleFlipCamera}
+            disabled={status === 'starting'}
+          >
+            <FlipIcon src={cameraFlipIcon} alt="" aria-hidden="true" />
+          </FlipButton>
         </Viewfinder>
 
         {status !== 'ready' && (
@@ -442,11 +485,16 @@ const Viewfinder = styled.div`
   background: var(--Text-Primary);
 `
 
+/*
+ * 전면 카메라는 거울처럼 좌우를 뒤집어 보여준다. 그래야 손을 드는 방향이 맞다.
+ * 저장되는 사진은 뒤집지 않는다(애플 기본 카메라와 같다).
+ */
 const Preview = styled.video`
   width: 100%;
   height: 100%;
   display: block;
   object-fit: cover;
+  transform: ${({ $mirrored }) => ($mirrored ? 'scaleX(-1)' : 'none')};
 `
 
 const ViewfinderTint = styled.div`
@@ -490,6 +538,35 @@ const CountChip = styled.span`
   padding: 6px 11px;
   border-radius: 20px;
   color: #f2e9dc;
+`
+
+/* 위쪽 칩들과 같은 가장자리 여백·바탕색을 쓴다. */
+const FlipButton = styled.button`
+  position: absolute;
+  z-index: 1;
+  right: 8px;
+  bottom: 8px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(36 28 22 / 60%);
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`
+
+const FlipIcon = styled.img`
+  width: 22px;
+  height: 22px;
+  display: block;
 `
 
 const StatusOverlay = styled.div`
