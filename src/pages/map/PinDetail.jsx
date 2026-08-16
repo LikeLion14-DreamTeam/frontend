@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import styled from 'styled-components'
-import { Marker } from '@vis.gl/react-google-maps'
+import { Marker, useMap, useMapsLibrary } from '@vis.gl/react-google-maps'
 import Button from '../../components/common/Button'
 import ConfirmationModal from '../../components/common/ConfirmationModal'
 import GoogleMap from '../../components/common/GoogleMap'
+import SnapSheet from '../../components/common/SnapSheet'
 import VoiceMemoBar from '../../components/common/VoiceMemoBar'
 import activePinIcon from '../../assets/map/map-pin-active.svg'
 import deleteWarningIcon from '../../assets/icons/delete-warning.svg'
@@ -29,6 +30,7 @@ import { getTrip, getTripPins } from '../../features/trips/tripApi'
 
 // 지도에서 넘어오는 경로가 아직 없어 pinID 가 비면 이 값을 쓴다.
 const FALLBACK_PIN_ID = 101
+const DETAIL_MAP_ZOOM = 15.5
 
 const detailDateFormatter = new Intl.DateTimeFormat('ko-KR', {
   year: 'numeric',
@@ -60,6 +62,65 @@ const formatDeleteMeta = (pin, photoCount) => {
     .join(' · ')
 }
 
+/**
+ * 화면 픽셀만큼 남쪽으로 내린 중심을 구한다. 그만큼 핀이 위로 올라온다.
+ * 시트가 열린 상태에서 가려지지 않는 지도 영역의 가운데에 핀이 오도록 쓴다.
+ */
+const getOffsetCenter = (map, core, position, zoom, offsetPx) => {
+  const projection = map.getProjection()
+  if (!core || !projection) return null
+
+  const point = projection.fromLatLngToPoint(position)
+  const shifted = new core.Point(point.x, point.y + offsetPx / 2 ** zoom)
+  const latLng = projection.fromPointToLatLng(shifted)
+
+  return { lat: latLng.lat(), lng: latLng.lng() }
+}
+
+const CenterPinForSheet = ({ latitude, longitude, offsetPx }) => {
+  const map = useMap()
+  const core = useMapsLibrary('core')
+
+  useEffect(() => {
+    if (!map || !core) return undefined
+
+    const applyOffsetCenter = () => {
+      const zoom = map.getZoom()
+      if (zoom == null) return false
+
+      const center = getOffsetCenter(
+        map,
+        core,
+        { lat: latitude, lng: longitude },
+        zoom,
+        offsetPx,
+      )
+      if (!center) return false
+
+      if (typeof map.moveCamera === 'function') {
+        map.moveCamera({ center, zoom })
+      } else {
+        map.setCenter(center)
+      }
+
+      return true
+    }
+
+    if (applyOffsetCenter()) return undefined
+
+    const listener =
+      typeof map.addListener === 'function'
+        ? map.addListener('idle', () => {
+            if (applyOffsetCenter()) listener.remove()
+          })
+        : null
+
+    return () => listener?.remove()
+  }, [core, latitude, longitude, map, offsetPx])
+
+  return null
+}
+
 const PinDetail = () => {
   const navigate = useNavigate()
   const { pinID = FALLBACK_PIN_ID } = useParams()
@@ -85,10 +146,18 @@ const PinDetail = () => {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [viewportHeight, setViewportHeight] = useState(() => window.innerHeight)
+  const [sheetOffset, setSheetOffset] = useState(0)
 
   const fileInputRef = useRef(null)
   const [isUploading, setIsUploading] = useState(false)
   const [addMessage, setAddMessage] = useState('')
+
+  useEffect(() => {
+    const updateViewportHeight = () => setViewportHeight(window.innerHeight)
+    window.addEventListener('resize', updateViewportHeight)
+    return () => window.removeEventListener('resize', updateViewportHeight)
+  }, [])
 
   useEffect(() => {
     let ignore = false
@@ -312,10 +381,14 @@ const PinDetail = () => {
     }
   }
 
+  // API 응답 좌표가 문자열일 때도 새로고침 직후 마커/중심 계산이 깨지지 않게 맞춘다.
+  const latitude = Number(pin.latitude)
+  const longitude = Number(pin.longitude)
+
   // 위치 권한을 거부한 상태로 저장된 핀은 좌표가 없다. 지도를 그리지 않는다.
-  const hasCoordinates = pin.latitude !== null && pin.longitude !== null
+  const hasCoordinates = Number.isFinite(latitude) && Number.isFinite(longitude)
   const position = hasCoordinates
-    ? { lat: pin.latitude, lng: pin.longitude }
+    ? { lat: latitude, lng: longitude }
     : null
   const title = pin.place_name || pin.address || '이름 없는 장소'
   const representativePhotos = pin.representative_photos ?? []
@@ -324,6 +397,9 @@ const PinDetail = () => {
   const hiddenPhotoCount = Math.max(photos.length - previewPhotos.length, 0)
   // 5.3: 여정에 배정되기 전(진행 중)인 핀만 삭제할 수 있다.
   const isDeletable = pin.segment_id === null
+  // 시트가 열렸을 때 시작 위치(상단에서 317px)를 유지하되,
+  // 지도는 화면 전체를 채워 접힌 상태에서도 빈 배경이 보이지 않게 한다.
+  const detailSheetHeight = Math.max(403, viewportHeight - 317)
 
   return (
     <Page>
@@ -331,13 +407,18 @@ const PinDetail = () => {
         {hasCoordinates ? (
           <GoogleMap
             center={position}
-            zoom={15.5}
+            zoom={DETAIL_MAP_ZOOM}
             height="100%"
             borderRadius="0"
             bordered={false}
             mapOptions={{ clickableIcons: false, keyboardShortcuts: false }}
           >
             <Marker position={position} icon={activePinIcon} title={title} />
+            <CenterPinForSheet
+              latitude={position.lat}
+              longitude={position.lng}
+              offsetPx={detailSheetHeight / 2}
+            />
           </GoogleMap>
         ) : (
           <NoLocation>위치 정보 없음</NoLocation>
@@ -348,21 +429,30 @@ const PinDetail = () => {
         </BackButton>
 
         {journey && (
-          <JourneyChip>
+          <JourneyChip $sheetHeight={detailSheetHeight} $sheetOffset={sheetOffset}>
             {journey.name} · {journey.total}개 핀 중 {journey.order}번째
           </JourneyChip>
         )}
 
         {hasCoordinates && (
-          <OpenMapButton type="button" onClick={() => navigate('/map')}>
+          <OpenMapButton
+            type="button"
+            $sheetHeight={detailSheetHeight}
+            $sheetOffset={sheetOffset}
+            onClick={() => navigate('/map')}
+          >
             <img src={openMapIcon} alt="" />
             지도에서 보기
           </OpenMapButton>
         )}
       </MapHero>
 
-      <DetailSheet>
-        <SheetHandle aria-hidden="true" />
+      <DetailSheet
+        ariaLabel="핀 기록"
+        collapsedOffset={detailSheetHeight - 54}
+        height={detailSheetHeight}
+        onOffsetChange={setSheetOffset}
+      >
 
         <DetailContent>
           <PinIntro>
@@ -616,12 +706,12 @@ const PinDetail = () => {
 export default PinDetail
 
 const Page = styled.main`
+  position: relative;
   width: 100%;
   max-width: 450px;
   height: var(--app-viewport-height);
   margin: 0 auto;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
   background: var(--Background-Base);
   scrollbar-width: none;
 
@@ -728,8 +818,8 @@ const StateMessage = styled.p`
 `
 
 const MapHero = styled.section`
-  position: relative;
-  height: 348px;
+  position: absolute;
+  inset: 0;
   overflow: hidden;
   background: var(--Map-Base);
 `
@@ -757,7 +847,7 @@ const BackButton = styled.button`
 const JourneyChip = styled.span`
   position: absolute;
   z-index: 3;
-  bottom: 59px;
+  bottom: ${({ $sheetHeight }) => `${$sheetHeight + 28}px`};
   left: 20px;
   padding: 7px 12px;
   border-radius: 14px;
@@ -766,13 +856,14 @@ const JourneyChip = styled.span`
   color: var(--Text-Inverse);
   font: var(--text-ui-caption);
   white-space: nowrap;
+  transform: ${({ $sheetOffset }) => `translateY(${$sheetOffset}px)`};
 `
 
 const OpenMapButton = styled.button`
   position: absolute;
   z-index: 3;
   right: 22px;
-  bottom: 59px;
+  bottom: ${({ $sheetHeight }) => `${$sheetHeight + 28}px`};
   padding: 7px 12px;
   display: flex;
   align-items: center;
@@ -785,6 +876,7 @@ const OpenMapButton = styled.button`
   font: var(--text-ui-caption);
   white-space: nowrap;
   cursor: pointer;
+  transform: ${({ $sheetOffset }) => `translateY(${$sheetOffset}px)`};
 
   img {
     width: 15px;
@@ -793,32 +885,23 @@ const OpenMapButton = styled.button`
   }
 `
 
-const DetailSheet = styled.section`
-  position: relative;
+const DetailSheet = styled(SnapSheet)`
   z-index: 2;
-  min-height: 719px;
-  margin-top: -31px;
   border-radius: 30px 30px 0 0;
   background: var(--Background-Base);
-  box-shadow: var(--Effect-Bottom-Sheet);
-`
-
-const SheetHandle = styled.div`
-  position: absolute;
-  top: 13px;
-  left: 50%;
-  width: 54px;
-  height: 4px;
-  border-radius: 2px;
-  background: rgb(181 161 140 / 50%);
-  transform: translateX(-50%);
 `
 
 const DetailContent = styled.div`
-  padding: 60px 24px 48px;
+  height: 100%;
+  padding: 30px 24px 48px;
   display: flex;
   flex-direction: column;
   gap: 38px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar { display: none; }
 `
 
 /* PHOTOS·SUGGESTED 와 같이 본문 폭을 꽉 채운다. 여기만 354 로 묶어두면

@@ -10,6 +10,7 @@ import {
 } from '@vis.gl/react-google-maps'
 import Button from '../../components/common/Button'
 import GoogleMap from '../../components/common/GoogleMap'
+import SnapSheet from '../../components/common/SnapSheet'
 import NavBar from '../../components/layout/NavBar'
 import currentPositionSvg from '../../assets/map/current-position.svg?raw'
 import dropdownCheckIcon from '../../assets/map/dropdown-check.svg'
@@ -34,6 +35,9 @@ const DEFAULT_ZOOM = 13.3
 
 /* 내 위치로 갈 때 배율. 주변 길이 보일 만큼 당긴다. */
 const CURRENT_POSITION_ZOOM = 17
+const PIN_SHEET_COLLAPSED_OFFSET = 227
+const LOCATION_BUTTON_DEFAULT_BOTTOM = 129
+const LOCATION_BUTTON_RAISED_BOTTOM = 385
 
 /* 진행 중인 여행은 TRAVEL_SEGMENT 가 없어 segment_id 로 못 고른다.
    목록에서 구분하려고 쓰는 프론트 전용 값이다. */
@@ -476,6 +480,7 @@ const MapPage = () => {
   const [pinDetail, setPinDetail] = useState(null)
   const [pinPhotos, setPinPhotos] = useState([])
   const [sheetError, setSheetError] = useState('')
+  const [pinSheetOffset, setPinSheetOffset] = useState(0)
 
   /** 핀을 고르면 시트에 채울 값을 5.1 · 5.4 로 받는다. */
   useEffect(() => {
@@ -516,11 +521,22 @@ const MapPage = () => {
     }
   }, [selectedPinId])
 
+  useEffect(() => {
+    if (selectedPinId) setPinSheetOffset(0)
+  }, [selectedPinId])
+
   const selectedIndex = mapPins.findIndex(
     ({ pin_id }) => pin_id === selectedPinId,
   )
   const coverPhoto =
     pinPhotos.find((photo) => photo.is_pin_cover) ?? pinPhotos[0]
+
+  const locationButtonBottom = selectedPin
+    ? LOCATION_BUTTON_RAISED_BOTTOM -
+      ((LOCATION_BUTTON_RAISED_BOTTOM - LOCATION_BUTTON_DEFAULT_BOTTOM) *
+        pinSheetOffset) /
+        PIN_SHEET_COLLAPSED_OFFSET
+    : LOCATION_BUTTON_DEFAULT_BOTTOM
 
   /** iOS 는 사용자 제스처 안에서만 나침반 권한을 물을 수 있다. */
   const requestCompass = async () => {
@@ -588,6 +604,7 @@ const MapPage = () => {
             clickableIcons: false,
             keyboardShortcuts: false,
             minZoom: 3,
+            onClick: () => setSelectedPinId(null),
           }}
         >
           <Polyline
@@ -662,7 +679,7 @@ const MapPage = () => {
       <LocationButton
         type="button"
         aria-label="내 위치로 이동"
-        $raised={Boolean(selectedPin)}
+        $bottom={locationButtonBottom}
         onClick={handleLocate}
       >
         <img src={myLocationIcon} alt="" />
@@ -678,19 +695,14 @@ const MapPage = () => {
         </RecordButton>
       )}
 
-      <PinSheet $expanded={Boolean(selectedPin)} aria-hidden={!selectedPin}>
-        <SheetHandle
-          type="button"
-          aria-label={selectedPin ? '핀 정보 접기' : '핀 정보 펼치기'}
-          onClick={() => {
-            if (selectedPin) setSelectedPinId(null)
-            else if (mapPins[0]) setSelectedPinId(mapPins[0].pin_id)
-          }}
+      {selectedPin && (
+        <PinSheet
+          ariaLabel="핀 정보"
+          collapsedOffset={PIN_SHEET_COLLAPSED_OFFSET}
+          height={281}
+          onOffsetChange={setPinSheetOffset}
         >
-          <span />
-        </SheetHandle>
-
-        <SheetContent $visible={Boolean(selectedPin)}>
+          <PinSheetContent>
           {sheetError ? (
             <SheetMessage role="alert">{sheetError}</SheetMessage>
           ) : !pinDetail ? (
@@ -734,8 +746,9 @@ const MapPage = () => {
               </Pagination>
             </>
           )}
-        </SheetContent>
-      </PinSheet>
+          </PinSheetContent>
+        </PinSheet>
+      )}
 
       <NavBar activeOverride="map" />
 
@@ -841,14 +854,13 @@ const LocationButton = styled.button`
   position: absolute;
   z-index: 9;
   right: 13px;
-  bottom: ${({ $raised }) => ($raised ? '385px' : '129px')};
+  bottom: ${({ $bottom }) => `${$bottom}px`};
   width: 76px;
   height: 76px;
   padding: 0;
   border: 0;
   background: transparent;
   cursor: pointer;
-  transition: bottom 220ms ease;
 
   img {
     width: 76px;
@@ -882,52 +894,17 @@ const RecordButton = styled.button`
   }
 `
 
-const PinSheet = styled.section`
-  position: absolute;
+const PinSheet = styled(SnapSheet)`
   z-index: 8;
-  right: 0;
-  bottom: ${({ $expanded }) => ($expanded ? '75px' : '-181px')};
-  left: 0;
-  height: 281px;
-  overflow: hidden;
-  border-radius: 24px 24px 0 0;
-  background: var(--Surface-Base);
-  box-shadow: var(--Effect-Bottom-Sheet);
-  transition: bottom 220ms ease;
+  bottom: 75px;
 `
 
-const SheetHandle = styled.button`
-  position: absolute;
-  z-index: 1;
-  top: 0;
-  left: 50%;
-  width: 72px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  transform: translateX(-50%);
-  cursor: pointer;
-
-  span {
-    width: 40px;
-    height: 4px;
-    border-radius: 2px;
-    background: rgb(181 161 140 / 50%);
-  }
-`
-
-const SheetContent = styled.div`
+const PinSheetContent = styled.div`
   height: 100%;
-  padding: 30px 24px 20px;
+  padding: 0 24px 20px;
   display: flex;
   flex-direction: column;
   gap: 17px;
-  opacity: ${({ $visible }) => ($visible ? 1 : 0)};
-  transition: opacity 140ms ease;
 `
 
 const PinSummary = styled.div`
