@@ -139,4 +139,15 @@ export const MAP_STYLES = [
     elementType: 'labels.text.fill',
     stylers: [{ color: '#92998d' }],
   },
+  /*
+   * 구글 기본 아이콘(공원·박물관·정류장 등)을 전부 끈다. 우리 핀만 남긴다.
+   * 글자는 그대로 두므로 `남산` 같은 지명은 계속 보인다.
+   *
+   * featureType 을 지정하지 않아 모든 종류에 걸리고, 맨 끝에 둬야 위쪽의
+   * 세부 규칙(poi.park 등)에 밀리지 않는다.
+   */
+  {
+    elementType: 'labels.icon',
+    stylers: [{ visibility: 'off' }],
+  },
 ]

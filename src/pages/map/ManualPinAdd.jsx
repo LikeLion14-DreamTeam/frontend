@@ -8,7 +8,6 @@ import { reverseGeocode } from '../../features/pins/reverseGeocode'
 import crosshairIcon from '../../assets/map/manual-pin-crosshair.svg'
 import markerIcon from '../../assets/map/manual-pin-marker.svg'
 import searchIcon from '../../assets/map/manual-pin-search.svg'
-import { MAP_STYLES } from './mapStyles'
 
 /** 위치를 못 얻었을 때 시작 지점. 여기서 직접 옮겨 찍으면 된다. */
 const FALLBACK_CENTER = { lat: 37.5796, lng: 126.9849 }
@@ -125,11 +124,14 @@ const ManualPinAdd = () => {
     <Page>
       <MapLayer>
         {initialCenter && (
+          /*
+           * 지도를 움직여 위치를 직접 맞추는 화면이라 건물이 구분되는 단계까지
+           * 당긴다. 위치 지정 UI 를 쓰는 앱들이 잡는 정도다.
+           */
           <GoogleMap
             center={initialCenter}
-            zoom={16}
+            zoom={18}
             height="100%"
-            styles={MAP_STYLES}
             borderRadius="0"
             bordered={false}
             mapOptions={{

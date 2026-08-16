@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
-import { Marker, Polyline, useApiIsLoaded } from '@vis.gl/react-google-maps'
+import {
+  Marker,
+  Polyline,
+  useApiIsLoaded,
+  useMap,
+  useMapsLibrary,
+} from '@vis.gl/react-google-maps'
 import Button from '../../components/common/Button'
 import GoogleMap from '../../components/common/GoogleMap'
 import NavBar from '../../components/layout/NavBar'
@@ -19,10 +25,15 @@ import {
   getPinPhotos,
 } from '../../features/pins/pinApi'
 import { getTrip, getTripPins, getTrips } from '../../features/trips/tripApi'
-import { MAP_STYLES } from './mapStyles'
 
 // 여정을 아직 못 받았을 때 잠깐 보여줄 위치.
 const DEFAULT_CENTER = { lat: 48.8569, lng: 2.3376 }
+
+/* 여정을 볼 때 배율. 핀이 하나뿐이라 영역을 못 잡을 때만 쓰인다. */
+const DEFAULT_ZOOM = 13.3
+
+/* 내 위치로 갈 때 배율. 주변 길이 보일 만큼 당긴다. */
+const CURRENT_POSITION_ZOOM = 17
 
 /* 진행 중인 여행은 TRAVEL_SEGMENT 가 없어 segment_id 로 못 고른다.
    목록에서 구분하려고 쓰는 프론트 전용 값이다. */
@@ -31,6 +42,147 @@ const ONGOING_TRIP_ID = 'ongoing'
 // 아이콘 파일의 원본 크기. 정중앙을 좌표에 맞추는 데 쓴다.
 const PIN_SIZE = { width: 38, height: 38 }
 const ACTIVE_PIN_SIZE = { width: 48, height: 48 }
+
+/* 핀이 화면 가장자리에 딱 붙지 않도록 두는 여백.
+   위쪽은 여정 선택 드롭다운, 아래쪽은 핀 시트에 가려지는 만큼 더 준다. */
+const FIT_PADDING = { top: 110, right: 48, bottom: 150, left: 48 }
+
+/* 핀을 고르면 이 배율까지 확대한다. 이미 더 당겨 봤다면 그대로 둔다.
+   길 이름과 골목이 드러나는 단계로, 구글·애플 지도가 장소를 고를 때 잡는 정도다.
+   내 위치로 갈 때와 같은 값이라 둘 사이를 오가도 배율이 튀지 않는다. */
+const SELECTED_PIN_ZOOM = 17
+
+/* 핀 시트(높이 281 + 아래 여백 75)가 화면 아래를 가린다.
+   가려지지 않는 영역의 가운데에 오도록 그 절반만큼 위로 올린다. */
+const SELECTED_PIN_OFFSET = (281 + 75) / 2
+
+/** 핀으로 옮겨가는 데 걸리는 시간 */
+const FOCUS_DURATION_MS = 520
+
+/* 처음에 붙고 끝에서 감속한다. */
+const easeOut = (progress) => 1 - (1 - progress) ** 3
+
+const prefersReducedMotion = () =>
+  globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+
+/**
+ * 화면 픽셀만큼 남쪽으로 내린 중심을 구한다. 그만큼 핀이 위로 올라온다.
+ *
+ * 세계 좌표는 배율과 무관하게 256px 기준이라, 화면 픽셀을 배율로 나눠서 더한다.
+ */
+const getOffsetCenter = (map, core, position, zoom) => {
+  const projection = map.getProjection()
+  if (!core || !projection) return position
+
+  const point = projection.fromLatLngToPoint(position)
+  const shifted = new core.Point(
+    point.x,
+    point.y + SELECTED_PIN_OFFSET / 2 ** zoom,
+  )
+  const latLng = projection.fromPointToLatLng(shifted)
+
+  return { lat: latLng.lat(), lng: latLng.lng() }
+}
+
+/**
+ * 고른 핀으로 지도를 옮긴다.
+ *
+ * `useMap` 은 `<Map>` 안에서만 쓸 수 있어 자식 컴포넌트로 둔다. 그리는 건 없다.
+ */
+const FocusSelectedPin = ({ latitude, longitude }) => {
+  const map = useMap()
+  const core = useMapsLibrary('core')
+
+  useEffect(() => {
+    if (!map) return undefined
+
+    const startCenter = map.getCenter()
+    const startZoom = map.getZoom()
+    if (!startCenter || startZoom == null) return undefined
+
+    // 이미 더 당겨 봤다면 뒤로 물러나지 않는다.
+    const targetZoom = Math.max(startZoom, SELECTED_PIN_ZOOM)
+    const targetCenter = getOffsetCenter(
+      map,
+      core,
+      { lat: latitude, lng: longitude },
+      targetZoom,
+    )
+
+    /*
+     * 중심과 배율을 매 프레임 같이 옮긴다.
+     *
+     * `panTo` 는 중심만 부드럽고 `setZoom` 은 즉시 반영이라, 둘을 같이 쓰면
+     * 배율만 툭 튀고 이동은 뒤늦게 따라온다. 카메라를 직접 그려야 한 동작이 된다.
+     */
+    const moveCamera = (center, zoom) => {
+      if (typeof map.moveCamera === 'function') {
+        map.moveCamera({ center, zoom })
+        return
+      }
+
+      map.setZoom(zoom)
+      map.setCenter(center)
+    }
+
+    if (prefersReducedMotion()) {
+      moveCamera(targetCenter, targetZoom)
+      return undefined
+    }
+
+    const from = {
+      lat: startCenter.lat(),
+      lng: startCenter.lng(),
+      zoom: startZoom,
+    }
+    const startedAt = performance.now()
+    let frame = 0
+
+    const step = (now) => {
+      const progress = Math.min((now - startedAt) / FOCUS_DURATION_MS, 1)
+      const eased = easeOut(progress)
+
+      moveCamera(
+        {
+          lat: from.lat + (targetCenter.lat - from.lat) * eased,
+          lng: from.lng + (targetCenter.lng - from.lng) * eased,
+        },
+        from.zoom + (targetZoom - from.zoom) * eased,
+      )
+
+      if (progress < 1) frame = requestAnimationFrame(step)
+    }
+
+    frame = requestAnimationFrame(step)
+
+    // 다른 핀을 고르면 진행 중이던 이동을 멈추고 새로 시작한다.
+    return () => cancelAnimationFrame(frame)
+  }, [core, latitude, longitude, map])
+
+  return null
+}
+
+/**
+ * 핀이 모두 보이도록 지도 영역을 잡는다.
+ *
+ * 핀이 하나뿐이거나 전부 같은 자리면 영역이 점이 돼 최대 배율로 붙어버린다.
+ * 그때는 null 을 돌려주고 중심·배율 방식으로 넘긴다.
+ */
+const getPinBounds = (pins) => {
+  if (pins.length < 2) return null
+
+  const lats = pins.map(({ latitude }) => latitude)
+  const lngs = pins.map(({ longitude }) => longitude)
+
+  const north = Math.max(...lats)
+  const south = Math.min(...lats)
+  const east = Math.max(...lngs)
+  const west = Math.min(...lngs)
+
+  if (north === south && east === west) return null
+
+  return { north, south, east, west, padding: FIT_PADDING }
+}
 
 /* 현재 위치 아이콘은 점(17, 28)에서 오른쪽으로 원뿔이 뻗은 모양이다.
    그 점을 축으로 돌리면 원뿔이 원래 68x56 박스를 벗어나 잘리므로,
@@ -106,6 +258,10 @@ const MapPage = () => {
   const [selectedPinId, setSelectedPinId] = useState(null)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [mapCenter, setMapCenter] = useState(DEFAULT_CENTER)
+  /** 영역(mapBounds)을 못 잡을 때 쓰는 배율 */
+  const [mapZoom, setMapZoom] = useState(DEFAULT_ZOOM)
+  /** 핀이 둘 이상일 때만 쓴다. null 이면 mapCenter 로 잡는다. */
+  const [mapBounds, setMapBounds] = useState(null)
   const [mapKey, setMapKey] = useState(0)
 
   const [currentPosition, setCurrentPosition] = useState(null)
@@ -295,12 +451,15 @@ const MapPage = () => {
     [mapPins],
   )
 
-  // 여정을 바꾸면 그 여정의 첫 핀으로 지도를 옮긴다.
+  // 여정을 바꾸면 그 여정의 핀과 동선이 한눈에 들어오도록 지도를 다시 잡는다.
   useEffect(() => {
     const [first] = mapPins
     if (!first) return
 
+    // 핀이 하나면 영역을 못 잡으니 그 핀을 가운데 둔다.
+    setMapBounds(getPinBounds(mapPins))
     setMapCenter({ lat: first.latitude, lng: first.longitude })
+    setMapZoom(DEFAULT_ZOOM)
     setMapKey((current) => current + 1)
   }, [mapPins])
 
@@ -376,11 +535,22 @@ const MapPage = () => {
     }
   }
 
+  /**
+   * 내 위치로 지도를 옮긴다.
+   *
+   * 고른 핀은 먼저 푼다. 지도를 다시 그리면 `FocusSelectedPin` 이 새 지도를
+   * 받아 다시 동작해서, 내 위치로 갔다가 그 핀으로 되돌아간다.
+   * 화면 밖으로 나간 핀의 시트를 열어두는 것도 맞지 않는다.
+   */
   const handleLocate = () => {
     requestCompass()
+    setSelectedPinId(null)
 
     if (currentPosition) {
+      // 내 위치로 갈 때는 영역이 아니라 그 점을 가운데 두고 더 당겨 본다.
+      setMapBounds(null)
       setMapCenter(currentPosition)
+      setMapZoom(CURRENT_POSITION_ZOOM)
       setMapKey((current) => current + 1)
       return
     }
@@ -391,7 +561,9 @@ const MapPage = () => {
       const position = { lat: coords.latitude, lng: coords.longitude }
 
       setCurrentPosition(position)
+      setMapBounds(null)
       setMapCenter(position)
+      setMapZoom(CURRENT_POSITION_ZOOM)
       setMapKey((current) => current + 1)
     })
   }
@@ -406,10 +578,10 @@ const MapPage = () => {
       <MapLayer>
         <GoogleMap
           key={mapKey}
+          bounds={mapBounds}
           center={mapCenter}
-          zoom={13.3}
+          zoom={mapZoom}
           height="100%"
-          styles={MAP_STYLES}
           borderRadius="0"
           bordered={false}
           mapOptions={{
@@ -453,6 +625,13 @@ const MapPage = () => {
               })}
               title="현재 위치"
               zIndex={4}
+            />
+          )}
+
+          {selectedPin && (
+            <FocusSelectedPin
+              latitude={selectedPin.latitude}
+              longitude={selectedPin.longitude}
             />
           )}
         </GoogleMap>

@@ -457,6 +457,8 @@ const TripArchive = () => {
                 {mapPins.length ? (
                   <GoogleMap
                     markers={mapPins}
+                    /* 핀이 하나뿐이라 영역을 못 잡을 때만 쓰인다. */
+                    zoom={17}
                     height="100%"
                     borderRadius="15px"
                     bordered={false}
@@ -718,7 +720,7 @@ const TripStats = styled.p`
 
 const MapHero = styled.div`
   width: 100%;
-  height: 224px;
+  height: 300px;
   overflow: hidden;
   border-radius: 15px;
   background: #e0e0e0;
