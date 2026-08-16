@@ -13,7 +13,6 @@ import openMapIcon from '../../assets/map/open-map.svg'
 import refreshIcon from '../../assets/map/refresh.svg'
 import photoAddIcon from '../../assets/map/photo-add-round.svg'
 import noteEditIcon from '../../assets/map/note-edit.svg'
-import { MAP_STYLES } from './mapStyles'
 import {
   deletePin,
   getPin,
@@ -334,7 +333,6 @@ const PinDetail = () => {
             center={position}
             zoom={15.5}
             height="100%"
-            styles={MAP_STYLES}
             borderRadius="0"
             bordered={false}
             mapOptions={{ clickableIcons: false, keyboardShortcuts: false }}

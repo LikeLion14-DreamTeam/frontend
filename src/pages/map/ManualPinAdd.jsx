@@ -8,7 +8,6 @@ import { reverseGeocode } from '../../features/pins/reverseGeocode'
 import crosshairIcon from '../../assets/map/manual-pin-crosshair.svg'
 import markerIcon from '../../assets/map/manual-pin-marker.svg'
 import searchIcon from '../../assets/map/manual-pin-search.svg'
-import { MAP_STYLES } from './mapStyles'
 
 /** 위치를 못 얻었을 때 시작 지점. 여기서 직접 옮겨 찍으면 된다. */
 const FALLBACK_CENTER = { lat: 37.5796, lng: 126.9849 }
@@ -129,7 +128,6 @@ const ManualPinAdd = () => {
             center={initialCenter}
             zoom={16}
             height="100%"
-            styles={MAP_STYLES}
             borderRadius="0"
             bordered={false}
             mapOptions={{

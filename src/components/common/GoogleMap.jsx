@@ -1,13 +1,34 @@
 import React from 'react'
 import styled from 'styled-components'
-import { Map, AdvancedMarker, Pin } from '@vis.gl/react-google-maps'
+import { Map, Marker, useApiIsLoaded } from '@vis.gl/react-google-maps'
+import mapPinIcon from '../../assets/map/map-pin.svg'
+import { MAP_STYLES } from './mapStyles'
 
-// AdvancedMarker는 Map ID가 있어야 동작한다. 콘솔에서 발급받기 전까진 구글 제공 데모 ID 사용.
+// 클라우드 스타일을 쓸 때만 필요하다. 콘솔에서 발급받기 전까진 구글 제공 데모 ID 사용.
 const MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID || 'DEMO_MAP_ID'
 const HAS_API_KEY = Boolean(import.meta.env.VITE_GOOGLE_MAPS_API_KEY)
 
 const DEFAULT_CENTER = { lat: 37.5665, lng: 126.978 }
 const BOUNDS_PADDING = 0.6
+const PIN_SIZE = { width: 38, height: 38 }
+
+/**
+ * 핀 그림 한가운데를 좌표에 맞춘다.
+ *
+ * 물방울이 아니라 원형이라 기본값(아래 끝 기준)으로 두면 실제 위치보다
+ * 아래에 찍힌다. SDK 가 아직 안 붙었으면 URL 만 돌려주고, 로딩이 끝나면
+ * 다시 그려진다.
+ */
+const getPinIcon = () => {
+  const maps = globalThis.window?.google?.maps
+  if (!maps) return mapPinIcon
+
+  return {
+    url: mapPinIcon,
+    scaledSize: new maps.Size(PIN_SIZE.width, PIN_SIZE.height),
+    anchor: new maps.Point(PIN_SIZE.width / 2, PIN_SIZE.height / 2),
+  }
+}
 
 const getBounds = (markers) => {
   const lats = markers.map(({ lat }) => lat)
@@ -33,6 +54,7 @@ const getBounds = (markers) => {
  * - `markers` — `{ name, lat, lng }` 배열. `name` 은 key와 마커 툴팁에 쓰인다.
  * - `center` — 주면 `zoom` 과 함께 쓰이고, 안 주면 `markers` 로 영역을 계산한다.
  * - `children` — `<Map>` 내부에 그대로 들어간다(폴리라인 등 추가할 때).
+ * - `styles` — 앱 지도 테마가 기본값이다. 구글 클라우드 스타일을 쓰려면 `null`.
  * - `.env` 에 API 키가 없으면 Placeholder 박스를 렌더한다.
  */
 const GoogleMap = ({
@@ -40,12 +62,15 @@ const GoogleMap = ({
   center,
   zoom = 12,
   height = '470px',
-  styles,
+  styles = MAP_STYLES,
   borderRadius = '4px',
   bordered = true,
   mapOptions = {},
   children,
 }) => {
+  // SDK 가 붙으면 다시 그려서 마커 아이콘 크기를 제대로 잡는다.
+  useApiIsLoaded()
+
   if (!HAS_API_KEY) {
     return (
       <MapFallback
@@ -79,14 +104,14 @@ const GoogleMap = ({
         {...viewProps}
         {...mapOptions}
       >
+        {/* AdvancedMarker 는 Map ID 를 요구해 테마와 같이 못 쓴다. */}
         {markers.map(({ id, name, lat, lng }, index) => (
-          <AdvancedMarker
+          <Marker
             key={id ?? `${name}-${lat}-${lng}-${index}`}
             position={{ lat, lng }}
+            icon={getPinIcon()}
             title={name}
-          >
-            <Pin background="#111827" borderColor="#111827" glyphColor="#fff" />
-          </AdvancedMarker>
+          />
         ))}
         {children}
       </Map>

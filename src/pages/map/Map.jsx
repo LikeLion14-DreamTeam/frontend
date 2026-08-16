@@ -19,7 +19,6 @@ import {
   getPinPhotos,
 } from '../../features/pins/pinApi'
 import { getTrip, getTripPins, getTrips } from '../../features/trips/tripApi'
-import { MAP_STYLES } from './mapStyles'
 
 // 여정을 아직 못 받았을 때 잠깐 보여줄 위치.
 const DEFAULT_CENTER = { lat: 48.8569, lng: 2.3376 }
@@ -409,7 +408,6 @@ const MapPage = () => {
           center={mapCenter}
           zoom={13.3}
           height="100%"
-          styles={MAP_STYLES}
           borderRadius="0"
           bordered={false}
           mapOptions={{
