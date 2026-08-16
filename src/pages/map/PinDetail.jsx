@@ -10,7 +10,6 @@ import VoiceMemoBar from '../../components/common/VoiceMemoBar'
 import activePinIcon from '../../assets/map/map-pin-active.svg'
 import deleteWarningIcon from '../../assets/icons/delete-warning.svg'
 import backIcon from '../../assets/map/detail-back.svg'
-import openMapIcon from '../../assets/map/open-map.svg'
 import refreshIcon from '../../assets/map/refresh.svg'
 import photoAddIcon from '../../assets/map/photo-add-round.svg'
 import noteEditIcon from '../../assets/map/note-edit.svg'
@@ -434,17 +433,6 @@ const PinDetail = () => {
           </JourneyChip>
         )}
 
-        {hasCoordinates && (
-          <OpenMapButton
-            type="button"
-            $sheetHeight={detailSheetHeight}
-            $sheetOffset={sheetOffset}
-            onClick={() => navigate('/map')}
-          >
-            <img src={openMapIcon} alt="" />
-            지도에서 보기
-          </OpenMapButton>
-        )}
       </MapHero>
 
       <DetailSheet
@@ -857,32 +845,6 @@ const JourneyChip = styled.span`
   font: var(--text-ui-caption);
   white-space: nowrap;
   transform: ${({ $sheetOffset }) => `translateY(${$sheetOffset}px)`};
-`
-
-const OpenMapButton = styled.button`
-  position: absolute;
-  z-index: 3;
-  right: 22px;
-  bottom: ${({ $sheetHeight }) => `${$sheetHeight + 28}px`};
-  padding: 7px 12px;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  border: 0;
-  border-radius: 14px;
-  background: rgb(255 253 249 / 95%);
-  box-shadow: var(--Effect-Chip);
-  color: var(--Primary-Cognac);
-  font: var(--text-ui-caption);
-  white-space: nowrap;
-  cursor: pointer;
-  transform: ${({ $sheetOffset }) => `translateY(${$sheetOffset}px)`};
-
-  img {
-    width: 15px;
-    height: 15px;
-    display: block;
-  }
 `
 
 const DetailSheet = styled(SnapSheet)`

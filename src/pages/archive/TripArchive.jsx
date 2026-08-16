@@ -438,9 +438,10 @@ const TripArchive = () => {
                       </TitleWithEdit>
                     )}
                     <ManageLink
+                      /* 여정 관리에서 이 포토북으로 되돌아올 수 있게 id 를 넘긴다. */
                       to={
                         archive.segmentId
-                          ? `/trip-management/${archive.segmentId}`
+                          ? `/trip-management/${archive.segmentId}?photobook=${archive.id}`
                           : '/trip-management'
                       }
                     >

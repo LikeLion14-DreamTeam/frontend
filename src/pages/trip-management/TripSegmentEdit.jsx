@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import styled from 'styled-components'
 import Button from '../../components/common/Button'
 import Card from '../../components/common/Card'
@@ -100,6 +100,16 @@ const getTripDeleteMeta = (trip, pins) => {
 const TripSegmentEdit = () => {
   const navigate = useNavigate()
   const { segmentId = FALLBACK_SEGMENT_ID } = useParams()
+  const [searchParams] = useSearchParams()
+
+  /**
+   * 어느 포토북에서 들어왔는지. 여정 관리로 돌아갈 때 그대로 넘겨서,
+   * 거기서 뒤로 한 번 더 가면 그 포토북으로 이어지게 한다.
+   */
+  const photobookId = searchParams.get('photobook')
+  const managementTo = photobookId
+    ? `/trip-management/${segmentId}?photobook=${photobookId}`
+    : `/trip-management/${segmentId}`
 
   const [trip, setTrip] = useState(null)
   const [pins, setPins] = useState([])
@@ -248,7 +258,7 @@ const TripSegmentEdit = () => {
         })),
       })
 
-      navigate(`/trip-management/${segmentId}`)
+      navigate(managementTo)
     } catch (error) {
       setErrorMessage(error.message)
     } finally {
@@ -276,7 +286,7 @@ const TripSegmentEdit = () => {
   return (
     <PageSurface>
       <Header
-        to={`/trip-management/${segmentId}`}
+        to={managementTo}
         title="여정 편집"
         height="136px"
         topPadding="58px"

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import styled from 'styled-components'
 import {
   Marker,
@@ -308,6 +308,18 @@ const MapPage = () => {
   }, [handleOrientation, startCompass])
   const [trips, setTrips] = useState([])
   const [selectedTripId, setSelectedTripId] = useState(null)
+  const [searchParams] = useSearchParams()
+  /**
+   * 들어올 때 주소에 적혀 있던 여정과 핀.
+   *
+   * 핀 상세를 보다 뒤로 오면 이 값으로 직전 화면을 그대로 되살린다.
+   * 처음 값만 쓰므로, 아래에서 주소를 갱신해도 목록을 다시 부르지 않는다.
+   */
+  const initialParams = useRef({
+    trip: searchParams.get('trip'),
+    pin: searchParams.get('pin'),
+  }).current
+  const hasRestoredPinRef = useRef(false)
   const [tripPins, setTripPins] = useState([])
   const [tripError, setTripError] = useState('')
 
@@ -383,9 +395,16 @@ const MapPage = () => {
             : ended
 
         setTrips(options)
-        setSelectedTripId(
-          (current) => current ?? options[0]?.segment_id ?? null,
-        )
+        setSelectedTripId((current) => {
+          if (current) return current
+
+          // 주소에 적힌 여정이 아직 있으면 그걸 고른다. 없으면 목록 첫 번째.
+          const fromUrl = options.find(
+            ({ segment_id }) => String(segment_id) === initialParams.trip,
+          )
+
+          return fromUrl?.segment_id ?? options[0]?.segment_id ?? null
+        })
       } catch (error) {
         if (!ignore) setTripError(error.message)
       }
@@ -396,7 +415,7 @@ const MapPage = () => {
     return () => {
       ignore = true
     }
-  }, [])
+  }, [initialParams.trip])
 
   /** 고른 여정의 핀만 받아 지도에 올린다(종료된 여정은 4.5). */
   useEffect(() => {
@@ -466,6 +485,39 @@ const MapPage = () => {
     setMapZoom(DEFAULT_ZOOM)
     setMapKey((current) => current + 1)
   }, [mapPins])
+
+  /*
+   * 핀 상세를 보다 뒤로 왔으면 그 핀을 다시 고른 상태로 되살린다.
+   * 핀 목록이 준비된 뒤 한 번만 한다. 이후 사용자가 고르는 것을 덮으면 안 된다.
+   */
+  useEffect(() => {
+    if (hasRestoredPinRef.current || !initialParams.pin) return
+    if (mapPins.length === 0) return
+
+    hasRestoredPinRef.current = true
+
+    const target = mapPins.find(
+      ({ pin_id }) => String(pin_id) === initialParams.pin,
+    )
+
+    if (target) setSelectedPinId(target.pin_id)
+  }, [initialParams.pin, mapPins])
+
+  /*
+   * 보고 있는 여정과 고른 핀을 주소에 남긴다. 핀 상세로 갔다가 뒤로 오면
+   * 이 주소로 돌아와 직전 화면이 그대로 살아난다.
+   *
+   * `replace` 라 기록이 쌓이지 않는다. 핀을 몇 번 눌러 보다 뒤로 갈 때
+   * 지도 안에서 맴돌지 않고 직전 화면으로 나가야 맞다.
+   */
+  useEffect(() => {
+    if (!selectedTripId) return
+
+    const params = new URLSearchParams({ trip: String(selectedTripId) })
+    if (selectedPinId) params.set('pin', String(selectedPinId))
+
+    navigate(`/map?${params}`, { replace: true })
+  }, [navigate, selectedPinId, selectedTripId])
 
   const selectedTrip = trips.find(
     ({ segment_id }) => segment_id === selectedTripId,
