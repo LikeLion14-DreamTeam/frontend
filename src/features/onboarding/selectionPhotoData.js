@@ -23,6 +23,14 @@ const MOODBOARD_STAGE_CONFIGS = [
   { roundNo: 7, folderName: '무드보드2' },
 ]
 
+const getPhotoId = ({ roundNo, setNo, order, isAbRound }) => {
+  if (isAbRound) {
+    return roundNo * 1000 + (order === 20 ? 1 : 2)
+  }
+
+  return roundNo * 1000 + (setNo - 1) * 9 + order
+}
+
 const createPhotoSets = ({ roundNo, folderName, isAbRound }) => {
   const groupedPhotos = new Map()
 
@@ -53,7 +61,7 @@ const createPhotoSets = ({ roundNo, folderName, isAbRound }) => {
       photos: photos
         .sort((left, right) => left.order - right.order)
         .map(({ src, order }, photoIndex) => ({
-          photoId: 200000 + roundNo * 1000 + setNo * 100 + order,
+          photoId: getPhotoId({ roundNo, setNo, order, isAbRound }),
           ...(isAbRound && { label: photoIndex === 0 ? 'A' : 'B' }),
           src,
           alt: isAbRound
