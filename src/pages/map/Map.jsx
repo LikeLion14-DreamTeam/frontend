@@ -31,6 +31,32 @@ const ONGOING_TRIP_ID = 'ongoing'
 const PIN_SIZE = { width: 38, height: 38 }
 const ACTIVE_PIN_SIZE = { width: 48, height: 48 }
 
+/* 핀이 화면 가장자리에 딱 붙지 않도록 두는 여백.
+   위쪽은 여정 선택 드롭다운, 아래쪽은 핀 시트에 가려지는 만큼 더 준다. */
+const FIT_PADDING = { top: 110, right: 48, bottom: 150, left: 48 }
+
+/**
+ * 핀이 모두 보이도록 지도 영역을 잡는다.
+ *
+ * 핀이 하나뿐이거나 전부 같은 자리면 영역이 점이 돼 최대 배율로 붙어버린다.
+ * 그때는 null 을 돌려주고 중심·배율 방식으로 넘긴다.
+ */
+const getPinBounds = (pins) => {
+  if (pins.length < 2) return null
+
+  const lats = pins.map(({ latitude }) => latitude)
+  const lngs = pins.map(({ longitude }) => longitude)
+
+  const north = Math.max(...lats)
+  const south = Math.min(...lats)
+  const east = Math.max(...lngs)
+  const west = Math.min(...lngs)
+
+  if (north === south && east === west) return null
+
+  return { north, south, east, west, padding: FIT_PADDING }
+}
+
 /* 현재 위치 아이콘은 점(17, 28)에서 오른쪽으로 원뿔이 뻗은 모양이다.
    그 점을 축으로 돌리면 원뿔이 원래 68x56 박스를 벗어나 잘리므로,
    점에서 원뿔 끝까지(38.25)를 반지름으로 하는 정사각형으로 다시 잡는다. */
@@ -105,6 +131,8 @@ const MapPage = () => {
   const [selectedPinId, setSelectedPinId] = useState(null)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [mapCenter, setMapCenter] = useState(DEFAULT_CENTER)
+  /** 핀이 둘 이상일 때만 쓴다. null 이면 mapCenter 로 잡는다. */
+  const [mapBounds, setMapBounds] = useState(null)
   const [mapKey, setMapKey] = useState(0)
 
   const [currentPosition, setCurrentPosition] = useState(null)
@@ -294,11 +322,13 @@ const MapPage = () => {
     [mapPins],
   )
 
-  // 여정을 바꾸면 그 여정의 첫 핀으로 지도를 옮긴다.
+  // 여정을 바꾸면 그 여정의 핀과 동선이 한눈에 들어오도록 지도를 다시 잡는다.
   useEffect(() => {
     const [first] = mapPins
     if (!first) return
 
+    // 핀이 하나면 영역을 못 잡으니 그 핀을 가운데 둔다.
+    setMapBounds(getPinBounds(mapPins))
     setMapCenter({ lat: first.latitude, lng: first.longitude })
     setMapKey((current) => current + 1)
   }, [mapPins])
@@ -379,6 +409,8 @@ const MapPage = () => {
     requestCompass()
 
     if (currentPosition) {
+      // 내 위치로 갈 때는 영역이 아니라 그 점을 가운데 둔다.
+      setMapBounds(null)
       setMapCenter(currentPosition)
       setMapKey((current) => current + 1)
       return
@@ -390,6 +422,7 @@ const MapPage = () => {
       const position = { lat: coords.latitude, lng: coords.longitude }
 
       setCurrentPosition(position)
+      setMapBounds(null)
       setMapCenter(position)
       setMapKey((current) => current + 1)
     })
@@ -405,6 +438,7 @@ const MapPage = () => {
       <MapLayer>
         <GoogleMap
           key={mapKey}
+          bounds={mapBounds}
           center={mapCenter}
           zoom={13.3}
           height="100%"

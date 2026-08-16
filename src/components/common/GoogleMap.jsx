@@ -53,6 +53,9 @@ const getBounds = (markers) => {
  *
  * - `markers` — `{ name, lat, lng }` 배열. `name` 은 key와 마커 툴팁에 쓰인다.
  * - `center` — 주면 `zoom` 과 함께 쓰이고, 안 주면 `markers` 로 영역을 계산한다.
+ * - `bounds` — `{ north, south, east, west, padding }`. 주면 이 영역이 다 보이게
+ *   배율을 맞춘다. `center`·`zoom` 보다 우선한다. 마커를 children 으로 직접
+ *   그리는 화면에서 쓴다.
  * - `children` — `<Map>` 내부에 그대로 들어간다(폴리라인 등 추가할 때).
  * - `styles` — 앱 지도 테마가 기본값이다. 구글 클라우드 스타일을 쓰려면 `null`.
  * - `.env` 에 API 키가 없으면 Placeholder 박스를 렌더한다.
@@ -60,6 +63,7 @@ const getBounds = (markers) => {
 const GoogleMap = ({
   markers = [],
   center,
+  bounds,
   zoom = 12,
   height = '470px',
   styles = MAP_STYLES,
@@ -87,11 +91,15 @@ const GoogleMap = ({
     )
   }
 
-  // 중심을 지정하지 않으면 마커가 모두 보이도록 영역을 잡는다.
-  const viewProps =
-    !center && markers.length > 0
-      ? { defaultBounds: getBounds(markers) }
-      : { defaultCenter: center || DEFAULT_CENTER, defaultZoom: zoom }
+  /*
+   * 영역을 직접 받으면 그대로 쓰고, 없으면 마커로 계산한다.
+   * 둘 다 없을 때만 중심과 배율로 잡는다.
+   */
+  const fitBounds = bounds ?? (!center && markers.length > 0 ? getBounds(markers) : null)
+
+  const viewProps = fitBounds
+    ? { defaultBounds: fitBounds }
+    : { defaultCenter: center || DEFAULT_CENTER, defaultZoom: zoom }
 
   return (
     <MapFrame
@@ -103,6 +111,12 @@ const GoogleMap = ({
         mapId={styles ? undefined : MAP_ID}
         gestureHandling="greedy"
         disableDefaultUI
+        /*
+         * 테마(styles)를 쓰면 래스터 지도라 소수점 배율이 기본으로 꺼져 있다.
+         * 그대로 두면 zoom 값이 정수로 반올림되고, bounds 를 맞출 때도 정수
+         * 단계로 떨어져 여백이 필요 이상으로 남는다.
+         */
+        isFractionalZoomEnabled
         styles={styles}
         style={{ width: '100%', height: '100%' }}
         {...viewProps}
