@@ -458,7 +458,7 @@ const TripArchive = () => {
                   <GoogleMap
                     markers={mapPins}
                     /* 핀이 하나뿐이라 영역을 못 잡을 때만 쓰인다. */
-                    zoom={15}
+                    zoom={17}
                     height="100%"
                     borderRadius="15px"
                     bordered={false}

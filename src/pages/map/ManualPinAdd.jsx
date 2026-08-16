@@ -124,9 +124,13 @@ const ManualPinAdd = () => {
     <Page>
       <MapLayer>
         {initialCenter && (
+          /*
+           * 지도를 움직여 위치를 직접 맞추는 화면이라 건물이 구분되는 단계까지
+           * 당긴다. 위치 지정 UI 를 쓰는 앱들이 잡는 정도다.
+           */
           <GoogleMap
             center={initialCenter}
-            zoom={16}
+            zoom={18}
             height="100%"
             borderRadius="0"
             bordered={false}
