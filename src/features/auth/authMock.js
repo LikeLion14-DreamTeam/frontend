@@ -3,6 +3,7 @@ export const MOCK_GOOGLE_LOGIN_RESPONSE = {
   user: {
     user_id: 1,
     email: 'traveler@example.com',
+    profile_image_url: 'https://lh3.googleusercontent.com/a/mock-profile-photo',
     created_at: '2026-08-01T00:00:00.000000Z',
     onboarding_completed: false,
     permission_intro_shown: false,
