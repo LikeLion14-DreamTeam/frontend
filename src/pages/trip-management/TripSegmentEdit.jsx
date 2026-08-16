@@ -74,18 +74,27 @@ const formatDateRange = (startAt, endAt) => {
   return `${start} – ${start.slice(0, 4) === end.slice(0, 4) ? end.slice(5) : end}`
 }
 
-/** 삭제 확인 시트에 띄우는 한 줄 요약. 없는 값은 빼고 이어 붙인다. */
-const getTripDeleteMeta = (trip) =>
-  [
+/**
+ * 삭제 확인 시트에 띄우는 한 줄 요약. 없는 값은 빼고 이어 붙인다.
+ *
+ * 여정을 지우면 제외해 둔 핀까지 전부 사라지므로, 화면에서 고른 핀이 아니라
+ * 여정에 속한 핀 전체를 센다. 4.2 의 수치는 포함된 핀 기준이라 쓰지 않는다.
+ */
+const getTripDeleteMeta = (trip, pins) => {
+  const photoCount = pins.reduce((total, pin) => total + (pin.photo_count ?? 0), 0)
+
+  return [
     formatDateRange(trip.start_at, trip.end_at),
-    typeof trip.pin_count === 'number' ? `핀 ${trip.pin_count}개` : '',
-    typeof trip.photo_count === 'number' ? `사진 ${trip.photo_count}장` : '',
+    `핀 ${pins.length}개`,
+    `사진 ${photoCount}장`,
+    // TODO: 4.5 에 핀별 음성 메모 수가 없어 포함된 핀 기준 값만 쓸 수 있다.
     typeof trip.voice_memo_count === 'number'
       ? `음성 ${trip.voice_memo_count}개`
       : '',
   ]
     .filter(Boolean)
     .join(' · ')
+}
 
 const TripSegmentEdit = () => {
   const navigate = useNavigate()
@@ -480,7 +489,7 @@ const TripSegmentEdit = () => {
             <TripDeleteTargetCard>
               <TripDeleteTargetName>{trip.name}</TripDeleteTargetName>
               <TripDeleteTargetMeta>
-                {getTripDeleteMeta(trip)}
+                {getTripDeleteMeta(trip, pins)}
               </TripDeleteTargetMeta>
             </TripDeleteTargetCard>
             <TripDeleteWarning id="trip-delete-warning">
