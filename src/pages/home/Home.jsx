@@ -1072,6 +1072,7 @@ const PassportCoverImage = styled.img`
   width: 45.6%;
   height: auto;
   flex: none;
+  margin-bottom: 13px;
   aspect-ratio: 173 / 249;
   display: block;
   transform-origin: left center;
