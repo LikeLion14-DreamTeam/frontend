@@ -718,7 +718,7 @@ const TripStats = styled.p`
 
 const MapHero = styled.div`
   width: 100%;
-  height: 224px;
+  height: 300px;
   overflow: hidden;
   border-radius: 15px;
   background: #e0e0e0;

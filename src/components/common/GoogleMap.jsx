@@ -1,6 +1,6 @@
 import React from 'react'
 import styled from 'styled-components'
-import { Map, Marker, useApiIsLoaded } from '@vis.gl/react-google-maps'
+import { Map, Marker, useMapsLibrary } from '@vis.gl/react-google-maps'
 import mapPinIcon from '../../assets/map/map-pin.svg'
 import { MAP_STYLES } from './mapStyles'
 
@@ -16,17 +16,17 @@ const PIN_SIZE = { width: 38, height: 38 }
  * 핀 그림 한가운데를 좌표에 맞춘다.
  *
  * 물방울이 아니라 원형이라 기본값(아래 끝 기준)으로 두면 실제 위치보다
- * 아래에 찍힌다. SDK 가 아직 안 붙었으면 URL 만 돌려주고, 로딩이 끝나면
- * 다시 그려진다.
+ * 아래에 찍힌다.
+ *
+ * @param core `Size` 와 `Point` 가 든 core 라이브러리. 아직 없으면 null
  */
-const getPinIcon = () => {
-  const maps = globalThis.window?.google?.maps
-  if (!maps) return mapPinIcon
+const getPinIcon = (core) => {
+  if (!core) return mapPinIcon
 
   return {
     url: mapPinIcon,
-    scaledSize: new maps.Size(PIN_SIZE.width, PIN_SIZE.height),
-    anchor: new maps.Point(PIN_SIZE.width / 2, PIN_SIZE.height / 2),
+    scaledSize: new core.Size(PIN_SIZE.width, PIN_SIZE.height),
+    anchor: new core.Point(PIN_SIZE.width / 2, PIN_SIZE.height / 2),
   }
 }
 
@@ -68,8 +68,12 @@ const GoogleMap = ({
   mapOptions = {},
   children,
 }) => {
-  // SDK 가 붙으면 다시 그려서 마커 아이콘 크기를 제대로 잡는다.
-  useApiIsLoaded()
+  /*
+   * `Size` 와 `Point` 가 든 core 라이브러리. 최신 로더는 라이브러리를 나눠서
+   * 불러오기 때문에, `window.google.maps` 가 생겼다고 이 둘이 있는 건 아니다.
+   * 다 실리면 null 에서 바뀌며 다시 그려진다.
+   */
+  const core = useMapsLibrary('core')
 
   if (!HAS_API_KEY) {
     return (
@@ -109,7 +113,7 @@ const GoogleMap = ({
           <Marker
             key={id ?? `${name}-${lat}-${lng}-${index}`}
             position={{ lat, lng }}
-            icon={getPinIcon()}
+            icon={getPinIcon(core)}
             title={name}
           />
         ))}
