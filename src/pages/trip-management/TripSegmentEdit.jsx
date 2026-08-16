@@ -10,6 +10,7 @@ import deleteWarningIcon from '../../assets/icons/delete-warning.svg'
 import editBackIcon from '../../assets/icons/trip-edit-back.svg'
 import selectChevronIcon from '../../assets/icons/trip-select-chevron.svg'
 import {
+  deleteTrip,
   getTrip,
   getTripPins,
   updateTrip,
@@ -109,6 +110,7 @@ const TripSegmentEdit = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
   useEffect(() => {
@@ -251,6 +253,23 @@ const TripSegmentEdit = () => {
       setErrorMessage(error.message)
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  /** 명세 4.4. 핀·사진·음성 메모와 포토북까지 함께 사라진다. */
+  const handleDelete = async () => {
+    setIsDeleting(true)
+    setErrorMessage('')
+
+    try {
+      await deleteTrip(segmentId)
+
+      // 이 여정도 포토북도 없어졌으니 목록으로 보내고 뒤로가기를 막는다.
+      navigate('/archive', { replace: true })
+    } catch (error) {
+      setErrorMessage(error.message)
+      setIsDeleting(false)
+      setIsConfirmingDelete(false)
     }
   }
 
@@ -458,7 +477,7 @@ const TripSegmentEdit = () => {
               <SaveButton
                 type="button"
                 onClick={handleSave}
-                disabled={isSaving}
+                disabled={isSaving || isDeleting}
               >
                 {isSaving ? '저장 중...' : '변경사항 저장'}
               </SaveButton>
@@ -466,7 +485,7 @@ const TripSegmentEdit = () => {
                 type="button"
                 $variant="ghost"
                 onClick={() => setIsConfirmingDelete(true)}
-                disabled={isSaving}
+                disabled={isSaving || isDeleting}
               >
                 여정 삭제하기
               </DeleteTrigger>
@@ -475,13 +494,14 @@ const TripSegmentEdit = () => {
         )}
       </TripSegmentEditWrapper>
 
-      {/* TODO: 확인을 누르면 삭제 API 를 호출한다. 명세를 받는 대로 잇는다. */}
       <ConfirmationModal
         open={trip !== null && isConfirmingDelete}
         title="이 여정을 삭제할까요?"
-        confirmLabel="여정 삭제하기"
-        onConfirm={() => setIsConfirmingDelete(false)}
+        confirmLabel={isDeleting ? '삭제하는 중...' : '여정 삭제하기'}
+        onConfirm={() => void handleDelete()}
         onCancel={() => setIsConfirmingDelete(false)}
+        confirmDisabled={isDeleting}
+        cancelDisabled={isDeleting}
         ariaDescribedBy="trip-delete-warning"
       >
         {trip && (
