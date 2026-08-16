@@ -1178,7 +1178,7 @@ const PassportCover = styled.button`
   padding: 0;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   border: 0;
   background: none;
   cursor: pointer;
@@ -1200,6 +1200,11 @@ const PassportCoverImage = styled.img`
   width: 45.6%;
   height: auto;
   flex: none;
+  /*
+   * 표지 왼쪽 끝(책등)을 화면 한가운데에 둔다. 이 상자가 여권 펼침면과 같은
+   * 폭이고 화면 가운데 정렬돼 있어서, 50% 가 곧 화면 중앙이다.
+   */
+  margin-left: 50%;
   margin-bottom: 13px;
   aspect-ratio: 173 / 249;
   display: block;
