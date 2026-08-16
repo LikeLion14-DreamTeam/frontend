@@ -524,8 +524,16 @@ const MapPage = () => {
     }
   }
 
+  /**
+   * 내 위치로 지도를 옮긴다.
+   *
+   * 고른 핀은 먼저 푼다. 지도를 다시 그리면 `FocusSelectedPin` 이 새 지도를
+   * 받아 다시 동작해서, 내 위치로 갔다가 그 핀으로 되돌아간다.
+   * 화면 밖으로 나간 핀의 시트를 열어두는 것도 맞지 않는다.
+   */
   const handleLocate = () => {
     requestCompass()
+    setSelectedPinId(null)
 
     if (currentPosition) {
       // 내 위치로 갈 때는 영역이 아니라 그 점을 가운데 둔다.
