@@ -32,7 +32,7 @@ const MoodBoard = () => {
   const [photoRounds] = useState(() =>
     selectRandomPhotoSets(MOODBOARD_PHOTO_ROUNDS),
   )
-  const { isReady, round, setRound } = useOnboardingStart({
+  const { isReady, round, setRound, syncAfterSave } = useOnboardingStart({
     stage: MOODBOARD_STAGE,
     isRelearning,
   })
@@ -81,10 +81,8 @@ const MoodBoard = () => {
         selectedPhotoIds,
       })
 
-      if (!isLastRound) {
-        setRound((currentRound) => currentRound + 1)
-        return
-      }
+      // 서버가 아직 이 단계면 그쪽이 알려주는 라운드에 머문다.
+      if (await syncAfterSave()) return
 
       if (isRelearning) {
         navigate('/mypage', {

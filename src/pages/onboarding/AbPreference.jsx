@@ -31,7 +31,7 @@ const AbPreference = () => {
   const [photoRounds] = useState(() =>
     selectRandomPhotoSets(AB_PHOTO_ROUNDS),
   )
-  const { isReady, round, setRound } = useOnboardingStart({
+  const { isReady, round, setRound, syncAfterSave } = useOnboardingStart({
     stage: AB_SELECTION_STAGE,
     isRelearning,
   })
@@ -69,10 +69,8 @@ const AbPreference = () => {
         selectedPhotoIds: [selectedPhotoId],
       })
 
-      if (!isLastRound) {
-        setRound((currentRound) => currentRound + 1)
-        return
-      }
+      // 서버가 아직 이 단계면 그쪽이 알려주는 라운드에 머문다.
+      if (await syncAfterSave()) return
 
       navigate(getOnboardingFlowPath('/onboarding/moodboard', isRelearning))
     } catch (error) {

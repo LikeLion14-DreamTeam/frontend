@@ -47,7 +47,7 @@ const BasicQuestion = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const isRelearning = isRelearningFlow(location.search)
-  const { isReady, round, setRound } = useOnboardingStart({
+  const { isReady, round, setRound, syncAfterSave } = useOnboardingStart({
     stage: BASIC_QUESTION_STAGE,
     isRelearning,
   })
@@ -91,10 +91,8 @@ const BasicQuestion = () => {
         replaceExisting: isRelearning,
       })
 
-      if (!isLastRound) {
-        setRound((currentRound) => currentRound + 1)
-        return
-      }
+      // 서버가 아직 이 단계면 그쪽이 알려주는 라운드에 머문다.
+      if (await syncAfterSave()) return
 
       navigate(
         getOnboardingFlowPath('/onboarding/ab-preference', isRelearning),

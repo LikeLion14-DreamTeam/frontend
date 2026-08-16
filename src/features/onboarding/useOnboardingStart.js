@@ -71,7 +71,30 @@ const useOnboardingStart = ({ stage, isRelearning }) => {
     }
   }, [isRelearning, navigate, stage, user])
 
-  return { isReady, round, setRound }
+  /**
+   * 저장한 뒤 서버 진행 상태를 다시 읽어 화면을 맞춘다.
+   *
+   * 저장이 성공했다고 화면이 제멋대로 다음 라운드로 넘어가면 안 된다. 서버는
+   * 같은 사진을 다시 받으면 갱신만 하고 라운드를 전진시키지 않는데, 그때 화면만
+   * 앞서가면 이후 요청이 전부 `현재 진행 중인 라운드가 아닙니다` 로 막힌다.
+   *
+   * @returns 아직 이 단계에 머물면 true. 다음 화면으로 넘어가도 되면 false.
+   */
+  const syncAfterSave = async () => {
+    try {
+      const progress = await getOnboardingProgress()
+
+      if (progress.current_stage !== stage) return false
+
+      setRound(progress.current_round)
+      return true
+    } catch {
+      // 조회에 실패하면 기존 흐름대로 진행한다.
+      return false
+    }
+  }
+
+  return { isReady, round, setRound, syncAfterSave }
 }
 
 export default useOnboardingStart
