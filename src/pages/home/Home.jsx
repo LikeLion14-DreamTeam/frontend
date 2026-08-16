@@ -668,6 +668,7 @@ const JourneyBody = styled.div`
   flex-direction: column;
   gap: ${journeyScale(32)};
   align-items: flex-start;
+  justify-content: space-around;
 `
 
 /* 진행 중인 여정과 최근 태깅한 제품을 좌우로 넘겨 본다. */
@@ -972,8 +973,7 @@ const EndJourneyButton = styled.button`
 /* 누르면 촬영 화면으로 이동한다. */
 const ContinueJourneyLink = styled(Link)`
   width: ${journeyScale(105)};
-  /* 배경 이미지 안의 CTA 가이드 박스(시안 44px)를 완전히 덮는다. */
-  height: ${journeyScale(44)};
+  height: ${journeyScale(33)};
   display: flex;
   align-items: center;
   justify-content: center;
