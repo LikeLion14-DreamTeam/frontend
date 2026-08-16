@@ -35,6 +35,9 @@ const DEFAULT_ZOOM = 13.3
 
 /* 내 위치로 갈 때 배율. 주변 길이 보일 만큼 당긴다. */
 const CURRENT_POSITION_ZOOM = 17
+const PIN_SHEET_COLLAPSED_OFFSET = 227
+const LOCATION_BUTTON_DEFAULT_BOTTOM = 129
+const LOCATION_BUTTON_RAISED_BOTTOM = 385
 
 /* 진행 중인 여행은 TRAVEL_SEGMENT 가 없어 segment_id 로 못 고른다.
    목록에서 구분하려고 쓰는 프론트 전용 값이다. */
@@ -477,6 +480,7 @@ const MapPage = () => {
   const [pinDetail, setPinDetail] = useState(null)
   const [pinPhotos, setPinPhotos] = useState([])
   const [sheetError, setSheetError] = useState('')
+  const [pinSheetOffset, setPinSheetOffset] = useState(0)
 
   /** 핀을 고르면 시트에 채울 값을 5.1 · 5.4 로 받는다. */
   useEffect(() => {
@@ -517,11 +521,22 @@ const MapPage = () => {
     }
   }, [selectedPinId])
 
+  useEffect(() => {
+    if (selectedPinId) setPinSheetOffset(0)
+  }, [selectedPinId])
+
   const selectedIndex = mapPins.findIndex(
     ({ pin_id }) => pin_id === selectedPinId,
   )
   const coverPhoto =
     pinPhotos.find((photo) => photo.is_pin_cover) ?? pinPhotos[0]
+
+  const locationButtonBottom = selectedPin
+    ? LOCATION_BUTTON_RAISED_BOTTOM -
+      ((LOCATION_BUTTON_RAISED_BOTTOM - LOCATION_BUTTON_DEFAULT_BOTTOM) *
+        pinSheetOffset) /
+        PIN_SHEET_COLLAPSED_OFFSET
+    : LOCATION_BUTTON_DEFAULT_BOTTOM
 
   /** iOS 는 사용자 제스처 안에서만 나침반 권한을 물을 수 있다. */
   const requestCompass = async () => {
@@ -589,6 +604,7 @@ const MapPage = () => {
             clickableIcons: false,
             keyboardShortcuts: false,
             minZoom: 3,
+            onClick: () => setSelectedPinId(null),
           }}
         >
           <Polyline
@@ -663,7 +679,7 @@ const MapPage = () => {
       <LocationButton
         type="button"
         aria-label="내 위치로 이동"
-        $raised={Boolean(selectedPin)}
+        $bottom={locationButtonBottom}
         onClick={handleLocate}
       >
         <img src={myLocationIcon} alt="" />
@@ -682,8 +698,9 @@ const MapPage = () => {
       {selectedPin && (
         <PinSheet
           ariaLabel="핀 정보"
-          collapsedOffset={227}
+          collapsedOffset={PIN_SHEET_COLLAPSED_OFFSET}
           height={281}
+          onOffsetChange={setPinSheetOffset}
         >
           <PinSheetContent>
           {sheetError ? (
@@ -837,14 +854,13 @@ const LocationButton = styled.button`
   position: absolute;
   z-index: 9;
   right: 13px;
-  bottom: ${({ $raised }) => ($raised ? '385px' : '129px')};
+  bottom: ${({ $bottom }) => `${$bottom}px`};
   width: 76px;
   height: 76px;
   padding: 0;
   border: 0;
   background: transparent;
   cursor: pointer;
-  transition: bottom 220ms ease;
 
   img {
     width: 76px;

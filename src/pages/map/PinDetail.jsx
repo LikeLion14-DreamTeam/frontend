@@ -857,7 +857,6 @@ const JourneyChip = styled.span`
   font: var(--text-ui-caption);
   white-space: nowrap;
   transform: ${({ $sheetOffset }) => `translateY(${$sheetOffset}px)`};
-  transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
 `
 
 const OpenMapButton = styled.button`
@@ -878,7 +877,6 @@ const OpenMapButton = styled.button`
   white-space: nowrap;
   cursor: pointer;
   transform: ${({ $sheetOffset }) => `translateY(${$sheetOffset}px)`};
-  transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
 
   img {
     width: 15px;
