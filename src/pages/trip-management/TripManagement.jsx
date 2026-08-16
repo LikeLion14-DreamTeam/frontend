@@ -124,8 +124,8 @@ const TripManagement = () => {
     <PageSurface>
       <Header
         to="/archive"
-        height="104px"
-        topPadding="58px"
+        height="118px"
+        topPadding="72px"
         barHeight="24px"
         rightContent={
           <EditLink to={`/trip-management/${segmentId}/edit`}>여정 편집</EditLink>

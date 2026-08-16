@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Polyline } from '@vis.gl/react-google-maps'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import styled from 'styled-components'
+import noteEditIcon from '../../assets/map/note-edit.svg'
 import paperTexture from '../../assets/pin-save/manual-pin-form-bg.png'
 import GoogleMap from '../../components/common/GoogleMap'
 import Header from '../../components/layout/Header'
@@ -425,9 +426,14 @@ const TripArchive = () => {
                         <TripTitle>{archive.title}</TripTitle>
                         <EditNameButton
                           type="button"
+                          aria-label="포토북 이름 수정"
                           onClick={handleStartNameEdit}
                         >
-                          이름 수정
+                          <EditNameIcon
+                            src={noteEditIcon}
+                            alt=""
+                            aria-hidden="true"
+                          />
                         </EditNameButton>
                       </TitleWithEdit>
                     )}
@@ -608,6 +614,7 @@ const TitleRow = styled.div`
   gap: 16px;
 `
 
+/* 아이콘 아래끝을 제목 글자 아래끝에 맞춘다. */
 const TitleWithEdit = styled.div`
   min-width: 0;
   display: flex;
@@ -625,19 +632,21 @@ const TripTitle = styled.h1`
   text-overflow: ellipsis;
 `
 
+/* 홈 화면의 여정 이름 수정 버튼과 같은 크기·아이콘을 쓴다. */
 const EditNameButton = styled.button`
-  flex: 0 0 auto;
+  width: 17px;
+  height: 16px;
+  flex: none;
   padding: 0;
   border: 0;
-  color: #9f9489;
-  background: transparent;
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 18px;
-  text-decoration: underline;
-  text-underline-position: from-font;
+  background: none;
   cursor: pointer;
+`
+
+const EditNameIcon = styled.img`
+  width: 100%;
+  height: 100%;
+  display: block;
 `
 
 const NameEditForm = styled.form`
