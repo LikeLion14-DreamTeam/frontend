@@ -615,8 +615,9 @@ const JourneyBlock = styled.section`
 const JourneyBand = styled.p`
   position: absolute;
   top: 0;
-  right: ${journeyScale(6)};
-  left: ${journeyScale(6)};
+  /* PNG 자체의 투명 여백이 아니라 실제 가죽 외곽선과 같은 카드 폭을 쓴다. */
+  right: 0;
+  left: 0;
   aspect-ratio: 350 / 77;
   padding: ${journeyScale(10)} 0 0 ${journeyScale(17)};
   border-radius: ${journeyScale(16)};
@@ -660,8 +661,7 @@ const JourneyImage = styled.img`
 const JourneyBody = styled.div`
   position: relative;
   height: 100%;
-  padding: ${journeyScale(27)} ${journeyScale(40)} ${journeyScale(16)}
-    ${journeyScale(27)};
+  padding: ${journeyScale(27)} ${journeyScale(40)} ${journeyScale(16)} ${journeyScale(27)};
   display: flex;
   flex-direction: column;
   gap: ${journeyScale(32)};
@@ -970,7 +970,8 @@ const EndJourneyButton = styled.button`
 /* 누르면 촬영 화면으로 이동한다. */
 const ContinueJourneyLink = styled(Link)`
   width: ${journeyScale(105)};
-  height: ${journeyScale(33)};
+  /* 배경 이미지 안의 CTA 가이드 박스(시안 44px)를 완전히 덮는다. */
+  height: ${journeyScale(44)};
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1118,8 +1119,7 @@ const PassportImage = styled.img`
 const StampPages = styled.div`
   position: absolute;
   inset: 0;
-  padding: ${passportScale(40)} ${passportScale(20)} ${passportScale(52)}
-    ${passportScale(19)};
+  padding: ${passportScale(40)} ${passportScale(20)} ${passportScale(52)} ${passportScale(19)};
   display: flex;
   align-items: center;
   gap: ${passportScale(17)};
