@@ -688,9 +688,7 @@ const MyPage = () => {
         </AccountPanel>
       </Content>
 
-      <NavigationBoundary>
-        <NavBar />
-      </NavigationBoundary>
+      <NavBar />
 
       <ConfirmationModal
         open={isRelearningConfirmOpen}
@@ -798,7 +796,7 @@ export default MyPage
 
 const PageShell = styled.main`
   width: 100%;
-  max-width: 402px;
+  max-width: 450px;
   height: var(--app-viewport-height);
   margin: 0 auto;
   overflow-y: auto;
@@ -813,7 +811,7 @@ const PageShell = styled.main`
 
 const Content = styled.div`
   width: 100%;
-  max-width: 402px;
+  max-width: 450px;
   min-height: 100%;
   margin: 0 auto;
   padding: calc(74px - var(--design-safe-top)) 24px 115px;
