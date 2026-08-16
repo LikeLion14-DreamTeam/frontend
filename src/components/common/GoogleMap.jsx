@@ -9,7 +9,10 @@ const MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID || 'DEMO_MAP_ID'
 const HAS_API_KEY = Boolean(import.meta.env.VITE_GOOGLE_MAPS_API_KEY)
 
 const DEFAULT_CENTER = { lat: 37.5665, lng: 126.978 }
-const BOUNDS_PADDING = 0.6
+
+/* 마커가 화면 가장자리에 붙지 않도록 두는 여백. 위경도가 아니라 화면 픽셀이다.
+   위경도로 주면 도 단위라 도시 하나짜리 여정도 나라 단위로 벌어진다. */
+const BOUNDS_PADDING = 32
 const PIN_SIZE = { width: 38, height: 38 }
 
 /**
@@ -30,16 +33,24 @@ const getPinIcon = (core) => {
   }
 }
 
+/**
+ * 마커가 모두 보이는 영역.
+ *
+ * 마커가 하나거나 전부 같은 자리면 영역이 점이 돼 최대 배율로 붙어버린다.
+ * 그때는 null 을 돌려주고 중심·배율 방식으로 넘긴다.
+ */
 const getBounds = (markers) => {
   const lats = markers.map(({ lat }) => lat)
   const lngs = markers.map(({ lng }) => lng)
 
-  return {
-    north: Math.max(...lats) + BOUNDS_PADDING,
-    south: Math.min(...lats) - BOUNDS_PADDING,
-    east: Math.max(...lngs) + BOUNDS_PADDING,
-    west: Math.min(...lngs) - BOUNDS_PADDING,
-  }
+  const north = Math.max(...lats)
+  const south = Math.min(...lats)
+  const east = Math.max(...lngs)
+  const west = Math.min(...lngs)
+
+  if (north === south && east === west) return null
+
+  return { north, south, east, west, padding: BOUNDS_PADDING }
 }
 
 /**
@@ -95,11 +106,21 @@ const GoogleMap = ({
    * 영역을 직접 받으면 그대로 쓰고, 없으면 마커로 계산한다.
    * 둘 다 없을 때만 중심과 배율로 잡는다.
    */
-  const fitBounds = bounds ?? (!center && markers.length > 0 ? getBounds(markers) : null)
+  const [firstMarker] = markers
+  const fitBounds =
+    bounds ?? (!center && firstMarker ? getBounds(markers) : null)
+
+  /* 마커가 하나뿐이면 영역을 못 잡는다. 그 마커를 가운데 두고 `zoom` 을 쓴다.
+     기본 좌표로 두면 엉뚱하게 서울이 뜬다. */
+  const fallbackCenter =
+    center ??
+    (firstMarker
+      ? { lat: firstMarker.lat, lng: firstMarker.lng }
+      : DEFAULT_CENTER)
 
   const viewProps = fitBounds
     ? { defaultBounds: fitBounds }
-    : { defaultCenter: center || DEFAULT_CENTER, defaultZoom: zoom }
+    : { defaultCenter: fallbackCenter, defaultZoom: zoom }
 
   return (
     <MapFrame
