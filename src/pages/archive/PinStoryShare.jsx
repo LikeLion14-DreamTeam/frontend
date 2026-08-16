@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import styled, { css } from 'styled-components'
 import arrowIcon from '../../assets/story-share/arrow.svg'
@@ -6,11 +6,11 @@ import closeIcon from '../../assets/story-share/close.svg'
 import downloadIcon from '../../assets/story-share/download.svg'
 import shareIcon from '../../assets/story-share/share.svg'
 import { getPhotobook } from '../../features/photobooks/photobookApi'
+import SnapSheet from '../../components/common/SnapSheet'
 
 const STORY_WIDTH = 1080
 const STORY_HEIGHT = 1920
 const SHEET_COLLAPSED_OFFSET = 236
-const SHEET_SNAP_THRESHOLD = 72
 
 const templates = [
   { id: 'story2', name: '프린트', count: 3 },
@@ -277,8 +277,6 @@ const PinStoryShare = () => {
   const canvasRef = useRef(null)
   const templateListRef = useRef(null)
   const objectUrlRef = useRef('')
-  const sheetOffsetRef = useRef(0)
-  const sheetDragRef = useRef(null)
   const [pin, setPin] = useState(state?.pin ?? null)
   const [selectedId, setSelectedId] = useState('story0')
   const [photoOrder, setPhotoOrder] = useState([])
@@ -286,9 +284,6 @@ const PinStoryShare = () => {
   const [thumbnails, setThumbnails] = useState({})
   const [isRendering, setIsRendering] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
-  const [sheetOffset, setSheetOffset] = useState(0)
-  const [isSheetCollapsed, setIsSheetCollapsed] = useState(false)
-  const [isSheetDragging, setIsSheetDragging] = useState(false)
 
   const selectedIndex = templates.findIndex((template) => template.id === selectedId)
   const selectedTemplate = templates[selectedIndex] ?? templates[2]
@@ -415,78 +410,6 @@ const PinStoryShare = () => {
   const canMovePrevious = templates.slice(0, selectedIndex).some((template) => template.count <= photos.length)
   const canMoveNext = templates.slice(selectedIndex + 1).some((template) => template.count <= photos.length)
 
-  const moveSheetTo = useCallback((offset) => {
-    const nextOffset = Math.min(
-      SHEET_COLLAPSED_OFFSET,
-      Math.max(0, offset),
-    )
-    sheetOffsetRef.current = nextOffset
-    setSheetOffset(nextOffset)
-  }, [])
-
-  const snapSheet = useCallback((collapsed) => {
-    setIsSheetCollapsed(collapsed)
-    setIsSheetDragging(false)
-    moveSheetTo(collapsed ? SHEET_COLLAPSED_OFFSET : 0)
-  }, [moveSheetTo])
-
-  const handleSheetPointerDown = (event) => {
-    if (event.pointerType === 'mouse' && event.button !== 0) return
-    event.currentTarget.setPointerCapture(event.pointerId)
-    sheetDragRef.current = {
-      pointerId: event.pointerId,
-      captureTarget: event.currentTarget,
-      startY: event.clientY,
-      startOffset: sheetOffsetRef.current,
-      moved: false,
-    }
-    setIsSheetDragging(true)
-  }
-
-  const handleSheetPointerMove = useCallback((event) => {
-    const drag = sheetDragRef.current
-    if (!drag || drag.pointerId !== event.pointerId) return
-    const deltaY = event.clientY - drag.startY
-    if (Math.abs(deltaY) > 5) drag.moved = true
-    moveSheetTo(drag.startOffset + deltaY)
-  }, [moveSheetTo])
-
-  const handleSheetPointerEnd = useCallback((event) => {
-    const drag = sheetDragRef.current
-    if (!drag || drag.pointerId !== event.pointerId) return
-    if (drag.captureTarget?.hasPointerCapture(event.pointerId)) {
-      drag.captureTarget.releasePointerCapture(event.pointerId)
-    }
-    sheetDragRef.current = null
-
-    if (!drag.moved) {
-      snapSheet(!isSheetCollapsed)
-      return
-    }
-
-    snapSheet(sheetOffsetRef.current >= SHEET_SNAP_THRESHOLD)
-  }, [isSheetCollapsed, snapSheet])
-
-  const handleSheetKeyDown = (event) => {
-    if (event.key !== 'Enter' && event.key !== ' ') return
-    event.preventDefault()
-    snapSheet(!isSheetCollapsed)
-  }
-
-  useEffect(() => {
-    if (!isSheetDragging) return undefined
-
-    window.addEventListener('pointermove', handleSheetPointerMove)
-    window.addEventListener('pointerup', handleSheetPointerEnd)
-    window.addEventListener('pointercancel', handleSheetPointerEnd)
-
-    return () => {
-      window.removeEventListener('pointermove', handleSheetPointerMove)
-      window.removeEventListener('pointerup', handleSheetPointerEnd)
-      window.removeEventListener('pointercancel', handleSheetPointerEnd)
-    }
-  }, [handleSheetPointerEnd, handleSheetPointerMove, isSheetDragging])
-
   return (
     <Page>
       <TopBar>
@@ -508,30 +431,14 @@ const PinStoryShare = () => {
         <canvas ref={canvasRef} hidden />
       </PreviewStage>
 
-      {isSheetCollapsed ? (
-        <SheetRevealButton type="button" onClick={() => snapSheet(false)} aria-label="템플릿 선택창 열기">
-          <img src={arrowIcon} alt="" />
-          <img src={arrowIcon} alt="" />
-        </SheetRevealButton>
-      ) : null}
-
-      <TemplateSheet $offset={sheetOffset} $dragging={isSheetDragging}>
-        <SheetDragHeader
-          role="button"
-          tabIndex={0}
-          aria-label={isSheetCollapsed ? '템플릿 선택창 열기' : '템플릿 선택창 접기'}
-          aria-expanded={!isSheetCollapsed}
-          onPointerDown={handleSheetPointerDown}
-          onKeyDown={handleSheetKeyDown}
-        >
-          <Handle />
-          <SheetTitle>템플릿 선택</SheetTitle>
-        </SheetDragHeader>
-        <SheetContent
-          hidden={isSheetCollapsed}
-          inert={isSheetCollapsed ? true : undefined}
-          aria-hidden={isSheetCollapsed}
-        >
+      <TemplateSheet
+        ariaLabel="템플릿 선택창"
+        centered
+        collapsedOffset={SHEET_COLLAPSED_OFFSET}
+        height={310}
+        snapThreshold={72}
+        title="템플릿 선택"
+      >
           <TemplateScroller ref={templateListRef}>
             {templates.map((template) => {
               const disabled = template.count > photos.length
@@ -555,7 +462,6 @@ const PinStoryShare = () => {
             이 장만 이미지로 저장
           </SaveButton>
           {errorMessage ? <Notice role="alert">{errorMessage}</Notice> : null}
-        </SheetContent>
       </TemplateSheet>
     </Page>
   )
@@ -684,92 +590,13 @@ const ArrowButton = styled.button`
   &:disabled { opacity: 0.2; cursor: default; }
 `
 
-const TemplateSheet = styled.section`
+const TemplateSheet = styled(SnapSheet)`
   width: min(100%, 402px);
-  height: 310px;
-  position: absolute;
   left: 50%;
-  bottom: 0;
   z-index: 4;
-  transform: translate(-50%, ${({ $offset }) => $offset}px);
   padding: 0 0 20px;
-  border-radius: 24px 24px 0 0;
   background: var(--Background-Paper);
-  box-shadow: var(--Effect-Bottom-Sheet);
   color: var(--Text-Primary);
-  overflow: hidden;
-  transition: ${({ $dragging }) =>
-    $dragging ? 'none' : 'transform 280ms cubic-bezier(0.22, 1, 0.36, 1)'};
-  will-change: transform;
-`
-
-const SheetDragHeader = styled.div`
-  width: 100%;
-  height: 63px;
-  padding-top: 10px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  cursor: grab;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
-
-  &:active { cursor: grabbing; }
-  &:focus-visible { outline: 2px solid var(--Accent-Gold); outline-offset: -4px; }
-`
-
-const Handle = styled.div`
-  width: 40px;
-  height: 4px;
-  margin: 0 auto 14px;
-  border-radius: 2px;
-  background: var(--Secondary-Taupe);
-  opacity: 0.5;
-`
-
-const SheetTitle = styled.h2`
-  height: 39px;
-  font: var(--text-ui-h3);
-  font-weight: 500;
-  text-align: center;
-`
-
-const SheetContent = styled.div`
-  transition: opacity 120ms ease;
-
-  &[aria-hidden='true'] {
-    opacity: 0;
-    pointer-events: none;
-  }
-`
-
-const SheetRevealButton = styled.button`
-  width: 48px;
-  height: 48px;
-  position: absolute;
-  left: 50%;
-  bottom: 82px;
-  z-index: 3;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-
-  img {
-    width: 11px;
-    height: 20px;
-    display: block;
-    transform: rotate(90deg);
-    opacity: 0.55;
-  }
-
-  img + img { margin-top: -13px; }
 `
 
 const TemplateScroller = styled.div`

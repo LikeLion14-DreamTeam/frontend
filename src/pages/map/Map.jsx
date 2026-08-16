@@ -10,6 +10,7 @@ import {
 } from '@vis.gl/react-google-maps'
 import Button from '../../components/common/Button'
 import GoogleMap from '../../components/common/GoogleMap'
+import SnapSheet from '../../components/common/SnapSheet'
 import NavBar from '../../components/layout/NavBar'
 import currentPositionSvg from '../../assets/map/current-position.svg?raw'
 import dropdownCheckIcon from '../../assets/map/dropdown-check.svg'
@@ -678,19 +679,13 @@ const MapPage = () => {
         </RecordButton>
       )}
 
-      <PinSheet $expanded={Boolean(selectedPin)} aria-hidden={!selectedPin}>
-        <SheetHandle
-          type="button"
-          aria-label={selectedPin ? '핀 정보 접기' : '핀 정보 펼치기'}
-          onClick={() => {
-            if (selectedPin) setSelectedPinId(null)
-            else if (mapPins[0]) setSelectedPinId(mapPins[0].pin_id)
-          }}
+      {selectedPin && (
+        <PinSheet
+          ariaLabel="핀 정보"
+          collapsedOffset={227}
+          height={281}
         >
-          <span />
-        </SheetHandle>
-
-        <SheetContent $visible={Boolean(selectedPin)}>
+          <PinSheetContent>
           {sheetError ? (
             <SheetMessage role="alert">{sheetError}</SheetMessage>
           ) : !pinDetail ? (
@@ -734,8 +729,9 @@ const MapPage = () => {
               </Pagination>
             </>
           )}
-        </SheetContent>
-      </PinSheet>
+          </PinSheetContent>
+        </PinSheet>
+      )}
 
       <NavBar activeOverride="map" />
 
@@ -882,52 +878,17 @@ const RecordButton = styled.button`
   }
 `
 
-const PinSheet = styled.section`
-  position: absolute;
+const PinSheet = styled(SnapSheet)`
   z-index: 8;
-  right: 0;
-  bottom: ${({ $expanded }) => ($expanded ? '75px' : '-181px')};
-  left: 0;
-  height: 281px;
-  overflow: hidden;
-  border-radius: 24px 24px 0 0;
-  background: var(--Surface-Base);
-  box-shadow: var(--Effect-Bottom-Sheet);
-  transition: bottom 220ms ease;
+  bottom: 75px;
 `
 
-const SheetHandle = styled.button`
-  position: absolute;
-  z-index: 1;
-  top: 0;
-  left: 50%;
-  width: 72px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  transform: translateX(-50%);
-  cursor: pointer;
-
-  span {
-    width: 40px;
-    height: 4px;
-    border-radius: 2px;
-    background: rgb(181 161 140 / 50%);
-  }
-`
-
-const SheetContent = styled.div`
+const PinSheetContent = styled.div`
   height: 100%;
-  padding: 30px 24px 20px;
+  padding: 0 24px 20px;
   display: flex;
   flex-direction: column;
   gap: 17px;
-  opacity: ${({ $visible }) => ($visible ? 1 : 0)};
-  transition: opacity 140ms ease;
 `
 
 const PinSummary = styled.div`

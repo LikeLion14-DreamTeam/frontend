@@ -3,6 +3,7 @@ import styled from 'styled-components'
 import { useNavigate } from 'react-router-dom'
 import Button from '../../components/common/Button'
 import GoogleMap from '../../components/common/GoogleMap'
+import SnapSheet from '../../components/common/SnapSheet'
 import NavBar from '../../components/layout/NavBar'
 import { reverseGeocode } from '../../features/pins/reverseGeocode'
 import crosshairIcon from '../../assets/map/manual-pin-crosshair.svg'
@@ -166,8 +167,11 @@ const ManualPinAdd = () => {
         <CrosshairIcon src={crosshairIcon} alt="" />
       </CenterMarker>
 
-      <AddressSheet>
-        <SheetHandle aria-hidden="true" />
+      <AddressSheet
+        ariaLabel="선택한 위치"
+        collapsedOffset={137}
+        height={191}
+      >
         <LocationLabel>선택한 위치</LocationLabel>
         <LocationTitle>
           {address.trim() || place?.address || '지도에서 선택한 위치'}
@@ -294,28 +298,11 @@ const CrosshairIcon = styled.img`
   transform: translateX(-50%);
 `
 
-const AddressSheet = styled.section`
-  position: absolute;
+const AddressSheet = styled(SnapSheet)`
   z-index: 8;
-  right: 0;
   bottom: 75px;
-  left: 0;
-  height: 191px;
-  overflow: hidden;
   border-radius: 22px 22px 0 0;
   background: var(--Surface-Base);
-  box-shadow: var(--Effect-Bottom-Sheet);
-`
-
-const SheetHandle = styled.div`
-  position: absolute;
-  top: 10px;
-  left: 50%;
-  width: 40px;
-  height: 4px;
-  border-radius: 2px;
-  background: rgb(181 161 140 / 50%);
-  transform: translateX(-50%);
 `
 
 const LocationLabel = styled.p`
