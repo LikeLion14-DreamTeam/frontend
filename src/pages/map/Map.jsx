@@ -29,6 +29,12 @@ import { getTrip, getTripPins, getTrips } from '../../features/trips/tripApi'
 // 여정을 아직 못 받았을 때 잠깐 보여줄 위치.
 const DEFAULT_CENTER = { lat: 48.8569, lng: 2.3376 }
 
+/* 여정을 볼 때 배율. 핀이 하나뿐이라 영역을 못 잡을 때만 쓰인다. */
+const DEFAULT_ZOOM = 13.3
+
+/* 내 위치로 갈 때 배율. 주변 길이 보일 만큼 당긴다. */
+const CURRENT_POSITION_ZOOM = 17
+
 /* 진행 중인 여행은 TRAVEL_SEGMENT 가 없어 segment_id 로 못 고른다.
    목록에서 구분하려고 쓰는 프론트 전용 값이다. */
 const ONGOING_TRIP_ID = 'ongoing'
@@ -250,6 +256,8 @@ const MapPage = () => {
   const [selectedPinId, setSelectedPinId] = useState(null)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [mapCenter, setMapCenter] = useState(DEFAULT_CENTER)
+  /** 영역(mapBounds)을 못 잡을 때 쓰는 배율 */
+  const [mapZoom, setMapZoom] = useState(DEFAULT_ZOOM)
   /** 핀이 둘 이상일 때만 쓴다. null 이면 mapCenter 로 잡는다. */
   const [mapBounds, setMapBounds] = useState(null)
   const [mapKey, setMapKey] = useState(0)
@@ -449,6 +457,7 @@ const MapPage = () => {
     // 핀이 하나면 영역을 못 잡으니 그 핀을 가운데 둔다.
     setMapBounds(getPinBounds(mapPins))
     setMapCenter({ lat: first.latitude, lng: first.longitude })
+    setMapZoom(DEFAULT_ZOOM)
     setMapKey((current) => current + 1)
   }, [mapPins])
 
@@ -536,9 +545,10 @@ const MapPage = () => {
     setSelectedPinId(null)
 
     if (currentPosition) {
-      // 내 위치로 갈 때는 영역이 아니라 그 점을 가운데 둔다.
+      // 내 위치로 갈 때는 영역이 아니라 그 점을 가운데 두고 더 당겨 본다.
       setMapBounds(null)
       setMapCenter(currentPosition)
+      setMapZoom(CURRENT_POSITION_ZOOM)
       setMapKey((current) => current + 1)
       return
     }
@@ -551,6 +561,7 @@ const MapPage = () => {
       setCurrentPosition(position)
       setMapBounds(null)
       setMapCenter(position)
+      setMapZoom(CURRENT_POSITION_ZOOM)
       setMapKey((current) => current + 1)
     })
   }
@@ -567,7 +578,7 @@ const MapPage = () => {
           key={mapKey}
           bounds={mapBounds}
           center={mapCenter}
-          zoom={13.3}
+          zoom={mapZoom}
           height="100%"
           borderRadius="0"
           bordered={false}
