@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
-import { Marker, Polyline, useApiIsLoaded } from '@vis.gl/react-google-maps'
+import {
+  Marker,
+  Polyline,
+  useApiIsLoaded,
+  useMap,
+  useMapsLibrary,
+} from '@vis.gl/react-google-maps'
 import Button from '../../components/common/Button'
 import GoogleMap from '../../components/common/GoogleMap'
 import NavBar from '../../components/layout/NavBar'
@@ -34,6 +40,119 @@ const ACTIVE_PIN_SIZE = { width: 48, height: 48 }
 /* 핀이 화면 가장자리에 딱 붙지 않도록 두는 여백.
    위쪽은 여정 선택 드롭다운, 아래쪽은 핀 시트에 가려지는 만큼 더 준다. */
 const FIT_PADDING = { top: 110, right: 48, bottom: 150, left: 48 }
+
+/* 핀을 고르면 이 배율까지 확대한다. 이미 더 당겨 봤다면 그대로 둔다. */
+const SELECTED_PIN_ZOOM = 16
+
+/* 핀 시트(높이 281 + 아래 여백 75)가 화면 아래를 가린다.
+   가려지지 않는 영역의 가운데에 오도록 그 절반만큼 위로 올린다. */
+const SELECTED_PIN_OFFSET = (281 + 75) / 2
+
+/** 핀으로 옮겨가는 데 걸리는 시간 */
+const FOCUS_DURATION_MS = 520
+
+/* 처음에 붙고 끝에서 감속한다. */
+const easeOut = (progress) => 1 - (1 - progress) ** 3
+
+const prefersReducedMotion = () =>
+  globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+
+/**
+ * 화면 픽셀만큼 남쪽으로 내린 중심을 구한다. 그만큼 핀이 위로 올라온다.
+ *
+ * 세계 좌표는 배율과 무관하게 256px 기준이라, 화면 픽셀을 배율로 나눠서 더한다.
+ */
+const getOffsetCenter = (map, core, position, zoom) => {
+  const projection = map.getProjection()
+  if (!core || !projection) return position
+
+  const point = projection.fromLatLngToPoint(position)
+  const shifted = new core.Point(
+    point.x,
+    point.y + SELECTED_PIN_OFFSET / 2 ** zoom,
+  )
+  const latLng = projection.fromPointToLatLng(shifted)
+
+  return { lat: latLng.lat(), lng: latLng.lng() }
+}
+
+/**
+ * 고른 핀으로 지도를 옮긴다.
+ *
+ * `useMap` 은 `<Map>` 안에서만 쓸 수 있어 자식 컴포넌트로 둔다. 그리는 건 없다.
+ */
+const FocusSelectedPin = ({ latitude, longitude }) => {
+  const map = useMap()
+  const core = useMapsLibrary('core')
+
+  useEffect(() => {
+    if (!map) return undefined
+
+    const startCenter = map.getCenter()
+    const startZoom = map.getZoom()
+    if (!startCenter || startZoom == null) return undefined
+
+    // 이미 더 당겨 봤다면 뒤로 물러나지 않는다.
+    const targetZoom = Math.max(startZoom, SELECTED_PIN_ZOOM)
+    const targetCenter = getOffsetCenter(
+      map,
+      core,
+      { lat: latitude, lng: longitude },
+      targetZoom,
+    )
+
+    /*
+     * 중심과 배율을 매 프레임 같이 옮긴다.
+     *
+     * `panTo` 는 중심만 부드럽고 `setZoom` 은 즉시 반영이라, 둘을 같이 쓰면
+     * 배율만 툭 튀고 이동은 뒤늦게 따라온다. 카메라를 직접 그려야 한 동작이 된다.
+     */
+    const moveCamera = (center, zoom) => {
+      if (typeof map.moveCamera === 'function') {
+        map.moveCamera({ center, zoom })
+        return
+      }
+
+      map.setZoom(zoom)
+      map.setCenter(center)
+    }
+
+    if (prefersReducedMotion()) {
+      moveCamera(targetCenter, targetZoom)
+      return undefined
+    }
+
+    const from = {
+      lat: startCenter.lat(),
+      lng: startCenter.lng(),
+      zoom: startZoom,
+    }
+    const startedAt = performance.now()
+    let frame = 0
+
+    const step = (now) => {
+      const progress = Math.min((now - startedAt) / FOCUS_DURATION_MS, 1)
+      const eased = easeOut(progress)
+
+      moveCamera(
+        {
+          lat: from.lat + (targetCenter.lat - from.lat) * eased,
+          lng: from.lng + (targetCenter.lng - from.lng) * eased,
+        },
+        from.zoom + (targetZoom - from.zoom) * eased,
+      )
+
+      if (progress < 1) frame = requestAnimationFrame(step)
+    }
+
+    frame = requestAnimationFrame(step)
+
+    // 다른 핀을 고르면 진행 중이던 이동을 멈추고 새로 시작한다.
+    return () => cancelAnimationFrame(frame)
+  }, [core, latitude, longitude, map])
+
+  return null
+}
 
 /**
  * 핀이 모두 보이도록 지도 영역을 잡는다.
@@ -485,6 +604,13 @@ const MapPage = () => {
               })}
               title="현재 위치"
               zIndex={4}
+            />
+          )}
+
+          {selectedPin && (
+            <FocusSelectedPin
+              latitude={selectedPin.latitude}
+              longitude={selectedPin.longitude}
             />
           )}
         </GoogleMap>
