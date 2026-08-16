@@ -346,82 +346,89 @@ const Home = () => {
       ) : (
         <>
           <JourneyCarousel {...journeySwipe}>
-            {currentJourneyCard === JOURNEY_CARD ? (
-              <JourneyBlock>
-                <JourneyBand>JOURNEY IN PROGRESS</JourneyBand>
+            {/* 두 장을 나란히 두고 트랙을 밀어 넘긴다. */}
+            <JourneyTrack $index={journeyIndex}>
+              {hasPins && (
+                <JourneySlide aria-hidden={currentJourneyCard !== JOURNEY_CARD}>
+                <JourneyBlock>
+                  <JourneyBand>JOURNEY IN PROGRESS</JourneyBand>
 
-                <JourneyCard>
-                  <JourneyImage src={journeyCardImage} alt="" aria-hidden="true" />
+                  <JourneyCard>
+                    <JourneyImage src={journeyCardImage} alt="" aria-hidden="true" />
 
-                  <JourneyBody>
-                    <JourneyInfo>
-                      <TripNameRow>
-                        <TripName>{currentTrip.name}</TripName>
-                        <EditNameButton
+                    <JourneyBody>
+                      <JourneyInfo>
+                        <TripNameRow>
+                          <TripName>{currentTrip.name}</TripName>
+                          <EditNameButton
+                            type="button"
+                            aria-label="여정 이름 수정"
+                            onClick={openNameEditor}
+                          >
+                            <EditNameIcon src={noteEditIcon} alt="" aria-hidden="true" />
+                          </EditNameButton>
+                        </TripNameRow>
+                        <JourneyMeta>
+                          <MetaLine>
+                            {formatStartedAt(currentTrip.started_at)} — 진행중
+                          </MetaLine>
+                          <MetaLine>{formatCounts(currentTrip)}</MetaLine>
+                        </JourneyMeta>
+                      </JourneyInfo>
+
+                      <JourneyActions>
+                        <EndJourneyButton
                           type="button"
-                          aria-label="여정 이름 수정"
-                          onClick={openNameEditor}
+                          onClick={() => {
+                            setEndError('')
+                            setIsConfirmingEnd(true)
+                          }}
                         >
-                          <EditNameIcon src={noteEditIcon} alt="" aria-hidden="true" />
-                        </EditNameButton>
-                      </TripNameRow>
-                      <JourneyMeta>
-                        <MetaLine>
-                          {formatStartedAt(currentTrip.started_at)} — 진행중
-                        </MetaLine>
-                        <MetaLine>{formatCounts(currentTrip)}</MetaLine>
-                      </JourneyMeta>
-                    </JourneyInfo>
+                          여정 종료하기
+                        </EndJourneyButton>
+                        <ContinueJourneyLink to="/record/multi-capture">
+                          여정 계속하기
+                        </ContinueJourneyLink>
+                      </JourneyActions>
+                    </JourneyBody>
+                  </JourneyCard>
+                </JourneyBlock>
+                </JourneySlide>
+              )}
 
-                    <JourneyActions>
-                      <EndJourneyButton
-                        type="button"
-                        onClick={() => {
-                          setEndError('')
-                          setIsConfirmingEnd(true)
-                        }}
-                      >
-                        여정 종료하기
-                      </EndJourneyButton>
-                      <ContinueJourneyLink to="/record/multi-capture">
-                        여정 계속하기
-                      </ContinueJourneyLink>
-                    </JourneyActions>
-                  </JourneyBody>
-                </JourneyCard>
-              </JourneyBlock>
-            ) : (
-              /*
-               * 시안 `3 홈 화면 - 2`. 진행 중인 여정이 없을 때는 이 카드만 뜨고,
-               * 있을 때는 오른쪽으로 넘겨서 볼 수 있다.
-               */
-              <LastTaggedCard>
-                {/* 카드 오른쪽에 겹쳐 깔리는 장식. 광원 하나에 테두리 두 겹이다. */}
-                <CardGlow aria-hidden="true" />
-                <CardRing $variant="outer" aria-hidden="true" />
-                <CardRing $variant="inner" aria-hidden="true" />
+              {/*
+                시안 `3 홈 화면 - 2`. 진행 중인 여정이 없을 때는 이 카드만 뜨고,
+                있을 때는 오른쪽으로 넘겨서 볼 수 있다.
+              */}
+              <JourneySlide aria-hidden={currentJourneyCard !== LAST_TAGGED_CARD}>
+                <LastTaggedCard>
+                  {/* 카드 오른쪽에 겹쳐 깔리는 장식. 광원 하나에 테두리 두 겹이다. */}
+                  <CardGlow aria-hidden="true" />
+                  <CardRing $variant="outer" aria-hidden="true" />
+                  <CardRing $variant="inner" aria-hidden="true" />
 
-                <ProductImage
-                  src={lastTaggedProductImage}
-                  alt=""
-                  aria-hidden="true"
-                />
+                  <ProductImage
+                    src={lastTaggedProductImage}
+                    alt=""
+                    aria-hidden="true"
+                  />
 
-                <LastTaggedLabel>LAST TAGGED</LastTaggedLabel>
+                  <LastTaggedLabel>LAST TAGGED</LastTaggedLabel>
 
-                <LastTaggedBody>
-                  {/* 보여주기용 고정 값이다. 연동할 API 를 두지 않기로 했다. */}
-                  <ProductIdentity>
-                    <ProductName>Ottomar 비세토스 위켄더</ProductName>
-                    <ProductTaggedAt>2024.03.15 태깅</ProductTaggedAt>
-                  </ProductIdentity>
+                  <LastTaggedBody>
+                    {/* 보여주기용 고정 값이다. 연동할 API 를 두지 않기로 했다. */}
+                    <ProductIdentity>
+                      <ProductName>Ottomar 비세토스 위켄더</ProductName>
+                      <ProductTaggedAt>2024.03.15 태깅</ProductTaggedAt>
+                    </ProductIdentity>
 
-                  <StartJourneyLink to="/record/multi-capture">
-                    눌러서 여정 시작하기
-                  </StartJourneyLink>
-                </LastTaggedBody>
-              </LastTaggedCard>
-            )}
+                    <StartJourneyLink to="/record/multi-capture">
+                      눌러서 여정 시작하기
+                    </StartJourneyLink>
+                  </LastTaggedBody>
+                </LastTaggedCard>
+              </JourneySlide>
+            </JourneyTrack>
           </JourneyCarousel>
 
           {journeyCards.length > 1 && (
@@ -668,9 +675,10 @@ const LabelTick = styled.span`
 `
 
 /* 시안에서 카드(좌 20)가 띠(좌 26)보다 넓어 본문 패딩 밖으로 4px 넘어간다. */
+/* 슬라이드가 이미 본문보다 좌우 4px 넓어서 여기서는 더 넓히지 않는다. */
 const JourneyBlock = styled.section`
   position: relative;
-  margin: 15px -4px 0;
+  margin: 15px 0 0;
   /* 안쪽 cqw 값의 기준점 */
   container-type: inline-size;
 `
@@ -737,15 +745,63 @@ const JourneyBody = styled.div`
   justify-content: space-around;
 `
 
-/* 진행 중인 여정과 최근 태깅한 제품을 좌우로 넘겨 본다. */
+/*
+ * 여정 카드 배경이 카드 박스 아래로 이만큼 삐져나온다. 트랙을 가로로 자르면
+ * 세로도 같이 잘리므로, 아래에 그만큼 자리를 두고 점을 같은 만큼 끌어올린다.
+ */
+const JOURNEY_BLEED = 36
+
+/* 카드 그림자가 좌우로 퍼지는 거리. 이만큼 잘라내지 않고 남겨둔다. */
+const JOURNEY_SHADOW_ROOM = 24
+
+/* 슬라이드 사이 간격. 그림자 여유보다 넓어야 옆 카드가 그 구간에 비치지 않는다. */
+const JOURNEY_SLIDE_GAP = JOURNEY_SHADOW_ROOM * 2
+
+/*
+ * 진행 중인 여정과 최근 태깅한 제품을 좌우로 넘겨 본다.
+ *
+ * 좌우로 넘치는 슬라이드를 자르려면 `overflow: hidden` 이 필요한데, 그러면
+ * 카드 그림자까지 각지게 잘린다. 그래서 안쪽 여백으로 그림자 자리를 남기고
+ * 바깥 여백으로 그만큼 도로 당겨, 카드 위치는 그대로 두면서 잘리지만 않게 한다.
+ * (여정 카드가 본문보다 좌우 4px 씩 넓은 것도 여기서 함께 반영한다)
+ */
 const JourneyCarousel = styled.div`
+  margin: 0 ${-(JOURNEY_SHADOW_ROOM + 4)}px;
+  padding: 0 ${JOURNEY_SHADOW_ROOM}px ${JOURNEY_BLEED}px;
+  overflow: hidden;
   /* 가로 제스처는 카드 넘기기로 쓰고 세로 스크롤은 그대로 둔다. */
   touch-action: pan-y;
 `
 
+/* 슬라이드 하나 폭에 간격을 더한 만큼씩 민다. */
+const JourneyTrack = styled.div`
+  display: flex;
+  align-items: flex-start;
+  transform: translateX(
+    calc(
+      ${({ $index }) => $index * -100}% -
+        ${({ $index }) => $index * JOURNEY_SLIDE_GAP}px
+    )
+  );
+  transition: transform 340ms cubic-bezier(0.33, 0, 0.2, 1);
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+`
+
+const JourneySlide = styled.div`
+  width: 100%;
+  flex: none;
+
+  & + & {
+    margin-left: ${JOURNEY_SLIDE_GAP}px;
+  }
+`
+
 const JourneyDots = styled.div`
   height: 7px;
-  margin-top: 10px;
+  margin-top: ${10 - JOURNEY_BLEED}px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -770,7 +826,8 @@ const JourneyPlaceholder = styled.p`
 /* 시안 `3 홈 화면 - 2` 의 Card. 350 × 228, 좌우 26 여백. */
 const LastTaggedCard = styled.section`
   position: relative;
-  margin: 15px 2px 0;
+  /* 슬라이드가 본문보다 4px 넓으니 시안의 2px 에 그만큼 더한다. */
+  margin: 15px 6px 0;
   aspect-ratio: 350 / 228;
   overflow: hidden;
   border-radius: ${lastTaggedScale(16)};
