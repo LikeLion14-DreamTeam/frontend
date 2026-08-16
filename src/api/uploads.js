@@ -77,7 +77,8 @@ export const uploadPhoto = async (file) => {
 /** 음성 파일을 업로드하고 8.2의 audio_file에 전달할 공개 URL을 반환한다. */
 export const uploadAudio = async (file) => {
   const upload = await createUpload({
-    fileType: 'audio',
+    // 명세 0-2 가 허용하는 값은 photo · voice 뿐이다.
+    fileType: 'voice',
     contentType: file.type || 'audio/webm',
   })
 
