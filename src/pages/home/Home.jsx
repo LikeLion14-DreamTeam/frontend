@@ -722,6 +722,8 @@ const JourneyImage = styled.img`
   max-width: none;
   /* 화면이 402 보다 넓어져도 늘어나지 않고 잘리게 한다. */
   object-fit: cover;
+  /* 카드 아래로 넘쳐서 아래 점을 덮는다. 장식이니 누름은 통과시킨다. */
+  pointer-events: none;
 `
 
 const JourneyBody = styled.div`
