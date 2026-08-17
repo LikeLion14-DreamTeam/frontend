@@ -959,6 +959,10 @@ const MapBootPlaceholder = styled.div`
   background: var(--Map-Base);
 `
 
+/* 지도 위에 뜬 버튼들이 화면 가장자리에서 띄우는 여백.
+   내 위치 버튼은 아래도 하단 내비게이션(75) 위로 같은 만큼 띄운다. */
+const MAP_BUTTON_INSET = 13
+
 /* 여정 선택 버튼의 자리. 핀 추가 버튼이 같은 줄에 서도록 여기서 가져다 쓴다. */
 const TRIP_SELECTOR_TOP = 19
 const TRIP_SELECTOR_HEIGHT = 40
@@ -969,9 +973,9 @@ const TRIP_SELECTOR_HEIGHT = 40
 const TripSelector = styled.button`
   position: absolute;
   z-index: 34;
-  /* 화면 위쪽 여백을 왼쪽과 같게 둔다. */
   top: ${TRIP_SELECTOR_TOP}px;
-  left: 19px;
+  /* 왼쪽 여백은 버튼들의 오른쪽 여백과 같은 값이다. */
+  left: ${MAP_BUTTON_INSET}px;
   width: max-content;
   max-width: 240px;
   height: ${TRIP_SELECTOR_HEIGHT}px;
@@ -1010,16 +1014,13 @@ const Chevron = styled.img`
 `
 
 /* 아이콘 파일(76)은 그림자가 번지는 자리까지 담고 있어 눈에 보이는 원(48)보다
-   크다. 원의 가장자리를 여백에 맞추려면 그 차이만큼 밖으로 밀어야 한다.
-   줄인 크기에 맞춰 그림자 여백도 같은 비율로 준다. */
-const LOCATION_BUTTON_BOX = 60
-const LOCATION_SHADOW_SCALE = LOCATION_BUTTON_BOX / 76
+   크다. 그래서 원의 지름을 정하고 파일 크기를 거기서 거꾸로 구한다.
+   원의 가장자리를 여백에 맞추려면 그림자 여백만큼 밖으로 밀어야 한다. */
+const LOCATION_CIRCLE_SIZE = 34
+const LOCATION_SHADOW_SCALE = LOCATION_CIRCLE_SIZE / 48
+const LOCATION_BUTTON_BOX = 76 * LOCATION_SHADOW_SCALE
 const LOCATION_SHADOW_RIGHT = 14 * LOCATION_SHADOW_SCALE
 const LOCATION_SHADOW_BOTTOM = 18 * LOCATION_SHADOW_SCALE
-
-/* 지도 위에 뜬 버튼들이 화면 가장자리에서 띄우는 여백.
-   내 위치 버튼은 아래도 하단 내비게이션(75) 위로 같은 만큼 띄운다. */
-const MAP_BUTTON_INSET = 13
 
 const LocationButton = styled.button`
   position: absolute;
@@ -1042,7 +1043,7 @@ const LocationButton = styled.button`
 
 /* 여정 선택 버튼과 같은 줄이다. 높이가 서로 달라, 윗자리를 맞추는 대신
    가운데를 맞춘다. 오른쪽 여백은 아래 내 위치 버튼과 같은 값으로 둔다. */
-const RECORD_BUTTON_SIZE = 48
+const RECORD_BUTTON_SIZE = 40
 
 const RecordButton = styled.button`
   position: absolute;
@@ -1096,7 +1097,7 @@ const TripDropdown = styled.section`
   z-index: 33;
   top: 67px;
   right: 43px;
-  left: 19px;
+  left: ${MAP_BUTTON_INSET}px;
   max-height: calc(100% - 95px);
   padding: 20px 15px;
   overflow-y: auto;
