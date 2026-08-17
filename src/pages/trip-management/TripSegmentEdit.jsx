@@ -121,6 +121,14 @@ const TripSegmentEdit = () => {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [includedIds, setIncludedIds] = useState([])
+  /**
+   * 사용자가 기간을 직접 골랐는지.
+   *
+   * 그 전까지는 핀을 고르는 대로 기간이 따라 움직인다. 한 번 기간을 정하고 나면
+   * 그게 기준이 되어, 범위 밖 핀은 고를 수 없다. 날짜 칸은 여정 정보로 미리
+   * 채워져 있어서 값이 비었는지로는 구분할 수 없다.
+   */
+  const [hasPickedDate, setHasPickedDate] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
@@ -197,9 +205,21 @@ const TripSegmentEdit = () => {
 
   const pinDate = (pin) => toDateInputValue(pin.tagged_at)
 
-  /** 선택이 바뀌면 기간을 첫 핀 · 마지막 핀 날짜로 맞춘다. */
+  /** 정해진 기간 밖에 찍힌 핀. 이 여정에 넣을 수 없어 고르지 못하게 한다. */
+  const isOutOfRange = (pin) => {
+    if (!hasPickedDate || !startDate || !endDate) return false
+
+    const date = pinDate(pin)
+
+    return Boolean(date) && (date < startDate || date > endDate)
+  }
+
+  /** 선택이 바뀌면 기간을 첫 핀 · 마지막 핀 날짜로 맞춘다.
+      기간을 직접 정한 뒤에는 그쪽이 기준이라 건드리지 않는다. */
   const selectPins = (ids) => {
     setIncludedIds(ids)
+
+    if (hasPickedDate) return
 
     const dates = pins
       .filter((pin) => ids.includes(pin.pin_id))
@@ -215,6 +235,7 @@ const TripSegmentEdit = () => {
 
   /** 기간이 바뀌면 그 사이에 찍은 핀만 선택 상태로 다시 맞춘다. */
   const applyDateRange = (start, end) => {
+    setHasPickedDate(true)
     setStartDate(start)
     setEndDate(end)
 
@@ -239,6 +260,9 @@ const TripSegmentEdit = () => {
   }
 
   const togglePin = (pinId) => {
+    const pin = pins.find((item) => item.pin_id === pinId)
+    if (pin && isOutOfRange(pin)) return
+
     selectPins(
       includedIds.includes(pinId)
         ? includedIds.filter((id) => id !== pinId)
@@ -447,6 +471,7 @@ const TripSegmentEdit = () => {
                       const title = pin.place_name || '이름 없는 장소'
                       const hasCoordinates =
                         pin.latitude !== null && pin.longitude !== null
+                      const outOfRange = isOutOfRange(pin)
 
                       return (
                         <PinRow key={pin.pin_id}>
@@ -465,6 +490,7 @@ const TripSegmentEdit = () => {
                               type="checkbox"
                               checked={includedSet.has(pin.pin_id)}
                               onChange={() => togglePin(pin.pin_id)}
+                              disabled={outOfRange}
                               aria-label={`${title} 선택`}
                             />
                             <PinCheckboxVisual aria-hidden="true">
