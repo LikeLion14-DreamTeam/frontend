@@ -106,13 +106,16 @@ const PlayButton = styled.button`
   }
 `
 
+/* 막대 사이를 고정 간격으로 두면 남는 폭보다 길어져 뒷부분이 잘린다. 그러면
+   칠해진 막대의 비율과 눈에 보이는 진행도가 어긋난다. 간격을 남는 폭에 맞춰
+   나눠 가지게 해서 어떤 폭에서도 막대가 다 보이게 한다. */
 const Waveform = styled.span`
   min-width: 0;
   height: 24px;
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 2px;
+  justify-content: space-between;
   overflow: hidden;
 `
 
