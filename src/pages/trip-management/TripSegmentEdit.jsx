@@ -474,7 +474,7 @@ const TripSegmentEdit = () => {
                       const outOfRange = isOutOfRange(pin)
 
                       return (
-                        <PinRow key={pin.pin_id}>
+                        <PinRow key={pin.pin_id} $disabled={outOfRange}>
                           <PinNumber>핀 {index + 1}</PinNumber>
                           <PinText>
                             <PinTitle>{title}</PinTitle>
@@ -790,6 +790,10 @@ const PinList = styled.div`
   gap: 10px;
 `
 
+/*
+ * 흐림은 "고를 수 없다"는 뜻이다. 고를 수 있는 핀은 체크 여부와 상관없이
+ * 또렷하게 두고, 체크박스만으로 선택 상태를 보여준다.
+ */
 const PinRow = styled.label`
   width: 100%;
   min-height: 70px;
@@ -799,15 +803,11 @@ const PinRow = styled.label`
   align-items: center;
   gap: 12px;
   background: var(--Surface-Base);
-  cursor: pointer;
+  opacity: ${({ $disabled }) => ($disabled ? 0.5 : 1)};
+  cursor: ${({ $disabled }) => ($disabled ? 'not-allowed' : 'pointer')};
   transition:
     opacity 160ms ease,
     background-color 160ms ease;
-
-  &:has(input:not(:checked)) {
-    background: var(--Surface-Base);
-    opacity: 0.5;
-  }
 `
 
 const PinNumber = styled.p`
