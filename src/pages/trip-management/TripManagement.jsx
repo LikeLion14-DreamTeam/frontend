@@ -146,7 +146,7 @@ const TripManagement = () => {
         topPadding="72px"
         barHeight="24px"
         rightContent={
-          <EditLink to={editTo}>여정 편집</EditLink>
+          <EditLink to={editTo}>여정 구간 편집</EditLink>
         }
       />
 

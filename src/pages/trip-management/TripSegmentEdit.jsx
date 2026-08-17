@@ -121,6 +121,14 @@ const TripSegmentEdit = () => {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [includedIds, setIncludedIds] = useState([])
+  /**
+   * 사용자가 기간을 직접 골랐는지.
+   *
+   * 그 전까지는 핀을 고르는 대로 기간이 따라 움직인다. 한 번 기간을 정하고 나면
+   * 그게 기준이 되어, 범위 밖 핀은 고를 수 없다. 날짜 칸은 여정 정보로 미리
+   * 채워져 있어서 값이 비었는지로는 구분할 수 없다.
+   */
+  const [hasPickedDate, setHasPickedDate] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
@@ -190,14 +198,28 @@ const TripSegmentEdit = () => {
     .map((pin, index) => (includedSet.has(pin.pin_id) ? index : -1))
     .filter((index) => index >= 0)
 
-  const firstIncludedIndex = includedIndexes[0] ?? 0
-  const lastIncludedIndex = includedIndexes.at(-1) ?? pins.length - 1
+  /* 고른 핀이 없으면 -1 로 둔다. 0 으로 두면 첫 핀을 고른 것처럼 보인다. */
+  const firstIncludedIndex = includedIndexes[0] ?? -1
+  const lastIncludedIndex = includedIndexes.at(-1) ?? -1
+  const hasIncludedPin = includedIndexes.length > 0
 
   const pinDate = (pin) => toDateInputValue(pin.tagged_at)
 
-  /** 선택이 바뀌면 기간을 첫 핀 · 마지막 핀 날짜로 맞춘다. */
+  /** 정해진 기간 밖에 찍힌 핀. 이 여정에 넣을 수 없어 고르지 못하게 한다. */
+  const isOutOfRange = (pin) => {
+    if (!hasPickedDate || !startDate || !endDate) return false
+
+    const date = pinDate(pin)
+
+    return Boolean(date) && (date < startDate || date > endDate)
+  }
+
+  /** 선택이 바뀌면 기간을 첫 핀 · 마지막 핀 날짜로 맞춘다.
+      기간을 직접 정한 뒤에는 그쪽이 기준이라 건드리지 않는다. */
   const selectPins = (ids) => {
     setIncludedIds(ids)
+
+    if (hasPickedDate) return
 
     const dates = pins
       .filter((pin) => ids.includes(pin.pin_id))
@@ -213,6 +235,7 @@ const TripSegmentEdit = () => {
 
   /** 기간이 바뀌면 그 사이에 찍은 핀만 선택 상태로 다시 맞춘다. */
   const applyDateRange = (start, end) => {
+    setHasPickedDate(true)
     setStartDate(start)
     setEndDate(end)
 
@@ -237,6 +260,9 @@ const TripSegmentEdit = () => {
   }
 
   const togglePin = (pinId) => {
+    const pin = pins.find((item) => item.pin_id === pinId)
+    if (pin && isOutOfRange(pin)) return
+
     selectPins(
       includedIds.includes(pinId)
         ? includedIds.filter((id) => id !== pinId)
@@ -297,7 +323,7 @@ const TripSegmentEdit = () => {
     <PageSurface>
       <Header
         to={managementTo}
-        title="여정 편집"
+        title="여정 구간 편집"
         height="136px"
         topPadding="58px"
         barHeight="50px"
@@ -370,8 +396,8 @@ const TripSegmentEdit = () => {
 
                 <RangeSelectRow>
                   <RangeLabel>첫 번째 핀</RangeLabel>
-                  <RangeValue>
-                    {pinOptions[firstIncludedIndex]?.label}
+                  <RangeValue $placeholder={!hasIncludedPin}>
+                    {pinOptions[firstIncludedIndex]?.label ?? '핀을 선택해주세요'}
                   </RangeValue>
                   <RangeSelect
                     id="firstPin"
@@ -401,7 +427,9 @@ const TripSegmentEdit = () => {
 
                 <RangeSelectRow>
                   <RangeLabel>마지막 핀</RangeLabel>
-                  <RangeValue>{pinOptions[lastIncludedIndex]?.label}</RangeValue>
+                  <RangeValue $placeholder={!hasIncludedPin}>
+                    {pinOptions[lastIncludedIndex]?.label ?? '핀을 선택해주세요'}
+                  </RangeValue>
                   <RangeSelect
                     id="lastPin"
                     aria-label="마지막 핀"
@@ -443,9 +471,10 @@ const TripSegmentEdit = () => {
                       const title = pin.place_name || '이름 없는 장소'
                       const hasCoordinates =
                         pin.latitude !== null && pin.longitude !== null
+                      const outOfRange = isOutOfRange(pin)
 
                       return (
-                        <PinRow key={pin.pin_id}>
+                        <PinRow key={pin.pin_id} $disabled={outOfRange}>
                           <PinNumber>핀 {index + 1}</PinNumber>
                           <PinText>
                             <PinTitle>{title}</PinTitle>
@@ -461,6 +490,7 @@ const TripSegmentEdit = () => {
                               type="checkbox"
                               checked={includedSet.has(pin.pin_id)}
                               onChange={() => togglePin(pin.pin_id)}
+                              disabled={outOfRange}
                               aria-label={`${title} 선택`}
                             />
                             <PinCheckboxVisual aria-hidden="true">
@@ -692,7 +722,9 @@ const RangeLabel = styled.label`
 const RangeValue = styled.p`
   min-width: 0;
   flex: 1;
-  color: var(--Text-Primary);
+  /* 안내 문구일 때는 고른 값과 구분되게 흐리게 둔다. */
+  color: ${({ $placeholder }) =>
+    $placeholder ? 'var(--State-Disabled-Text)' : 'var(--Text-Primary)'};
   font: var(--text-ui-label);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -758,6 +790,10 @@ const PinList = styled.div`
   gap: 10px;
 `
 
+/*
+ * 흐림은 "고를 수 없다"는 뜻이다. 고를 수 있는 핀은 체크 여부와 상관없이
+ * 또렷하게 두고, 체크박스만으로 선택 상태를 보여준다.
+ */
 const PinRow = styled.label`
   width: 100%;
   min-height: 70px;
@@ -767,15 +803,11 @@ const PinRow = styled.label`
   align-items: center;
   gap: 12px;
   background: var(--Surface-Base);
-  cursor: pointer;
+  opacity: ${({ $disabled }) => ($disabled ? 0.5 : 1)};
+  cursor: ${({ $disabled }) => ($disabled ? 'not-allowed' : 'pointer')};
   transition:
     opacity 160ms ease,
     background-color 160ms ease;
-
-  &:has(input:not(:checked)) {
-    background: var(--Surface-Base);
-    opacity: 0.5;
-  }
 `
 
 const PinNumber = styled.p`
