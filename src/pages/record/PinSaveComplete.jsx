@@ -10,6 +10,7 @@ import {
 } from '../../features/pins/recordPhotos'
 import { reverseGeocode } from '../../features/pins/reverseGeocode'
 import useRecordDraftStore from '../../features/pins/useRecordDraftStore'
+import useSwipeNavigation from '../../hooks/useSwipeNavigation'
 import useVoiceRecorder, {
   formatVoiceDuration,
 } from '../../features/pins/useVoiceRecorder'
@@ -78,14 +79,19 @@ const PinSaveComplete = () => {
     deleteRecording,
   } = useVoiceRecorder()
 
+  const {
+    index: photoIndex,
+    handlers: photoSwipe,
+  } = useSwipeNavigation(photos.length)
+
   const record = {
-    photo: photos[0]?.url ?? '',
     location:
       address ||
       (latitude != null && longitude != null
         ? `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`
         : '위치 정보 없음'),
-    time: formatRecordTime(photos[0]?.capturedAt),
+    // 촬영 시각은 지금 보고 있는 사진 기준이다.
+    time: formatRecordTime(photos[photoIndex]?.capturedAt),
     photoCount: photos.length,
   }
 
@@ -268,11 +274,23 @@ const PinSaveComplete = () => {
           </SuccessDescription>
         </SuccessHeader>
 
-        <SavedPhoto>
-          {record.photo && <SavedImage src={record.photo} alt="저장된 여행 사진" />}
+        <SavedPhoto {...photoSwipe}>
+          {/* 찍은 사진을 나란히 두고 트랙을 밀어 넘긴다. */}
+          <PhotoTrack $index={photoIndex}>
+            {photos.map((photo, index) => (
+              <SavedImage
+                key={photo.id}
+                src={photo.url}
+                alt={`저장된 여행 사진 ${index + 1}`}
+              />
+            ))}
+          </PhotoTrack>
+
           <PhotoGradient aria-hidden="true" />
           <PhotoCount>
-            {record.photoCount > 0 ? `1 / ${record.photoCount}` : '사진 없음'}
+            {record.photoCount > 0
+              ? `${photoIndex + 1} / ${record.photoCount}`
+              : '사진 없음'}
           </PhotoCount>
           <PhotoCopy>
             <PhotoLocation>{record.location}</PhotoLocation>
@@ -478,6 +496,8 @@ const SuccessDescription = styled.p`
 const SavedPhoto = styled.section`
   position: relative;
   height: 234px;
+  /* 가로 제스처는 사진 넘기기로 쓰고 세로 스크롤은 그대로 둔다. */
+  touch-action: pan-y;
   margin-top: 24px;
   overflow: hidden;
   border: 1px solid var(--Border-Default);
@@ -486,13 +506,24 @@ const SavedPhoto = styled.section`
   box-shadow: var(--Effect-Chip);
 `
 
+/* 트랙 안에서 한 장씩 자리를 차지한다. 겹치지 않게 절대 위치를 쓰지 않는다. */
 const SavedImage = styled.img`
-  position: absolute;
-  inset: 0;
   width: 100%;
   height: 100%;
+  flex: none;
   display: block;
   object-fit: cover;
+`
+
+const PhotoTrack = styled.div`
+  height: 100%;
+  display: flex;
+  transform: translateX(${({ $index }) => $index * -100}%);
+  transition: transform 320ms cubic-bezier(0.33, 0, 0.2, 1);
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
 `
 
 const PhotoGradient = styled.div`
@@ -527,8 +558,15 @@ const PhotoCopy = styled.div`
   color: var(--Text-Inverse);
 `
 
+/*
+ * 18px 이면 흔한 길이의 도로명주소도 두 줄로 넘어간다. 15px 로 낮춰 대부분
+ * 한 줄에 담기게 하고, 그래도 넘치는 긴 주소는 말줄임으로 한 줄을 지킨다.
+ */
 const PhotoLocation = styled.h2`
-  font: var(--text-ui-h3);
+  overflow: hidden;
+  font: var(--text-ui-button);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `
 
 const PhotoTime = styled.p`
