@@ -138,6 +138,14 @@ export const getMockTasteProfileAxes = () => ({
   axes: MOCK_TASTE_PROFILE_AXES.map((axis) => ({ ...axis })),
 })
 
+/** 온보딩/재학습 완료 시 목 취향 프로필의 학습 시간을 갱신한다. */
+export const markMockTasteProfileLearned = () => {
+  MOCK_TASTE_PROFILE.lastUpdatedAt = new Date().toISOString()
+  persistMockTasteProfile(MOCK_TASTE_PROFILE)
+
+  return getMockTasteProfileAxes()
+}
+
 /** API 명세 2.5와 동일하게 축 하나를 수정하고 반영 완료 상태를 반환한다. */
 export const updateMockTasteProfileAxis = ({ axisCode, value }) => {
   if (typeof axisCode !== 'string' || axisCode.trim() === '') {

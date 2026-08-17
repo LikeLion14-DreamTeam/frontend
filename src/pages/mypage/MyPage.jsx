@@ -1384,10 +1384,3 @@ const ChevronIcon = styled.img`
   display: block;
 `
 
-const NavigationBoundary = styled.div`
-  nav {
-    width: min(100%, 402px);
-    left: 50%;
-    transform: translateX(-50%);
-  }
-`
