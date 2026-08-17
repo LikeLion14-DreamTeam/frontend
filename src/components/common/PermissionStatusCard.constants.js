@@ -37,7 +37,8 @@ export const permissionStatusCardPresets = {
     title: '위치',
     description: '이 핀이 지도 위 어디인지 기록해요',
     disabledDescription: '지도 위에 기록이 안 돼요',
-    enabledBadgeLabel: '선택',
+    // 위치 없이는 핀·지도·여정이 성립하지 않아 허용 전에는 진입을 막는다.
+    enabledBadgeLabel: '필수',
     icon: locationOnIcon,
     disabledIcon: locationOffIcon,
     iconSize: 26,

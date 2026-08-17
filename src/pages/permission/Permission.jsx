@@ -208,7 +208,8 @@ const Permission = () => {
 
   return (
     <>
-      <Header />
+      {/* 로그인 직후 도착하는 화면이라 돌아갈 곳이 없다. */}
+      <Header showBack={false} />
 
       <PermissionWrapper>
         <Body>
