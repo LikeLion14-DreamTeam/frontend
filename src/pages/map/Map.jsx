@@ -1002,32 +1002,45 @@ const Chevron = styled.img`
 
 /* 핀 시트가 올라오면 그 위로 함께 올라간다. 시트 위 여백(29)은 접힌 상태와 같다.
    접힘: 시트 윗변 100 + 29 = 129 / 펼침: 시트 윗변 356 + 29 = 385 */
+/* 아이콘 파일(76)은 그림자가 번지는 자리까지 담고 있어 눈에 보이는 원(48)보다
+   크다. 원의 가장자리를 여백에 맞추려면 그 차이만큼 밖으로 밀어야 한다.
+   줄인 크기에 맞춰 그림자 여백도 같은 비율로 준다. */
+const LOCATION_BUTTON_BOX = 60
+const LOCATION_SHADOW_SCALE = LOCATION_BUTTON_BOX / 76
+const LOCATION_SHADOW_RIGHT = 14 * LOCATION_SHADOW_SCALE
+const LOCATION_SHADOW_BOTTOM = 18 * LOCATION_SHADOW_SCALE
+
+/* 지도 위에 뜬 버튼들이 화면 가장자리에서 띄우는 여백.
+   내 위치 버튼은 아래도 하단 내비게이션(75) 위로 같은 만큼 띄운다. */
+const MAP_BUTTON_INSET = 13
+
 const LocationButton = styled.button`
   position: absolute;
   z-index: 9;
-  right: 13px;
-  bottom: 129px;
-  width: 76px;
-  height: 76px;
+  right: ${MAP_BUTTON_INSET - LOCATION_SHADOW_RIGHT}px;
+  bottom: ${75 + MAP_BUTTON_INSET - LOCATION_SHADOW_BOTTOM}px;
+  width: ${LOCATION_BUTTON_BOX}px;
+  height: ${LOCATION_BUTTON_BOX}px;
   padding: 0;
   border: 0;
   background: transparent;
   cursor: pointer;
 
   img {
-    width: 76px;
-    height: 76px;
+    width: ${LOCATION_BUTTON_BOX}px;
+    height: ${LOCATION_BUTTON_BOX}px;
     display: block;
   }
 `
 
+/* 오른쪽 위 구석에 붙는다. 위·오른쪽 여백을 같은 값으로 둔다. */
 const RecordButton = styled.button`
   position: absolute;
-  top: 56px;
-  right: 13px;
+  top: ${MAP_BUTTON_INSET}px;
+  right: ${MAP_BUTTON_INSET}px;
   z-index: 9;
-  width: 60px;
-  height: 60px;
+  width: 48px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1039,8 +1052,8 @@ const RecordButton = styled.button`
   cursor: pointer;
 
   img {
-    width: 38px;
-    height: 38px;
+    width: 30px;
+    height: 30px;
     display: block;
     object-fit: contain;
   }
