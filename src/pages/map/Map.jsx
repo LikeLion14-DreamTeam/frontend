@@ -8,9 +8,9 @@ import {
   useMap,
   useMapsLibrary,
 } from '@vis.gl/react-google-maps'
-import Button from '../../components/common/Button'
 import GoogleMap, { FOCUS_ZOOM } from '../../components/common/GoogleMap'
-import SnapSheet from '../../components/common/SnapSheet'
+import MapOverlay from '../../components/common/MapOverlay'
+import PinPopover from '../../components/common/PinPopover'
 import NavBar from '../../components/layout/NavBar'
 import currentPositionSvg from '../../assets/map/current-position.svg?raw'
 import dropdownCheckIcon from '../../assets/map/dropdown-check.svg'
@@ -41,9 +41,6 @@ const DEFAULT_ZOOM = 13.3
 
 /* 내 위치로 갈 때 배율. 주변 길이 보일 만큼 당긴다. */
 const CURRENT_POSITION_ZOOM = 17
-const PIN_SHEET_COLLAPSED_OFFSET = 227
-const LOCATION_BUTTON_DEFAULT_BOTTOM = 129
-const LOCATION_BUTTON_RAISED_BOTTOM = 385
 
 /* 진행 중인 여행은 TRAVEL_SEGMENT 가 없어 segment_id 로 못 고른다.
    목록에서 구분하려고 쓰는 프론트 전용 값이다. */
@@ -54,16 +51,16 @@ const PIN_SIZE = { width: 38, height: 38 }
 const ACTIVE_PIN_SIZE = { width: 48, height: 48 }
 
 /* 핀이 화면 가장자리에 딱 붙지 않도록 두는 여백.
-   위쪽은 여정 선택 드롭다운, 아래쪽은 핀 시트에 가려지는 만큼 더 준다. */
+   위쪽은 여정 선택 드롭다운, 아래쪽은 하단 내비게이션에 가려지는 만큼 더 준다. */
 const FIT_PADDING = { top: 110, right: 48, bottom: 150, left: 48 }
 
 /* 핀을 고르면 이 배율까지 확대한다. 이미 더 당겨 봤다면 그대로 둔다.
    영역 맞춤 상한과 같은 값이라, 개요에서 핀을 골라도 배율이 튀지 않는다. */
 const SELECTED_PIN_ZOOM = FOCUS_ZOOM
 
-/* 핀 시트(높이 281 + 아래 여백 75)가 화면 아래를 가린다.
-   가려지지 않는 영역의 가운데에 오도록 그 절반만큼 위로 올린다. */
-const SELECTED_PIN_OFFSET = (281 + 75) / 2
+/* 고른 핀을 화면 가운데에서 이만큼 내린다(음수면 아래로).
+   말풍선이 핀 위에 서므로, 핀을 가운데보다 내려야 말풍선이 다 보인다. */
+const SELECTED_PIN_SHIFT = -82
 
 /** 핀으로 옮겨가는 데 걸리는 시간 */
 const FOCUS_DURATION_MS = 520
@@ -75,7 +72,7 @@ const prefersReducedMotion = () =>
   globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 
 /**
- * 화면 픽셀만큼 남쪽으로 내린 중심을 구한다. 그만큼 핀이 위로 올라온다.
+ * 화면 픽셀만큼 남쪽으로 옮긴 중심을 구한다. 그만큼 핀이 위로 올라온다.
  *
  * 세계 좌표는 배율과 무관하게 256px 기준이라, 화면 픽셀을 배율로 나눠서 더한다.
  */
@@ -86,7 +83,7 @@ const getOffsetCenter = (map, core, position, zoom) => {
   const point = projection.fromLatLngToPoint(position)
   const shifted = new core.Point(
     point.x,
-    point.y + SELECTED_PIN_OFFSET / 2 ** zoom,
+    point.y + SELECTED_PIN_SHIFT / 2 ** zoom,
   )
   const latLng = projection.fromPointToLatLng(shifted)
 
@@ -231,7 +228,7 @@ const formatCounts = ({ pin_count, photo_count }) =>
     .filter(Boolean)
     .join(' · ')
 
-const sheetDateFormatter = new Intl.DateTimeFormat('ko-KR', {
+const popoverDateFormatter = new Intl.DateTimeFormat('ko-KR', {
   year: 'numeric',
   month: '2-digit',
   day: '2-digit',
@@ -240,9 +237,14 @@ const sheetDateFormatter = new Intl.DateTimeFormat('ko-KR', {
   hour12: true,
 })
 
+/* ko-KR 은 "2025. 06. 14. 오전 10:32" 로 준다.
+   날짜의 점은 붙이고, 시각 앞은 시안대로 띄운다. */
 const formatTaggedAt = (taggedAt) =>
   taggedAt
-    ? sheetDateFormatter.format(new Date(taggedAt)).replace(/\. /g, '.')
+    ? popoverDateFormatter
+        .format(new Date(taggedAt))
+        .replace(/\. /g, '.')
+        .replace(/\.(오전|오후)/, ' $1')
     : ''
 
 const MapPage = () => {
@@ -613,20 +615,19 @@ const MapPage = () => {
 
   const [pinDetail, setPinDetail] = useState(null)
   const [pinPhotos, setPinPhotos] = useState([])
-  const [sheetError, setSheetError] = useState('')
-  const [pinSheetOffset, setPinSheetOffset] = useState(0)
+  const [popoverError, setPopoverError] = useState('')
 
-  /** 핀을 고르면 시트에 채울 값을 5.1 · 5.4 로 받는다. */
+  /** 핀을 고르면 말풍선에 채울 값을 5.1 · 5.4 로 받는다. */
   useEffect(() => {
     if (!selectedPinId) {
       setPinDetail(null)
       setPinPhotos([])
-      setSheetError('')
+      setPopoverError('')
       return undefined
     }
 
     let ignore = false
-    setSheetError('')
+    setPopoverError('')
 
     const load = async () => {
       try {
@@ -644,7 +645,7 @@ const MapPage = () => {
 
         setPinDetail(null)
         setPinPhotos([])
-        setSheetError(error.message)
+        setPopoverError(error.message)
       }
     }
 
@@ -654,23 +655,6 @@ const MapPage = () => {
       ignore = true
     }
   }, [selectedPinId])
-
-  useEffect(() => {
-    if (selectedPinId) setPinSheetOffset(0)
-  }, [selectedPinId])
-
-  const selectedIndex = mapPins.findIndex(
-    ({ pin_id }) => pin_id === selectedPinId,
-  )
-  const coverPhoto =
-    pinPhotos.find((photo) => photo.is_pin_cover) ?? pinPhotos[0]
-
-  const locationButtonBottom = selectedPin
-    ? LOCATION_BUTTON_RAISED_BOTTOM -
-      ((LOCATION_BUTTON_RAISED_BOTTOM - LOCATION_BUTTON_DEFAULT_BOTTOM) *
-        pinSheetOffset) /
-        PIN_SHEET_COLLAPSED_OFFSET
-    : LOCATION_BUTTON_DEFAULT_BOTTOM
 
   /** iOS 는 사용자 제스처 안에서만 나침반 권한을 물을 수 있다. */
   const requestCompass = async () => {
@@ -799,10 +783,36 @@ const MapPage = () => {
             )}
 
             {selectedPin && (
-              <FocusSelectedPin
-                latitude={selectedPin.latitude}
-                longitude={selectedPin.longitude}
-              />
+              <>
+                <FocusSelectedPin
+                  latitude={selectedPin.latitude}
+                  longitude={selectedPin.longitude}
+                />
+
+                <MapOverlay
+                  latitude={selectedPin.latitude}
+                  longitude={selectedPin.longitude}
+                >
+                  <PopoverAnchor>
+                    <PinPopover
+                      title={
+                        pinDetail?.place_name ||
+                        pinDetail?.address ||
+                        '이름 없는 장소'
+                      }
+                      taggedAt={formatTaggedAt(pinDetail?.tagged_at)}
+                      photoCount={pinPhotos.length}
+                      hasVoiceMemo={Boolean(pinDetail?.voice_memo)}
+                      photos={pinDetail?.representative_photos ?? []}
+                      message={
+                        popoverError || (pinDetail ? '' : '불러오는 중...')
+                      }
+                      onClose={() => setSelectedPinId(null)}
+                      onDetail={() => navigate(`/map/pin/${selectedPinId}`)}
+                    />
+                  </PopoverAnchor>
+                </MapOverlay>
+              </>
             )}
           </GoogleMap>
         ) : (
@@ -839,7 +849,6 @@ const MapPage = () => {
       <LocationButton
         type="button"
         aria-label="내 위치로 이동"
-        $bottom={locationButtonBottom}
         onClick={handleLocate}
       >
         <img src={myLocationIcon} alt="" />
@@ -853,63 +862,6 @@ const MapPage = () => {
         >
           <img src={recordPlusIcon} alt="" />
         </RecordButton>
-      )}
-
-      {selectedPin && (
-        <PinSheet
-          ariaLabel="핀 정보"
-          collapsedOffset={PIN_SHEET_COLLAPSED_OFFSET}
-          height={281}
-          onOffsetChange={setPinSheetOffset}
-        >
-          <PinSheetContent>
-          {sheetError ? (
-            <SheetMessage role="alert">{sheetError}</SheetMessage>
-          ) : !pinDetail ? (
-            <SheetMessage>불러오는 중...</SheetMessage>
-          ) : (
-            <>
-                <PinSummary>
-                <PinPhoto>
-                  {coverPhoto && <PinPhotoImage src={coverPhoto.file_path} alt="" />}
-                </PinPhoto>
-                <PinText>
-                  <PinTitle>
-                    {pinDetail.place_name ||
-                      pinDetail.address ||
-                      '이름 없는 장소'}
-                  </PinTitle>
-                  {pinDetail.address && <PinMeta>{pinDetail.address}</PinMeta>}
-                  <PinMeta>{formatTaggedAt(pinDetail.tagged_at)}</PinMeta>
-                  <TagList>
-                    <Tag>사진 {pinPhotos.length}</Tag>
-                    {pinDetail.voice_memo && <Tag>음성 1</Tag>}
-                  </TagList>
-                </PinText>
-              </PinSummary>
-
-              <PinDescription>
-                {pinDetail.text_note || '남긴 기록이 없습니다.'}
-              </PinDescription>
-
-              <DetailButton
-                type="button"
-                onClick={() => navigate(`/map/pin/${selectedPinId}`)}
-              >
-                이 핀 기록 자세히 보기
-              </DetailButton>
-
-              {!isCountryFilterMode && (
-                <Pagination aria-label={`${selectedIndex + 1} / ${mapPins.length}`}>
-                  {mapPins.map((pin, index) => (
-                    <Dot key={pin.pin_id} $active={index === selectedIndex} />
-                  ))}
-                </Pagination>
-              )}
-            </>
-          )}
-          </PinSheetContent>
-        </PinSheet>
       )}
 
       <NavBar activeOverride="map" />
@@ -1007,19 +959,32 @@ const MapBootPlaceholder = styled.div`
   background: var(--Map-Base);
 `
 
+/* 지도 위에 뜬 버튼들이 화면 가장자리에서 띄우는 여백.
+   내 위치 버튼은 아래도 하단 내비게이션(75) 위로 같은 만큼 띄운다. */
+const MAP_BUTTON_INSET = 13
+
+/* 여정 선택 버튼의 자리. 핀 추가 버튼이 같은 줄에 서도록 여기서 가져다 쓴다. */
+const TRIP_SELECTOR_TOP = 19
+const TRIP_SELECTOR_HEIGHT = 40
+
+/* 여정 이름이 잘리지 않도록 글에 맞춰 늘어난다. 위아래 여백은 그림(28)에
+   맞춰 최소로만 두고, 지나치게 긴 이름만 상한에서 말줄임으로 넘긴다.
+   왼쪽 여백은 그림이 동그라미라 위아래와 거의 같게 둬야 가운데로 보인다. */
 const TripSelector = styled.button`
   position: absolute;
   z-index: 34;
-  top: 58px;
-  left: 19px;
-  width: 160px;
-  height: 48px;
-  padding: 10px 14px;
+  top: ${TRIP_SELECTOR_TOP}px;
+  /* 왼쪽 여백은 버튼들의 오른쪽 여백과 같은 값이다. */
+  left: ${MAP_BUTTON_INSET}px;
+  width: max-content;
+  max-width: 240px;
+  height: ${TRIP_SELECTOR_HEIGHT}px;
+  padding: 6px 14px 6px 7px;
   display: flex;
   align-items: center;
   gap: 10px;
   border: 0;
-  border-radius: 24px;
+  border-radius: 20px;
   background: var(--Surface-Base);
   box-shadow: var(--Effect-Card);
   color: var(--Text-Primary);
@@ -1048,34 +1013,45 @@ const Chevron = styled.img`
   margin-left: -5px;
 `
 
-/* 핀 시트가 올라오면 그 위로 함께 올라간다. 시트 위 여백(29)은 접힌 상태와 같다.
-   접힘: 시트 윗변 100 + 29 = 129 / 펼침: 시트 윗변 356 + 29 = 385 */
+/* 아이콘 파일(76)은 그림자가 번지는 자리까지 담고 있어 눈에 보이는 원(48)보다
+   크다. 그래서 원의 지름을 정하고 파일 크기를 거기서 거꾸로 구한다.
+   원의 가장자리를 여백에 맞추려면 그림자 여백만큼 밖으로 밀어야 한다. */
+const LOCATION_CIRCLE_SIZE = 34
+const LOCATION_SHADOW_SCALE = LOCATION_CIRCLE_SIZE / 48
+const LOCATION_BUTTON_BOX = 76 * LOCATION_SHADOW_SCALE
+const LOCATION_SHADOW_RIGHT = 14 * LOCATION_SHADOW_SCALE
+const LOCATION_SHADOW_BOTTOM = 18 * LOCATION_SHADOW_SCALE
+
 const LocationButton = styled.button`
   position: absolute;
   z-index: 9;
-  right: 13px;
-  bottom: ${({ $bottom }) => `${$bottom}px`};
-  width: 76px;
-  height: 76px;
+  right: ${MAP_BUTTON_INSET - LOCATION_SHADOW_RIGHT}px;
+  bottom: ${75 + MAP_BUTTON_INSET - LOCATION_SHADOW_BOTTOM}px;
+  width: ${LOCATION_BUTTON_BOX}px;
+  height: ${LOCATION_BUTTON_BOX}px;
   padding: 0;
   border: 0;
   background: transparent;
   cursor: pointer;
 
   img {
-    width: 76px;
-    height: 76px;
+    width: ${LOCATION_BUTTON_BOX}px;
+    height: ${LOCATION_BUTTON_BOX}px;
     display: block;
   }
 `
 
+/* 여정 선택 버튼과 같은 줄이다. 높이가 서로 달라, 윗자리를 맞추는 대신
+   가운데를 맞춘다. 오른쪽 여백은 아래 내 위치 버튼과 같은 값으로 둔다. */
+const RECORD_BUTTON_SIZE = 40
+
 const RecordButton = styled.button`
   position: absolute;
-  top: 56px;
-  right: 13px;
+  top: ${TRIP_SELECTOR_TOP + (TRIP_SELECTOR_HEIGHT - RECORD_BUTTON_SIZE) / 2}px;
+  right: ${MAP_BUTTON_INSET}px;
   z-index: 9;
-  width: 60px;
-  height: 60px;
+  width: ${RECORD_BUTTON_SIZE}px;
+  height: ${RECORD_BUTTON_SIZE}px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1087,119 +1063,20 @@ const RecordButton = styled.button`
   cursor: pointer;
 
   img {
-    width: 38px;
-    height: 38px;
+    width: 30px;
+    height: 30px;
     display: block;
     object-fit: contain;
   }
 `
 
-const PinSheet = styled(SnapSheet)`
-  z-index: 8;
-  bottom: 75px;
-`
-
-const PinSheetContent = styled.div`
-  height: 100%;
-  padding: 0 24px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 17px;
-`
-
-const PinSummary = styled.div`
-  width: 100%;
-  display: flex;
-  align-items: flex-start;
-  gap: 20px;
-`
-
-const PinPhoto = styled.div`
-  width: 106px;
-  height: 106px;
-  flex: 0 0 auto;
-  overflow: hidden;
-  border-radius: 12px;
-  background: var(--Map-Land);
-`
-
-const PinPhotoImage = styled.img`
-  width: 100%;
-  height: 100%;
-  display: block;
-  object-fit: cover;
-`
-
-const SheetMessage = styled.p`
-  padding-top: 20px;
-  color: var(--Text-Secondary);
-  font: var(--text-ui-body-m);
-  text-align: center;
-`
-
-const PinText = styled.div`
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-`
-
-const PinTitle = styled.h2`
-  overflow: hidden;
-  color: var(--Text-Primary);
-  font: var(--text-ui-h3);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`
-
-const PinMeta = styled.p`
-  color: var(--Text-Secondary);
-  font: var(--text-ui-caption);
-`
-
-const TagList = styled.div`
-  padding-top: 4px;
-  display: flex;
-  gap: 6px;
-`
-
-const Tag = styled.span`
-  padding: 3px 8px;
-  border-radius: 6px;
-  background: var(--Background-Base);
-  color: var(--Text-Secondary);
-  font: var(--text-ui-nav);
-`
-
-const PinDescription = styled.p`
-  overflow: hidden;
-  color: var(--Text-Secondary);
-  font: var(--text-ui-body-m);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`
-
-const DetailButton = styled(Button)`
-  height: 48px;
-  flex: 0 0 auto;
-  color: var(--Text-Inverse);
-  background: var(--Primary-Cognac);
-  font: var(--text-ui-button);
-`
-
-const Pagination = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-`
-
-const Dot = styled.span`
-  width: ${({ $active }) => ($active ? '16px' : '5px')};
-  height: 5px;
-  border-radius: 3px;
-  background: ${({ $active }) =>
-    $active ? 'var(--Primary-Cognac)' : 'rgb(181 161 140 / 40%)'};
+/* 좌표는 핀 그림의 한가운데다. 핀 위쪽 절반(24)과 시안의 틈(7)만큼 더 띄워
+   꼬리 끝이 핀 바로 위에 오게 한다. */
+const PopoverAnchor = styled.div`
+  position: absolute;
+  bottom: 31px;
+  left: 0;
+  transform: translateX(-50%);
 `
 
 const Scrim = styled.button`
@@ -1214,13 +1091,14 @@ const Scrim = styled.button`
   cursor: default;
 `
 
+/* 여정 선택 버튼(19 + 40) 아래 8px 에 붙는다. */
 const TripDropdown = styled.section`
   position: absolute;
   z-index: 33;
-  top: 114px;
+  top: 67px;
   right: 43px;
-  left: 19px;
-  max-height: calc(100% - 142px);
+  left: ${MAP_BUTTON_INSET}px;
+  max-height: calc(100% - 95px);
   padding: 20px 15px;
   overflow-y: auto;
   border-radius: 18px;
