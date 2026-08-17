@@ -5,6 +5,8 @@ import BackIcon from '../../assets/icons/Back.svg'
 
 const Header = ({
   to = '/',
+  /* 돌아갈 곳이 없는 화면에서는 false. 높이는 그대로 두고 버튼만 감춘다. */
+  showBack = true,
   title,
   rightContent,
   iconSrc = BackIcon,
@@ -23,20 +25,22 @@ const Header = ({
       $height={height}
       $topPadding={topPadding}
     >
-      <BackLink
-        $barHeight={barHeight}
-        $topPadding={topPadding}
-        to={to}
-        aria-label={ariaLabel}
-      >
-        <BackImage
-          $height={iconHeight}
-          $width={iconWidth}
-          src={iconSrc}
-          alt=""
-          aria-hidden="true"
-        />
-      </BackLink>
+      {showBack ? (
+        <BackLink
+          $barHeight={barHeight}
+          $topPadding={topPadding}
+          to={to}
+          aria-label={ariaLabel}
+        >
+          <BackImage
+            $height={iconHeight}
+            $width={iconWidth}
+            src={iconSrc}
+            alt=""
+            aria-hidden="true"
+          />
+        </BackLink>
+      ) : null}
       {title ? (
         <TitleSlot $barHeight={barHeight} $topPadding={topPadding}>
           <HeaderTitle>{title}</HeaderTitle>
