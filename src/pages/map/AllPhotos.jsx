@@ -40,6 +40,22 @@ const formatTime = (isoString) =>
 const formatDateTime = (isoString) =>
   isoString ? `${formatDate(isoString)} ${formatTime(isoString)}` : ''
 
+/**
+ * 사진 추가 결과를 한 줄로 옮긴다.
+ *
+ * 안내 칸의 높이가 고정이라 줄이 늘어나면 안 된다. 성공·실패를 가운뎃점으로 잇는다.
+ */
+const describeAddResult = ({ added, rejected }) => {
+  const lines = []
+
+  if (added.length > 0) lines.push(`${added.length}장을 추가했어요`)
+  if (rejected.length > 0) {
+    lines.push(`${rejected.length}장 실패 · ${describeRejected(rejected)}`)
+  }
+
+  return lines.join(' · ')
+}
+
 /** 찍힌 때. 없거나 읽을 수 없으면 0 으로 봐서 맨 앞에 모은다. */
 const capturedTime = (photo) => {
   const time = new Date(photo.captured_at).getTime()
@@ -254,21 +270,14 @@ const AllPhotos = () => {
         )}
       </Heading>
 
-      {addError && <StateMessage role="alert">{addError}</StateMessage>}
+      {/* 안내가 떠도 아래가 밀리지 않도록 자리를 늘 비워둔다. */}
+      <NoticeSlot>
+        {addError && <Notice role="alert">{addError}</Notice>}
 
-      {addResult && (
-        <AddResult role="status">
-          {addResult.added.length > 0 && (
-            <ResultLine>사진 {addResult.added.length}장을 추가했어요.</ResultLine>
-          )}
-          {addResult.rejected.length > 0 && (
-            <ResultLine>
-              {addResult.rejected.length}장은 추가하지 못했어요 ·{' '}
-              {describeRejected(addResult.rejected)}
-            </ResultLine>
-          )}
-        </AddResult>
-      )}
+        {!addError && addResult && (
+          <Notice role="status">{describeAddResult(addResult)}</Notice>
+        )}
+      </NoticeSlot>
 
       {isLoading && <StateMessage>불러오는 중...</StateMessage>}
 
@@ -471,7 +480,6 @@ const Meta = styled.p`
 
 const PhotoGroups = styled.div`
   width: 354px;
-  margin-top: 40px;
   display: flex;
   flex-direction: column;
   gap: 30px;
@@ -553,20 +561,34 @@ const HiddenFileInput = styled.input`
   pointer-events: none;
 `
 
-const AddResult = styled.div`
-  margin: 0 24px 12px 0;
-  border-radius: 10px;
-  padding: 10px 12px;
-  background: var(--Surface-Base);
+/* 원래 제목과 사진 사이에 있던 40px 여백을 그대로 안내 자리로 쓴다.
+   안내가 없을 때는 빈 채로 남아 예전과 같은 간격이 된다. */
+const NoticeSlot = styled.div`
+  width: 354px;
+  height: 40px;
+  flex: 0 0 auto;
+  /* 블록으로 두면 안내의 위쪽 여백이 부모 밖으로 collapse 돼 자리가 밀린다. */
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  justify-content: center;
 `
 
-const ResultLine = styled.p`
+/* 자리 높이에 맞춰 한 줄만 둔다. 긴 글은 잘라서 아래를 밀지 않게 한다.
+   자리(40)보다 낮게 두면 남는 8px 이 위아래로 나뉜다. */
+const Notice = styled.p`
+  width: 100%;
+  height: 32px;
+  flex: 0 0 auto;
+  border-radius: 10px;
+  padding: 0 12px;
+  background: var(--Surface-Base);
   color: var(--Text-Secondary);
   font: var(--text-ui-caption);
-  word-break: keep-all;
+  /* 가운데 정렬을 flex 로 하면 말줄임이 먹지 않아 줄 높이로 맞춘다. */
+  line-height: 32px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 `
 
 const SelectionBar = styled.div`
