@@ -518,11 +518,13 @@ const PinDetail = () => {
                 </TitleRow>
               )}
               <PinMeta>
-                {pin.address}
+                {pin.address && <PinMetaAddress>{pin.address}</PinMetaAddress>}
                 {pin.address && pin.tagged_at && (
-                  <>&nbsp;&nbsp;·&nbsp;&nbsp;</>
+                  <PinMetaDivider aria-hidden="true">·</PinMetaDivider>
                 )}
-                {formatTaggedAt(pin.tagged_at)}
+                {pin.tagged_at && (
+                  <PinMetaTime>{formatTaggedAt(pin.tagged_at)}</PinMetaTime>
+                )}
               </PinMeta>
             </HeadingGroup>
 
@@ -916,12 +918,15 @@ const JourneyChip = styled.span`
   z-index: 3;
   bottom: ${({ $sheetHeight }) => `${$sheetHeight + 28}px`};
   left: 20px;
+  max-width: calc(100% - 40px);
   padding: 7px 12px;
+  overflow: hidden;
   border-radius: 14px;
   background: rgb(42 37 34 / 60%);
   box-shadow: var(--Effect-Chip);
   color: var(--Text-Inverse);
   font: var(--text-ui-caption);
+  text-overflow: ellipsis;
   white-space: nowrap;
   transform: ${({ $sheetOffset }) => `translateY(${$sheetOffset}px)`};
 `
@@ -938,6 +943,7 @@ const DetailContent = styled.div`
   display: flex;
   flex-direction: column;
   gap: 38px;
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
@@ -955,12 +961,14 @@ const PinIntro = styled.section`
 `
 
 const HeadingGroup = styled.div`
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
 `
 
 const TitleRow = styled.div`
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -968,14 +976,41 @@ const TitleRow = styled.div`
 
 const PinTitle = styled.h1`
   min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
   color: var(--Text-Primary);
   font: var(--text-ui-h2);
-  letter-spacing: -0.22px;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `
 
 const PinMeta = styled.p`
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 7px;
+  row-gap: 2px;
   color: var(--Text-Secondary);
   font: var(--text-ui-caption);
+  line-height: 1.5;
+`
+
+const PinMetaAddress = styled.span`
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+`
+
+const PinMetaDivider = styled.span`
+  flex: 0 0 auto;
+`
+
+const PinMetaTime = styled.span`
+  flex: 0 0 auto;
+  max-width: 100%;
   white-space: nowrap;
 `
 
