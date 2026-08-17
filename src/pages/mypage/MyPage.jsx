@@ -164,6 +164,7 @@ const MyPage = () => {
   const [unlinkingProductTagId, setUnlinkingProductTagId] = useState(null)
   const [productPendingUnlink, setProductPendingUnlink] = useState(null)
   const [productUnlinkError, setProductUnlinkError] = useState('')
+  const [hasProfileImageError, setHasProfileImageError] = useState(false)
   const [mobileOS] = useState(detectMobileOS)
   const [permissionStatuses, setPermissionStatuses] = useState(() => ({
     location: DEVICE_PERMISSION_STATUS.IDLE,
@@ -177,11 +178,20 @@ const MyPage = () => {
       ? RELEARNING_COMPLETED_MESSAGE
       : '',
   )
+  const profileImageUrl =
+    typeof account?.profile_image_url === 'string'
+      ? account.profile_image_url.trim()
+      : ''
+  const shouldShowProfileImage = profileImageUrl && !hasProfileImageError
   const stats = [
     { label: '핀 개수', value: account?.pin_count ?? 0 },
     { label: '완료 여정', value: account?.completed_trip_count ?? 0 },
     { label: '방문 도시', value: account?.visited_city_count ?? 0 },
   ]
+
+  useEffect(() => {
+    setHasProfileImageError(false)
+  }, [profileImageUrl])
 
   useEffect(() => {
     let ignore = false
@@ -548,7 +558,17 @@ const MyPage = () => {
       <Content>
         <ProfileSection aria-label="프로필">
           <Avatar>
-            <AvatarIcon src={userIcon} alt="" aria-hidden="true" />
+            {shouldShowProfileImage ? (
+              <AvatarPhoto
+                src={profileImageUrl}
+                alt=""
+                aria-hidden="true"
+                referrerPolicy="no-referrer"
+                onError={() => setHasProfileImageError(true)}
+              />
+            ) : (
+              <AvatarIcon src={userIcon} alt="" aria-hidden="true" />
+            )}
           </Avatar>
           <ProfileText>
             <UserName>
@@ -954,6 +974,13 @@ const AvatarIcon = styled.img`
   width: 36px;
   height: 36px;
   display: block;
+`
+
+const AvatarPhoto = styled.img`
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
 `
 
 const ProfileText = styled.div`
