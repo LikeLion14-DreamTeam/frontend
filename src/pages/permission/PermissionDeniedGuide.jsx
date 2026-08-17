@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import Button from '../../components/common/Button'
-import Card from '../../components/common/Card'
 import PermissionStatusCard from '../../components/common/PermissionStatusCard'
 import { permissionStatusCardItems } from '../../components/common/PermissionStatusCard.constants'
 import Header from '../../components/layout/Header'
@@ -89,14 +88,6 @@ const Permission = () => {
                 )
               })}
           </PermissionList>
-
-          <PermissionDeniedActionCard>
-            <PermissionDeniedActionTitle>
-              권한 없이도 할 수 있는 것
-            </PermissionDeniedActionTitle>
-            <PermissionDeniedAction>지난 여정과 포토북 열람</PermissionDeniedAction>
-            <PermissionDeniedAction>저장된 핀의 사진·메모 보기</PermissionDeniedAction>
-          </PermissionDeniedActionCard>
         </Body>
 
         <Footer>
@@ -170,43 +161,6 @@ const PermissionList = styled.div`
   display: flex;
   flex-direction: column;
   gap: 12px;
-`
-
-const PermissionDeniedActionCard = styled(Card).attrs({ as: 'aside' })`
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 13px 20px;
-  border: 1px solid var(--Border-Default);
-  border-radius: 12px;
-  background: var(--Surface-Base);
-  overflow: hidden;
-`
-
-const PermissionDeniedActionTitle = styled.p`
-  color: var(--Text-Primary);
-  font: var(--text-ui-label);
-  word-break: keep-all;
-`
-
-const PermissionDeniedAction = styled.p`
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--Text-Secondary);
-  font: var(--text-ui-caption);
-  word-break: keep-all;
-
-  &::before {
-    content: '';
-    width: 4px;
-    height: 4px;
-    flex: 0 0 4px;
-    border-radius: 50%;
-    background: var(--Secondary-Taupe);
-  }
 `
 
 const Footer = styled.section`
