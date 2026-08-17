@@ -128,7 +128,6 @@ const Home = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [tripError, setTripError] = useState('')
   const [stamps, setStamps] = useState([])
-  const [isStampsLoading, setIsStampsLoading] = useState(true)
   const [isEditingName, setIsEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
   const [isSavingName, setIsSavingName] = useState(false)
@@ -162,8 +161,6 @@ const Home = () => {
     let ignore = false
 
     const load = async () => {
-      setIsStampsLoading(true)
-
       try {
         const { stamps: visited } = await getCountryStamps()
         if (!ignore) {
@@ -173,8 +170,6 @@ const Home = () => {
       } catch {
         // 도장은 부가 정보라 실패해도 빈 여권으로 둔다.
         if (!ignore) setStamps([])
-      } finally {
-        if (!ignore) setIsStampsLoading(false)
       }
     }
 
@@ -187,11 +182,6 @@ const Home = () => {
 
   const hasPins = currentTrip?.has_pins === true
   const stampSpreads = toStampSpreads(stamps)
-  const countryCount = stamps.length
-  const cityCount = stamps.reduce(
-    (total, stamp) => total + (stamp?.cities?.length ?? 0) + (stamp?.extra_city_count ?? 0),
-    0,
-  )
   const passportPages = [PASSPORT_COVER, ...stampSpreads]
 
   // 여권 면과 여정 카드는 같은 방식으로 좌우로 넘긴다.
@@ -415,23 +405,12 @@ const Home = () => {
         </>
       )}
 
-      <PassportBlock>
+      <PassportBlock $compact={!isLoading && !tripError && journeyCards.length === 1}>
         <PassportHead>
           <SectionLabel>
             <LabelTick aria-hidden="true" />
             나의 여행 여권
           </SectionLabel>
-
-          <ResultCard>
-            <ResultTitle>기록은 계속 쌓이고 있어요</ResultTitle>
-            <ResultDescription>
-              {isStampsLoading
-                ? '도장을 불러오는 중입니다.'
-                : countryCount === 0
-                  ? '아직 방문 도장이 없어요. 첫 태깅을 시작해보세요.'
-                  : `지금까지 ${cityCount}개의 도시, ${countryCount}개의 나라를 다녀왔어요.`}
-            </ResultDescription>
-          </ResultCard>
         </PassportHead>
 
         <PassportStage {...passportSwipe}>
@@ -862,7 +841,7 @@ const LastTaggedBody = styled.div`
   width: ${lastTaggedScale(307)};
   display: flex;
   flex-direction: column;
-  gap: ${lastTaggedScale(85)};
+  gap: ${lastTaggedScale(105)};
   align-items: flex-start;
 `
 
@@ -887,19 +866,28 @@ const ProductTaggedAt = styled.p`
   font: 400 ${lastTaggedScale(11)}/normal var(--font-sans);
 `
 
-/* 시안에서 카드 폭을 다 쓰지 않는 작은 알약 모양이다. */
 const StartJourneyLink = styled(Link)`
-  width: ${lastTaggedScale(136)};
-  height: ${lastTaggedScale(37)};
+  width: auto;
+  height: ${lastTaggedScale(14)};
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: ${lastTaggedScale(22)};
-  background: #f5eee4;
-  color: var(--Text-Primary);
-  font: 500 ${lastTaggedScale(12)}/normal var(--font-sans);
+  gap: ${lastTaggedScale(8)};
+  background: transparent;
+  color: var(--Accent-Gold);
+  font: 500 ${lastTaggedScale(12)}/${lastTaggedScale(14)} var(--font-sans);
   text-decoration: none;
   white-space: nowrap;
+
+  &::after {
+    width: ${lastTaggedScale(8)};
+    height: ${lastTaggedScale(8)};
+    flex: none;
+    border-top: ${lastTaggedScale(2)} solid currentColor;
+    border-right: ${lastTaggedScale(2)} solid currentColor;
+    content: '';
+    transform: rotate(45deg);
+  }
 `
 
 /* 시안의 도시명 자리에 여정 이름이 들어간다. 나라 줄은 없다. */
@@ -1079,7 +1067,7 @@ const ContinueJourneyLink = styled(Link)`
 
 /* 여권 면은 본문 폭(354)보다 넓은 376 이라 양쪽으로 11px 씩 넘어간다. */
 const PassportBlock = styled.section`
-  margin: 21px -11px 0;
+  margin: ${({ $compact }) => ($compact ? '-8px' : '12px')} -11px 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1091,28 +1079,10 @@ const PassportHead = styled.div`
   width: calc(100% - 22px);
   display: flex;
   flex-direction: column;
-  gap: 15px;
-`
 
-const ResultCard = styled.div`
-  width: 100%;
-  padding: 15px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  overflow: hidden;
-  border-radius: 14px;
-  background: rgb(181 118 59 / 9%);
-`
-
-const ResultTitle = styled.p`
-  color: var(--Text-Primary);
-  font: 500 14px/normal var(--font-sans);
-`
-
-const ResultDescription = styled.p`
-  color: rgb(129 116 104 / 90%);
-  font: 400 11px/normal var(--font-sans);
+  ${SectionLabel} {
+    margin-top: 10px;
+  }
 `
 
 /* 표지와 도장 면이 같은 자리를 쓴다. 넘겨도 아래 내용이 밀리지 않는다. */
