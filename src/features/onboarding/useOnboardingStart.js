@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getAuthenticatedEntryPath } from '../auth/authRoutes'
 import useAuthStore from '../auth/useAuthStore'
@@ -23,16 +23,31 @@ import { getOnboardingFlowPath, ONBOARDING_STAGE_PATHS } from './onboardingFlow'
  *
  * @param stage 이 화면이 담당하는 2.6 단계 값
  * @param isRelearning 재학습 흐름인지
+ * @param initialRound progress 조회 없이 시작할 때 사용할 화면 라운드
+ * @param normalizeRound 서버 라운드를 화면 라운드로 바꿔야 할 때 사용한다
+ * @param onProgressLoaded 진행 상태에 담긴 기존 응답을 화면 state로 복원할 때 사용한다
  * @returns `{ isReady, round, setRound }` — 준비 전에는 화면을 그리지 않는다
  */
-const useOnboardingStart = ({ stage, isRelearning }) => {
+const useOnboardingStart = ({
+  stage,
+  isRelearning,
+  initialRound = 1,
+  normalizeRound = (roundNo) => roundNo,
+  onProgressLoaded,
+}) => {
   const navigate = useNavigate()
   const user = useAuthStore((state) => state.user)
   const [isReady, setIsReady] = useState(false)
   const [round, setRound] = useState(1)
+  const normalizeRoundRef = useRef(normalizeRound)
+  const onProgressLoadedRef = useRef(onProgressLoaded)
+
+  normalizeRoundRef.current = normalizeRound
+  onProgressLoadedRef.current = onProgressLoaded
 
   useEffect(() => {
     if (isRelearning) {
+      setRound(initialRound)
       setIsReady(true)
       return undefined
     }
@@ -56,7 +71,8 @@ const useOnboardingStart = ({ stage, isRelearning }) => {
           return
         }
 
-        setRound(progress.current_round)
+        onProgressLoadedRef.current?.(progress)
+        setRound(normalizeRoundRef.current(progress.current_round))
         setIsReady(true)
       } catch {
         // 조회에 실패해도 온보딩을 막지는 않는다. 1라운드부터 시작한다.
@@ -69,7 +85,7 @@ const useOnboardingStart = ({ stage, isRelearning }) => {
     return () => {
       ignore = true
     }
-  }, [isRelearning, navigate, stage, user])
+  }, [initialRound, isRelearning, navigate, stage, user])
 
   /**
    * 저장한 뒤 서버 진행 상태를 다시 읽어 화면을 맞춘다.
@@ -86,7 +102,8 @@ const useOnboardingStart = ({ stage, isRelearning }) => {
 
       if (progress.current_stage !== stage) return false
 
-      setRound(progress.current_round)
+      onProgressLoadedRef.current?.(progress)
+      setRound(normalizeRoundRef.current(progress.current_round))
       return true
     } catch {
       // 조회에 실패하면 기존 흐름대로 진행한다.

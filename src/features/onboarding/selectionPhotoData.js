@@ -9,6 +9,7 @@ const originalPhotoSources = import.meta.glob(
 
 const SOURCE_ENTRIES = Object.entries(originalPhotoSources)
 const SET_FILE_PATTERN = /_set(\d+)_(\d+)\.webp$/i
+const PHOTO_SET_STORAGE_PREFIX = 'orte_onboarding_photo_sets'
 
 const AB_STAGE_CONFIGS = [
   { roundNo: 1, axisCode: 'brightness', folderName: 'AB1밝기' },
@@ -85,10 +86,96 @@ export const MOODBOARD_PHOTO_ROUNDS = MOODBOARD_STAGE_CONFIGS.map(
   }),
 )
 
-/** 각 단계가 다른 set을 고를 수 있도록 라운드별로 독립 추첨한다. */
-export const selectRandomPhotoSets = (rounds, random = Math.random) =>
-  rounds.map(({ photoSets, ...round }) => {
-    const selectedSet = photoSets[Math.floor(random() * photoSets.length)]
+const getStorage = () => {
+  if (typeof window === 'undefined') return null
+
+  try {
+    return window.localStorage
+  } catch {
+    return null
+  }
+}
+
+const getPhotoSetStorageKey = (storageKey) =>
+  `${PHOTO_SET_STORAGE_PREFIX}:${storageKey}`
+
+const readStoredSetNos = (storageKey) => {
+  const storage = getStorage()
+  if (!storage || !storageKey) return {}
+
+  try {
+    return JSON.parse(storage.getItem(getPhotoSetStorageKey(storageKey))) ?? {}
+  } catch {
+    return {}
+  }
+}
+
+const writeStoredSetNos = (storageKey, setNosByRoundNo) => {
+  const storage = getStorage()
+  if (!storage || !storageKey) return
+
+  try {
+    storage.setItem(
+      getPhotoSetStorageKey(storageKey),
+      JSON.stringify(setNosByRoundNo),
+    )
+  } catch {
+    // 저장소를 쓸 수 없어도 온보딩 진행 자체는 막지 않는다.
+  }
+}
+
+const findSetFromSavedSelections = ({ photoSets }, selectionPhotos) => {
+  const savedPhotoIds = new Set(
+    selectionPhotos.map((selection) => selection.photo_id),
+  )
+
+  if (savedPhotoIds.size === 0) return null
+
+  return (
+    photoSets.find((photoSet) =>
+      photoSet.photos.every((photo) => savedPhotoIds.has(photo.photoId)),
+    ) ?? null
+  )
+}
+
+const getSelectionsByRoundNo = (selectionPhotos) =>
+  selectionPhotos.reduce((rounds, selection) => {
+    const currentSelections = rounds.get(selection.round_no) ?? []
+
+    currentSelections.push(selection)
+    rounds.set(selection.round_no, currentSelections)
+
+    return rounds
+  }, new Map())
+
+/** 각 단계가 다른 set을 고르되, 이어하기·새로고침에서는 같은 후보를 유지한다. */
+export const selectRandomPhotoSets = (
+  rounds,
+  {
+    random = Math.random,
+    storageKey = '',
+    selectionPhotos = [],
+  } = {},
+) => {
+  const storedSetNos = readStoredSetNos(storageKey)
+  const savedSelectionsByRoundNo = getSelectionsByRoundNo(selectionPhotos)
+  const nextStoredSetNos = { ...storedSetNos }
+
+  const selectedRounds = rounds.map(({ photoSets, ...round }) => {
+    const storedSetNo = Number(storedSetNos[round.roundNo])
+    const storedSet = photoSets.find(
+      (photoSet) => photoSet.setNo === storedSetNo,
+    )
+    const savedSet = findSetFromSavedSelections(
+      { photoSets },
+      savedSelectionsByRoundNo.get(round.roundNo) ?? [],
+    )
+    const selectedSet =
+      storedSet ??
+      savedSet ??
+      photoSets[Math.floor(random() * photoSets.length)]
+
+    nextStoredSetNos[round.roundNo] = selectedSet.setNo
 
     return {
       ...round,
@@ -96,3 +183,8 @@ export const selectRandomPhotoSets = (rounds, random = Math.random) =>
       photos: selectedSet.photos,
     }
   })
+
+  writeStoredSetNos(storageKey, nextStoredSetNos)
+
+  return selectedRounds
+}
