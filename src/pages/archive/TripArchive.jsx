@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import styled from 'styled-components'
 import noteEditIcon from '../../assets/map/note-edit.svg'
 import paperTexture from '../../assets/pin-save/manual-pin-form-bg.png'
-import GoogleMap from '../../components/common/GoogleMap'
+import GoogleMap, { FOCUS_ZOOM } from '../../components/common/GoogleMap'
 import Header from '../../components/layout/Header'
 import {
   PhotobookCityHeader,
@@ -464,8 +464,9 @@ const TripArchive = () => {
                 {mapPins.length ? (
                   <GoogleMap
                     markers={mapPins}
-                    /* 핀이 하나뿐이라 영역을 못 잡을 때만 쓰인다. */
-                    zoom={17}
+                    /* 핀이 하나뿐이라 영역을 못 잡을 때만 쓰인다.
+                       영역 맞춤 상한과 같은 값이라 첫 배율이 일관된다. */
+                    zoom={FOCUS_ZOOM}
                     height="100%"
                     borderRadius="15px"
                     bordered={false}

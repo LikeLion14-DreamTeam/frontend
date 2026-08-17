@@ -554,11 +554,16 @@ const MapPage = () => {
     const [first] = mapPins
     if (!first) return
 
-    // 핀이 하나면 영역을 못 잡으니 그 핀을 가운데 둔다.
+    const bounds = getPinBounds(mapPins)
+
     hasInitialMapViewRef.current = true
-    setMapBounds(getPinBounds(mapPins))
+    setMapBounds(bounds)
     setMapCenter({ lat: first.latitude, lng: first.longitude })
-    setMapZoom(DEFAULT_ZOOM)
+    /*
+     * 핀이 하나면 맞출 영역이 없어 배율을 직접 줘야 한다. 영역 맞춤 상한과 같은
+     * 값을 써서, 핀이 하나든 여럿이든 첫 배율이 같게 보이도록 한다.
+     */
+    setMapZoom(bounds ? DEFAULT_ZOOM : FOCUS_ZOOM)
     setMapKey((current) => current + 1)
   }, [mapPins])
 
