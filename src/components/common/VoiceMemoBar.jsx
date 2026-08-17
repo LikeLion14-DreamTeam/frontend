@@ -21,9 +21,17 @@ const formatDuration = (duration) => {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
+/**
+ * 음성 메모 재생 막대.
+ *
+ * @param duration 전체 길이(초). 이미 다듬은 문자열을 넘겨도 그대로 쓴다
+ * @param position 재생 위치(초). 주면 `지난 시간 / 전체 길이` 로 보여준다.
+ *   넘기지 않는 화면은 전체 길이만 그대로 보여준다
+ */
 const VoiceMemoBar = ({
   className,
   duration = 0,
+  position = null,
   isPlaying = false,
   progress = 0,
   onToggle,
@@ -54,7 +62,11 @@ const VoiceMemoBar = ({
         ))}
       </Waveform>
 
-      <Duration>{formatDuration(duration)}</Duration>
+      <Duration>
+        {position == null
+          ? formatDuration(duration)
+          : `${formatDuration(position)} / ${formatDuration(duration)}`}
+      </Duration>
     </Bar>
   )
 }
@@ -94,13 +106,16 @@ const PlayButton = styled.button`
   }
 `
 
+/* 막대 사이를 고정 간격으로 두면 남는 폭보다 길어져 뒷부분이 잘린다. 그러면
+   칠해진 막대의 비율과 눈에 보이는 진행도가 어긋난다. 간격을 남는 폭에 맞춰
+   나눠 가지게 해서 어떤 폭에서도 막대가 다 보이게 한다. */
 const Waveform = styled.span`
   min-width: 0;
   height: 24px;
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 2px;
+  justify-content: space-between;
   overflow: hidden;
 `
 

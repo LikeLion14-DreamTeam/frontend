@@ -128,6 +128,9 @@ const PinDetail = () => {
   const [isPlaying, setIsPlaying] = useState(false)
   const [audioSrc, setAudioSrc] = useState(null)
   const [playedRatio, setPlayedRatio] = useState(0)
+  const [playedSec, setPlayedSec] = useState(0)
+  /* 5.1 이 길이를 안 줄 때를 대비해 오디오 파일에서 읽은 값을 따로 둔다. */
+  const [audioDuration, setAudioDuration] = useState(0)
   const [voiceError, setVoiceError] = useState('')
   const [pin, setPin] = useState(null)
   const [photos, setPhotos] = useState([])
@@ -565,27 +568,35 @@ const PinDetail = () => {
                 {pin.voice_memo && (
                   <>
                     <VoiceMemoBar
-                      duration={pin.voice_memo.duration_sec}
+                      duration={pin.voice_memo.duration_sec || audioDuration}
+                      position={playedSec}
                       isPlaying={isPlaying}
                       progress={playedRatio}
                       onToggle={handleTogglePlay}
                       disabled={!audioSrc}
                     />
 
+                    {/* 재생 전에도 길이를 보여줘야 해서 정보만 미리 받는다. */}
                     <audio
                       ref={audioRef}
                       src={audioSrc ?? undefined}
-                      preload="none"
+                      preload="metadata"
+                      onLoadedMetadata={(event) => {
+                        const { duration } = event.currentTarget
+                        if (Number.isFinite(duration)) setAudioDuration(duration)
+                      }}
                       onPlay={() => setIsPlaying(true)}
                       onPause={() => setIsPlaying(false)}
                       onTimeUpdate={(event) => {
                         const { currentTime, duration } = event.currentTarget
+                        setPlayedSec(currentTime)
                         setPlayedRatio(
                           duration ? currentTime / duration : 0,
                         )
                       }}
                       onEnded={() => {
                         setIsPlaying(false)
+                        setPlayedSec(0)
                         setPlayedRatio(0)
                       }}
                       onError={() =>
