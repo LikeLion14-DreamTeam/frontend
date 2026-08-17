@@ -35,6 +35,11 @@ const formatDate = (isoString) =>
 const formatTime = (isoString) =>
   isoString ? timeFormatter.format(new Date(isoString)) : ''
 
+/* 나중에 추가한 사진은 다른 날에 찍혔을 수 있다. 시간만 보이면 묶음끼리
+   구분되지 않아 날짜를 앞에 붙인다. */
+const formatDateTime = (isoString) =>
+  isoString ? `${formatDate(isoString)} ${formatTime(isoString)}` : ''
+
 /** 찍힌 때. 없거나 읽을 수 없으면 0 으로 봐서 맨 앞에 모은다. */
 const capturedTime = (photo) => {
   const time = new Date(photo.captured_at).getTime()
@@ -280,7 +285,7 @@ const AllPhotos = () => {
           {groups.map((group) => (
             <PhotoGroup key={group.startedAt ?? group.offset}>
               <GroupHeading>
-                <Time>{formatTime(group.startedAt)}</Time>
+                <Time>{formatDateTime(group.startedAt)}</Time>
                 <Rule />
                 <Count>{group.photos.length}장</Count>
               </GroupHeading>
@@ -288,7 +293,7 @@ const AllPhotos = () => {
               <PhotoStrip
                 role="region"
                 aria-roledescription="carousel"
-                aria-label={`${formatTime(group.startedAt)} 사진 ${group.photos.length}장`}
+                aria-label={`${formatDateTime(group.startedAt)} 사진 ${group.photos.length}장`}
               >
                 {group.photos.map((photo, index) => (
                   <PhotoTile
@@ -487,11 +492,12 @@ const GroupHeading = styled.div`
   gap: 11px;
 `
 
+/* 날짜까지 들어가 길이가 달라지므로 폭을 고정하지 않고 글에 맞춘다. */
 const Time = styled.h2`
-  width: 70px;
   flex: 0 0 auto;
   color: var(--Text-Primary);
   font: var(--text-ui-label);
+  white-space: nowrap;
 `
 
 const Rule = styled.span`
