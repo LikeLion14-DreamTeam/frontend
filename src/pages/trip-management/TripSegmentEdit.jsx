@@ -190,8 +190,10 @@ const TripSegmentEdit = () => {
     .map((pin, index) => (includedSet.has(pin.pin_id) ? index : -1))
     .filter((index) => index >= 0)
 
-  const firstIncludedIndex = includedIndexes[0] ?? 0
-  const lastIncludedIndex = includedIndexes.at(-1) ?? pins.length - 1
+  /* 고른 핀이 없으면 -1 로 둔다. 0 으로 두면 첫 핀을 고른 것처럼 보인다. */
+  const firstIncludedIndex = includedIndexes[0] ?? -1
+  const lastIncludedIndex = includedIndexes.at(-1) ?? -1
+  const hasIncludedPin = includedIndexes.length > 0
 
   const pinDate = (pin) => toDateInputValue(pin.tagged_at)
 
@@ -297,7 +299,7 @@ const TripSegmentEdit = () => {
     <PageSurface>
       <Header
         to={managementTo}
-        title="여정 편집"
+        title="여정 구간 편집"
         height="136px"
         topPadding="58px"
         barHeight="50px"
@@ -370,8 +372,8 @@ const TripSegmentEdit = () => {
 
                 <RangeSelectRow>
                   <RangeLabel>첫 번째 핀</RangeLabel>
-                  <RangeValue>
-                    {pinOptions[firstIncludedIndex]?.label}
+                  <RangeValue $placeholder={!hasIncludedPin}>
+                    {pinOptions[firstIncludedIndex]?.label ?? '핀을 선택해주세요'}
                   </RangeValue>
                   <RangeSelect
                     id="firstPin"
@@ -401,7 +403,9 @@ const TripSegmentEdit = () => {
 
                 <RangeSelectRow>
                   <RangeLabel>마지막 핀</RangeLabel>
-                  <RangeValue>{pinOptions[lastIncludedIndex]?.label}</RangeValue>
+                  <RangeValue $placeholder={!hasIncludedPin}>
+                    {pinOptions[lastIncludedIndex]?.label ?? '핀을 선택해주세요'}
+                  </RangeValue>
                   <RangeSelect
                     id="lastPin"
                     aria-label="마지막 핀"
@@ -692,7 +696,9 @@ const RangeLabel = styled.label`
 const RangeValue = styled.p`
   min-width: 0;
   flex: 1;
-  color: var(--Text-Primary);
+  /* 안내 문구일 때는 고른 값과 구분되게 흐리게 둔다. */
+  color: ${({ $placeholder }) =>
+    $placeholder ? 'var(--State-Disabled-Text)' : 'var(--Text-Primary)'};
   font: var(--text-ui-label);
   overflow: hidden;
   text-overflow: ellipsis;
