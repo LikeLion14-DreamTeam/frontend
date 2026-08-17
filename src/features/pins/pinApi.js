@@ -148,11 +148,7 @@ export const createPin = async ({
  * `country_code` 는 필수이며, 같은 경로의 `/pins` 를 메서드로만 구분한다.
  * 응답은 커서 기반 페이지네이션을 따르며, 핀은 국가를 기준으로만 필터링한다.
  */
-export const getPinsByCountry = async ({
-  countryCode,
-  cursor = null,
-  limit = 20,
-} = {}) => {
+export const getPinsByCountry = async ({ countryCode, limit = 20 } = {}) => {
   const normalizedCountryCode = countryCode?.toUpperCase()
 
   if (!normalizedCountryCode) {
