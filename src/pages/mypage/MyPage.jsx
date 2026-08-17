@@ -189,6 +189,15 @@ const MyPage = () => {
     { label: '완료 여정', value: account?.completed_trip_count ?? 0 },
     { label: '방문 도시', value: account?.visited_city_count ?? 0 },
   ]
+  const accountDisplayName =
+    account?.email ??
+    (isAccountLoading ? '계정 정보 불러오는 중...' : 'Orte 여행자')
+  const accountNameDensity =
+    accountDisplayName.length > 34
+      ? 'dense'
+      : accountDisplayName.length > 26
+        ? 'compact'
+        : 'default'
 
   useEffect(() => {
     setHasProfileImageError(false)
@@ -573,9 +582,8 @@ const MyPage = () => {
             )}
           </Avatar>
           <ProfileText>
-            <UserName>
-              {account?.email ??
-                (isAccountLoading ? '계정 정보 불러오는 중...' : 'Orte 여행자')}
+            <UserName title={accountDisplayName} $density={accountNameDensity}>
+              {accountDisplayName}
             </UserName>
             {accountError ? (
               <AccountError role="alert">
@@ -987,6 +995,8 @@ const AvatarPhoto = styled.img`
 
 const ProfileText = styled.div`
   min-width: 0;
+  flex: 1 1 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -994,9 +1004,19 @@ const ProfileText = styled.div`
 `
 
 const UserName = styled.h1`
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
   color: #1f2937;
-  font: var(--text-ui-h2);
-  letter-spacing: -0.22px;
+  font: ${({ $density }) =>
+    $density === 'dense'
+      ? '700 18px/25px var(--font-sans)'
+      : $density === 'compact'
+        ? '700 20px/28px var(--font-sans)'
+        : 'var(--text-ui-h2)'};
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `
 
 const AccountType = styled.p`
