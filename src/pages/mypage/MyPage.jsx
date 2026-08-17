@@ -19,6 +19,14 @@ import {
   getProducts,
   unlinkProduct,
 } from '../../features/products/productApi'
+import {
+  DEVICE_PERMISSION_STATUS,
+  detectMobileOS,
+  getCurrentPermissionStatus,
+  rememberLocationGranted,
+  requestDevicePermission,
+} from '../../features/permissions/devicePermissions'
+import { recordPermissionEvent } from '../../features/permissions/permissionApi'
 import briefcaseIcon from '../../assets/icons/mypage/briefcase.svg'
 import chevronRightIcon from '../../assets/icons/mypage/chevron-right.svg'
 import closeIcon from '../../assets/icons/mypage/close.png'
@@ -104,10 +112,29 @@ const getProductRegisteredDate = (registeredAt) => {
 }
 
 const settings = [
-  { label: '위치 권한', state: '허용됨' },
-  { label: '카메라 권한', state: '허용됨' },
-  { label: '알림', state: '켜짐' },
+  { label: '위치 권한', permissionType: 'location' },
+  { label: '카메라 권한', permissionType: 'camera' },
 ]
+
+const getSettingStateLabel = (permissionType, status) => {
+  if (status === DEVICE_PERMISSION_STATUS.CHECKING) {
+    return '확인 중'
+  }
+
+  if (status === DEVICE_PERMISSION_STATUS.GRANTED) {
+    return '허용됨'
+  }
+
+  if (status === DEVICE_PERMISSION_STATUS.DENIED) {
+    return '거부됨'
+  }
+
+  if (status === DEVICE_PERMISSION_STATUS.UNSUPPORTED) {
+    return '미지원'
+  }
+
+  return '요청하기'
+}
 
 const MyPage = () => {
   const location = useLocation()
@@ -136,6 +163,11 @@ const MyPage = () => {
   const [unlinkingProductTagId, setUnlinkingProductTagId] = useState(null)
   const [productPendingUnlink, setProductPendingUnlink] = useState(null)
   const [productUnlinkError, setProductUnlinkError] = useState('')
+  const [mobileOS] = useState(detectMobileOS)
+  const [permissionStatuses, setPermissionStatuses] = useState(() => ({
+    location: DEVICE_PERMISSION_STATUS.IDLE,
+    camera: DEVICE_PERMISSION_STATUS.IDLE,
+  }))
   const savedTasteAxisValuesRef = useRef(new Map())
   const savingTasteAxisCodesRef = useRef(new Set())
   const [relearningNotice] = useState(() =>
@@ -245,6 +277,32 @@ const MyPage = () => {
       ignore = true
     }
   }, [clearUser, navigate, tasteAxesRequestKey])
+
+  useEffect(() => {
+    let ignore = false
+
+    const loadPermissionStatuses = async () => {
+      const permissionEntries = await Promise.all(
+        ['location', 'camera'].map(async (permissionType) => [
+          permissionType,
+          await getCurrentPermissionStatus(permissionType),
+        ]),
+      )
+
+      if (!ignore) {
+        setPermissionStatuses((currentStatuses) => ({
+          ...currentStatuses,
+          ...Object.fromEntries(permissionEntries),
+        }))
+      }
+    }
+
+    loadPermissionStatuses()
+
+    return () => {
+      ignore = true
+    }
+  }, [])
 
   useEffect(() => {
     let ignore = false
@@ -442,6 +500,41 @@ const MyPage = () => {
 
     // 서버 세션 해제 실패는 사용자 로그아웃을 되돌리지 않는다.
     void logoutRequest.catch(() => {})
+  }
+
+  const handlePermissionSettingClick = async (permissionType) => {
+    if (
+      permissionStatuses[permissionType] === DEVICE_PERMISSION_STATUS.CHECKING
+    ) {
+      return
+    }
+
+    setPermissionStatuses((currentStatuses) => ({
+      ...currentStatuses,
+      [permissionType]: DEVICE_PERMISSION_STATUS.CHECKING,
+    }))
+
+    const status = await requestDevicePermission(permissionType)
+
+    if (
+      permissionType === 'location' &&
+      status === DEVICE_PERMISSION_STATUS.GRANTED
+    ) {
+      rememberLocationGranted()
+    }
+
+    setPermissionStatuses((currentStatuses) => ({
+      ...currentStatuses,
+      [permissionType]: status,
+    }))
+
+    if (mobileOS) {
+      void recordPermissionEvent({
+        permission_type: permissionType,
+        status,
+        os: mobileOS,
+      }).catch(() => {})
+    }
   }
 
   const tasteProfileUpdatedDate = formatIsoDate(
@@ -675,9 +768,24 @@ const MyPage = () => {
 
         <AccountPanel aria-label="설정">
           {settings.map((setting) => (
-            <SettingRow type="button" key={setting.label}>
+            <SettingRow
+              type="button"
+              key={setting.label}
+              disabled={
+                permissionStatuses[setting.permissionType] ===
+                DEVICE_PERMISSION_STATUS.CHECKING
+              }
+              onClick={() =>
+                void handlePermissionSettingClick(setting.permissionType)
+              }
+            >
               <SettingLabel>{setting.label}</SettingLabel>
-              <SettingState>{setting.state}</SettingState>
+              <SettingState>
+                {getSettingStateLabel(
+                  setting.permissionType,
+                  permissionStatuses[setting.permissionType],
+                )}
+              </SettingState>
               <ChevronIcon src={chevronRightIcon} alt="" aria-hidden="true" />
             </SettingRow>
           ))}
@@ -1349,6 +1457,11 @@ const SettingRow = styled.button`
   color: var(--Text-Primary);
   text-align: left;
   cursor: pointer;
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.65;
+  }
 
   &:last-child {
     border-bottom: 0;
