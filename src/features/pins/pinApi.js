@@ -204,16 +204,13 @@ export const getPinsByCountry = async ({
 }
 
 /**
- * 진행 중인 여행의 핀 목록.
+ * 3.1.1 진행 중인 여행 핀 목록. 마지막 페이지까지 이어 받는다.
  *
  * 명세 0-1 에 따르면 진행 중인 여행은 TRAVEL_SEGMENT 가 없고 `segment_id` 가
- * NULL 인 핀들의 묶음이다. 계정당 하나뿐이라 파라미터가 필요 없다.
- *
- * TODO: 대응하는 엔드포인트가 아직 없다(백엔드 문의 중). 4.5 는 segment_id 를
- * 요구해서 쓸 수 없다. 실제 API 로 붙기 전까지 mock 이 아닐 때는 빈 목록을
- * 돌려주고, 응답 형태는 4.5 와 같게 맞춰둔다.
+ * NULL 인 핀들의 묶음이다. 계정당 하나뿐이라 대상을 지정할 파라미터가 없다.
+ * 3.1 은 집계만 주므로 지도에 개별 핀을 찍으려면 이쪽이 필요하다.
  */
-export const getOngoingPins = async () => {
+export const getOngoingPins = async ({ limit = 20 } = {}) => {
   if (USE_MOCK) {
     return {
       pins: Object.values(mockPinStore.pins)
@@ -223,13 +220,26 @@ export const getOngoingPins = async () => {
           place_name: pin.place_name,
           latitude: pin.latitude,
           longitude: pin.longitude,
+          photo_count: mockPinStore.photos[pin.pin_id]?.length ?? 0,
           tagged_at: pin.tagged_at,
           included_in_segment: true,
         })),
     }
   }
 
-  return { pins: [] }
+  const { pins } = await fetchAllPages(
+    (cursor) =>
+      apiClient.get('/trips/current/pins', { params: { cursor, limit } }),
+    'pins',
+  )
+
+  /*
+   * 진행 중인 핀은 아직 구간에 속하지 않아 응답에 `included_in_segment` 가 없다.
+   * 지도는 4.5 와 같은 형태를 기대하고 이 값으로 거르므로 여기서 채워 준다.
+   */
+  return {
+    pins: pins.map((pin) => ({ ...pin, included_in_segment: true })),
+  }
 }
 
 /**
