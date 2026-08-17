@@ -959,19 +959,28 @@ const MapBootPlaceholder = styled.div`
   background: var(--Map-Base);
 `
 
+/* 여정 선택 버튼의 자리. 핀 추가 버튼이 같은 줄에 서도록 여기서 가져다 쓴다. */
+const TRIP_SELECTOR_TOP = 19
+const TRIP_SELECTOR_HEIGHT = 40
+
+/* 여정 이름이 잘리지 않도록 글에 맞춰 늘어난다. 위아래 여백은 그림(28)에
+   맞춰 최소로만 두고, 지나치게 긴 이름만 상한에서 말줄임으로 넘긴다.
+   왼쪽 여백은 그림이 동그라미라 위아래와 거의 같게 둬야 가운데로 보인다. */
 const TripSelector = styled.button`
   position: absolute;
   z-index: 34;
-  top: 58px;
+  /* 화면 위쪽 여백을 왼쪽과 같게 둔다. */
+  top: ${TRIP_SELECTOR_TOP}px;
   left: 19px;
-  width: 160px;
-  height: 48px;
-  padding: 10px 14px;
+  width: max-content;
+  max-width: 240px;
+  height: ${TRIP_SELECTOR_HEIGHT}px;
+  padding: 6px 14px 6px 7px;
   display: flex;
   align-items: center;
   gap: 10px;
   border: 0;
-  border-radius: 24px;
+  border-radius: 20px;
   background: var(--Surface-Base);
   box-shadow: var(--Effect-Card);
   color: var(--Text-Primary);
@@ -1000,8 +1009,6 @@ const Chevron = styled.img`
   margin-left: -5px;
 `
 
-/* 핀 시트가 올라오면 그 위로 함께 올라간다. 시트 위 여백(29)은 접힌 상태와 같다.
-   접힘: 시트 윗변 100 + 29 = 129 / 펼침: 시트 윗변 356 + 29 = 385 */
 /* 아이콘 파일(76)은 그림자가 번지는 자리까지 담고 있어 눈에 보이는 원(48)보다
    크다. 원의 가장자리를 여백에 맞추려면 그 차이만큼 밖으로 밀어야 한다.
    줄인 크기에 맞춰 그림자 여백도 같은 비율로 준다. */
@@ -1033,14 +1040,17 @@ const LocationButton = styled.button`
   }
 `
 
-/* 오른쪽 위 구석에 붙는다. 위·오른쪽 여백을 같은 값으로 둔다. */
+/* 여정 선택 버튼과 같은 줄이다. 높이가 서로 달라, 윗자리를 맞추는 대신
+   가운데를 맞춘다. 오른쪽 여백은 아래 내 위치 버튼과 같은 값으로 둔다. */
+const RECORD_BUTTON_SIZE = 48
+
 const RecordButton = styled.button`
   position: absolute;
-  top: ${MAP_BUTTON_INSET}px;
+  top: ${TRIP_SELECTOR_TOP + (TRIP_SELECTOR_HEIGHT - RECORD_BUTTON_SIZE) / 2}px;
   right: ${MAP_BUTTON_INSET}px;
   z-index: 9;
-  width: 48px;
-  height: 48px;
+  width: ${RECORD_BUTTON_SIZE}px;
+  height: ${RECORD_BUTTON_SIZE}px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1080,13 +1090,14 @@ const Scrim = styled.button`
   cursor: default;
 `
 
+/* 여정 선택 버튼(19 + 40) 아래 8px 에 붙는다. */
 const TripDropdown = styled.section`
   position: absolute;
   z-index: 33;
-  top: 114px;
+  top: 67px;
   right: 43px;
   left: 19px;
-  max-height: calc(100% - 142px);
+  max-height: calc(100% - 95px);
   padding: 20px 15px;
   overflow-y: auto;
   border-radius: 18px;
