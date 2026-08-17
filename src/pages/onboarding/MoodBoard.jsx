@@ -19,27 +19,83 @@ import {
   isRelearningFlow,
 } from '../../features/onboarding/onboardingFlow'
 import { MOODBOARD_STAGE } from '../../features/onboarding/onboardingProgressApi'
+import {
+  clearRelearningDraft,
+  readRelearningDraft,
+  updateRelearningDraft,
+} from '../../features/onboarding/relearningDraft'
 import useOnboardingStart from '../../features/onboarding/useOnboardingStart'
 
 const TOTAL_ROUND = MOODBOARD_PHOTO_ROUNDS.length
 const SELECT_LIMIT = 3
+const FIRST_MOODBOARD_ROUND_NO = MOODBOARD_PHOTO_ROUNDS[0].roundNo
+const PHOTO_SET_STORAGE_KEY = 'moodboard'
+const PREVIOUS_STAGE_LAST_ROUND = 5
+
+const normalizeMoodboardRound = (roundNo) => {
+  if (roundNo >= FIRST_MOODBOARD_ROUND_NO) {
+    return roundNo - FIRST_MOODBOARD_ROUND_NO + 1
+  }
+
+  return roundNo
+}
 
 const MoodBoard = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const isRelearning = isRelearningFlow(location.search)
+  const initialRound = location.state?.initialRound ?? 1
   const user = useAuthStore((state) => state.user)
   const setUser = useAuthStore((state) => state.setUser)
-  const [photoRounds] = useState(() =>
-    selectRandomPhotoSets(MOODBOARD_PHOTO_ROUNDS),
+  const [photoRounds, setPhotoRounds] = useState(() =>
+    selectRandomPhotoSets(MOODBOARD_PHOTO_ROUNDS, {
+      storageKey: PHOTO_SET_STORAGE_KEY,
+    }),
   )
+  const [answers, setAnswers] = useState(() => {
+    const draft = isRelearning ? readRelearningDraft() : {}
+
+    return (
+      location.state?.moodAnswers ??
+      draft.moodAnswers ??
+      Array.from({ length: TOTAL_ROUND }, () => [])
+    )
+  })
   const { isReady, round, setRound, syncAfterSave } = useOnboardingStart({
     stage: MOODBOARD_STAGE,
     isRelearning,
+    initialRound,
+    normalizeRound: normalizeMoodboardRound,
+    onProgressLoaded: (progress) => {
+      const selectionPhotos = progress.selection_photos ?? []
+
+      setPhotoRounds(
+        selectRandomPhotoSets(MOODBOARD_PHOTO_ROUNDS, {
+          storageKey: PHOTO_SET_STORAGE_KEY,
+          selectionPhotos,
+        }),
+      )
+      setAnswers(() => {
+        const nextAnswers = Array.from({ length: TOTAL_ROUND }, () => [])
+
+        selectionPhotos.forEach((selection) => {
+          if (selection.round_no < FIRST_MOODBOARD_ROUND_NO) return
+
+          const answerIndex = normalizeMoodboardRound(selection.round_no) - 1
+
+          if (
+            selection.status &&
+            answerIndex >= 0 &&
+            answerIndex < TOTAL_ROUND
+          ) {
+            nextAnswers[answerIndex].push(selection.photo_id)
+          }
+        })
+
+        return nextAnswers.map((answer) => [...new Set(answer)])
+      })
+    },
   })
-  const [answers, setAnswers] = useState(() =>
-    Array.from({ length: TOTAL_ROUND }, () => []),
-  )
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -64,6 +120,10 @@ const MoodBoard = () => {
         ? currentSelection.filter((item) => item !== photoId)
         : [...currentSelection, photoId]
 
+      if (isRelearning) {
+        updateRelearningDraft({ moodAnswers: nextAnswers })
+      }
+
       return nextAnswers
     })
     setErrorMessage('')
@@ -82,12 +142,18 @@ const MoodBoard = () => {
         selectedPhotoIds,
       })
 
+      if (!isLastRound) {
+        setRound((currentRound) => currentRound + 1)
+        return
+      }
+
       // 서버가 아직 이 단계면 그쪽이 알려주는 라운드에 머문다.
       if (await syncAfterSave()) return
 
       await markTasteProfileLearned()
 
       if (isRelearning) {
+        clearRelearningDraft()
         navigate('/mypage', {
           replace: true,
           state: { relearningCompleted: true },
@@ -114,6 +180,19 @@ const MoodBoard = () => {
   }
 
   const handlePrev = () => {
+    if (round === 1) {
+      navigate(
+        getOnboardingFlowPath('/onboarding/ab-preference', isRelearning),
+        {
+          state: {
+            initialRound: PREVIOUS_STAGE_LAST_ROUND,
+            abAnswers: readRelearningDraft().abAnswers,
+          },
+        },
+      )
+      return
+    }
+
     setRound((currentRound) => currentRound - 1)
     setErrorMessage('')
   }
@@ -127,6 +206,10 @@ const MoodBoard = () => {
           '/onboarding/ab-preference',
           isRelearning,
         )}
+        state={{
+          initialRound: PREVIOUS_STAGE_LAST_ROUND,
+          abAnswers: readRelearningDraft().abAnswers,
+        }}
       />
 
       <OnboardingWrapper>
@@ -182,7 +265,7 @@ const MoodBoard = () => {
             type="button"
             $variant="ghost"
             onClick={handlePrev}
-            disabled={round === 1 || isSubmitting}
+            disabled={isSubmitting}
           >
             이전으로
           </Button>

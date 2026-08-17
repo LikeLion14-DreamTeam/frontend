@@ -9,6 +9,7 @@ const Header = ({
   showBack = true,
   title,
   rightContent,
+  state,
   iconSrc = BackIcon,
   iconWidth = '9px',
   iconHeight = '16px',
@@ -30,6 +31,7 @@ const Header = ({
           $barHeight={barHeight}
           $topPadding={topPadding}
           to={to}
+          state={state}
           aria-label={ariaLabel}
         >
           <BackImage

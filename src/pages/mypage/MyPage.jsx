@@ -15,6 +15,7 @@ import {
   updateTasteProfileAxis,
 } from '../../features/onboarding/tasteProfileApi'
 import { getOnboardingFlowPath } from '../../features/onboarding/onboardingFlow'
+import { clearRelearningDraft } from '../../features/onboarding/relearningDraft'
 import {
   getProducts,
   unlinkProduct,
@@ -446,6 +447,7 @@ const MyPage = () => {
 
   const handleStartRelearning = () => {
     setIsRelearningConfirmOpen(false)
+    clearRelearningDraft()
 
     navigate(
       getOnboardingFlowPath('/onboarding/basic-question', true),

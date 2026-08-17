@@ -15,9 +15,15 @@ import {
   isRelearningFlow,
 } from '../../features/onboarding/onboardingFlow'
 import { AB_SELECTION_STAGE } from '../../features/onboarding/onboardingProgressApi'
+import {
+  readRelearningDraft,
+  updateRelearningDraft,
+} from '../../features/onboarding/relearningDraft'
 import useOnboardingStart from '../../features/onboarding/useOnboardingStart'
 
 const TOTAL_ROUND = AB_PHOTO_ROUNDS.length
+const PHOTO_SET_STORAGE_KEY = 'ab-preference'
+const PREVIOUS_STAGE_LAST_ROUND = 5
 
 const question = {
   text: 'A/B 취향 파악',
@@ -28,16 +34,45 @@ const AbPreference = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const isRelearning = isRelearningFlow(location.search)
+  const initialRound = location.state?.initialRound ?? 1
   const [photoRounds] = useState(() =>
-    selectRandomPhotoSets(AB_PHOTO_ROUNDS),
+    selectRandomPhotoSets(AB_PHOTO_ROUNDS, {
+      storageKey: PHOTO_SET_STORAGE_KEY,
+    }),
   )
+  const [answers, setAnswers] = useState(() => {
+    const draft = isRelearning ? readRelearningDraft() : {}
+
+    return (
+      location.state?.abAnswers ??
+      draft.abAnswers ??
+      Array(TOTAL_ROUND).fill(null)
+    )
+  })
   const { isReady, round, setRound, syncAfterSave } = useOnboardingStart({
     stage: AB_SELECTION_STAGE,
     isRelearning,
+    initialRound,
+    onProgressLoaded: (progress) => {
+      setAnswers((currentAnswers) => {
+        const nextAnswers = [...currentAnswers]
+
+        progress.selection_photos?.forEach((selection) => {
+          const answerIndex = selection.round_no - 1
+
+          if (
+            selection.status &&
+            answerIndex >= 0 &&
+            answerIndex < TOTAL_ROUND
+          ) {
+            nextAnswers[answerIndex] = selection.photo_id
+          }
+        })
+
+        return nextAnswers
+      })
+    },
   })
-  const [answers, setAnswers] = useState(() =>
-    Array(TOTAL_ROUND).fill(null),
-  )
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -51,6 +86,11 @@ const AbPreference = () => {
     setAnswers((currentAnswers) => {
       const nextAnswers = [...currentAnswers]
       nextAnswers[round - 1] = photoId
+
+      if (isRelearning) {
+        updateRelearningDraft({ abAnswers: nextAnswers })
+      }
+
       return nextAnswers
     })
     setErrorMessage('')
@@ -69,10 +109,18 @@ const AbPreference = () => {
         selectedPhotoIds: [selectedPhotoId],
       })
 
+      if (!isLastRound) {
+        setRound((currentRound) => currentRound + 1)
+        return
+      }
+
       // 서버가 아직 이 단계면 그쪽이 알려주는 라운드에 머문다.
       if (await syncAfterSave()) return
 
-      navigate(getOnboardingFlowPath('/onboarding/moodboard', isRelearning))
+      navigate(
+        getOnboardingFlowPath('/onboarding/moodboard', isRelearning),
+        isRelearning ? { state: { abAnswers: answers } } : undefined,
+      )
     } catch (error) {
       setErrorMessage(
         error.message ??
@@ -84,6 +132,19 @@ const AbPreference = () => {
   }
 
   const handlePrev = () => {
+    if (round === 1) {
+      navigate(
+        getOnboardingFlowPath('/onboarding/basic-question', isRelearning),
+        {
+          state: {
+            initialRound: PREVIOUS_STAGE_LAST_ROUND,
+            basicAnswers: readRelearningDraft().basicAnswers,
+          },
+        },
+      )
+      return
+    }
+
     setRound((currentRound) => currentRound - 1)
     setErrorMessage('')
   }
@@ -97,6 +158,10 @@ const AbPreference = () => {
           '/onboarding/basic-question',
           isRelearning,
         )}
+        state={{
+          initialRound: PREVIOUS_STAGE_LAST_ROUND,
+          basicAnswers: readRelearningDraft().basicAnswers,
+        }}
       />
 
       <OnboardingWrapper>
@@ -141,7 +206,7 @@ const AbPreference = () => {
             type="button"
             $variant="ghost"
             onClick={handlePrev}
-            disabled={round === 1 || isSubmitting}
+            disabled={isSubmitting}
           >
             이전으로
           </Button>

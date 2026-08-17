@@ -11,6 +11,10 @@ import {
   isRelearningFlow,
 } from '../../features/onboarding/onboardingFlow'
 import { BASIC_QUESTION_STAGE } from '../../features/onboarding/onboardingProgressApi'
+import {
+  readRelearningDraft,
+  updateRelearningDraft,
+} from '../../features/onboarding/relearningDraft'
 import useOnboardingStart from '../../features/onboarding/useOnboardingStart'
 
 const questions = [
@@ -47,13 +51,36 @@ const BasicQuestion = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const isRelearning = isRelearningFlow(location.search)
+  const initialRound = location.state?.initialRound ?? 1
+  const [answers, setAnswers] = useState(() => {
+    const draft = isRelearning ? readRelearningDraft() : {}
+
+    return (
+      location.state?.basicAnswers ??
+      draft.basicAnswers ??
+      Array(TOTAL_ROUND).fill(null)
+    )
+  })
   const { isReady, round, setRound, syncAfterSave } = useOnboardingStart({
     stage: BASIC_QUESTION_STAGE,
     isRelearning,
+    initialRound,
+    onProgressLoaded: (progress) => {
+      setAnswers((currentAnswers) => {
+        const nextAnswers = [...currentAnswers]
+
+        progress.basic_question_responses?.forEach((response) => {
+          const answerIndex = response.round_no - 1
+
+          if (answerIndex >= 0 && answerIndex < TOTAL_ROUND) {
+            nextAnswers[answerIndex] = response.response
+          }
+        })
+
+        return nextAnswers
+      })
+    },
   })
-  const [answers, setAnswers] = useState(() =>
-    Array(TOTAL_ROUND).fill(null),
-  )
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -67,6 +94,11 @@ const BasicQuestion = () => {
     setAnswers((currentAnswers) => {
       const nextAnswers = [...currentAnswers]
       nextAnswers[round - 1] = option
+
+      if (isRelearning) {
+        updateRelearningDraft({ basicAnswers: nextAnswers })
+      }
+
       return nextAnswers
     })
     setErrorMessage('')
@@ -91,11 +123,17 @@ const BasicQuestion = () => {
         replaceExisting: isRelearning,
       })
 
+      if (!isLastRound) {
+        setRound((currentRound) => currentRound + 1)
+        return
+      }
+
       // 서버가 아직 이 단계면 그쪽이 알려주는 라운드에 머문다.
       if (await syncAfterSave()) return
 
       navigate(
         getOnboardingFlowPath('/onboarding/ab-preference', isRelearning),
+        isRelearning ? { state: { basicAnswers: answers } } : undefined,
       )
     } catch (error) {
       setErrorMessage(
