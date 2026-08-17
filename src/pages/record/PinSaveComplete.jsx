@@ -558,8 +558,15 @@ const PhotoCopy = styled.div`
   color: var(--Text-Inverse);
 `
 
+/*
+ * 18px 이면 흔한 길이의 도로명주소도 두 줄로 넘어간다. 15px 로 낮춰 대부분
+ * 한 줄에 담기게 하고, 그래도 넘치는 긴 주소는 말줄임으로 한 줄을 지킨다.
+ */
 const PhotoLocation = styled.h2`
-  font: var(--text-ui-h3);
+  overflow: hidden;
+  font: var(--text-ui-button);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `
 
 const PhotoTime = styled.p`
