@@ -50,6 +50,7 @@ const PhotobookCover = ({
           key={`${coverUrl}-${retryCount}`}
           src={coverUrl}
           alt={alt}
+          crossOrigin="anonymous"
           onError={retryCoverImage}
         />
       ) : null}

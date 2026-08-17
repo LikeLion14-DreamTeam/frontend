@@ -29,7 +29,7 @@ const PhotoPreviewOverlay = ({
       </PreviewClose>
 
       <PreviewStage>
-        <PreviewPhoto src={photo.url} alt="" />
+        <PreviewPhoto src={photo.url} alt="" crossOrigin="anonymous" />
 
         {index > 0 && (
           <PreviewNav

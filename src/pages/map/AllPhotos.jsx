@@ -316,6 +316,7 @@ const AllPhotos = () => {
                     }
                     src={photo.file_path}
                     alt={`${index + 1}번째 사진`}
+                    crossOrigin="anonymous"
                     aria-posinset={index + 1}
                     aria-setsize={group.photos.length}
                   />

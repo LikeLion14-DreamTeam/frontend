@@ -66,6 +66,7 @@ const PhotobookPinBlock = ({
                   $index={index}
                   src={photo.url}
                   alt={photo.alt}
+                  crossOrigin="anonymous"
                   loading="lazy"
                 />
               ) : (

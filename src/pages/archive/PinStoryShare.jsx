@@ -425,7 +425,7 @@ const PinStoryShare = () => {
       <PreviewStage>
         <ArrowButton type="button" $side="left" disabled={!canMovePrevious} onClick={() => moveTemplate(-1)} aria-label="이전 템플릿"><img src={arrowIcon} alt="" /></ArrowButton>
         <PreviewFrame $loading={isRendering}>
-          {previewUrl ? <PreviewImage src={previewUrl} alt={`${selectedTemplate.name} 스토리 미리보기`} /> : <PreviewState>{errorMessage || '불러오는 중...'}</PreviewState>}
+          {previewUrl ? <PreviewImage src={previewUrl} alt={`${selectedTemplate.name} 스토리 미리보기`} crossOrigin="anonymous" /> : <PreviewState>{errorMessage || '불러오는 중...'}</PreviewState>}
         </PreviewFrame>
         <ArrowButton type="button" $side="right" disabled={!canMoveNext} onClick={() => moveTemplate(1)} aria-label="다음 템플릿"><img src={arrowIcon} alt="" /></ArrowButton>
         <canvas ref={canvasRef} hidden />
@@ -451,7 +451,7 @@ const PinStoryShare = () => {
                   onClick={() => selectTemplate(template)}
                   aria-label={`${template.name} 템플릿${disabled ? `, 사진 ${template.count}장 필요` : ''}`}
                 >
-                  {thumbnails[template.id] ? <Thumbnail src={thumbnails[template.id]} alt="" /> : <ThumbnailSkeleton />}
+                  {thumbnails[template.id] ? <Thumbnail src={thumbnails[template.id]} alt="" crossOrigin="anonymous" /> : <ThumbnailSkeleton />}
                   {disabled ? <DisabledOverlay /> : null}
                 </TemplateButton>
               )

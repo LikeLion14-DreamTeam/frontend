@@ -871,7 +871,7 @@ const MapPage = () => {
             <>
                 <PinSummary>
                 <PinPhoto>
-                  {coverPhoto && <PinPhotoImage src={coverPhoto.file_path} alt="" />}
+                  {coverPhoto && <PinPhotoImage src={coverPhoto.file_path} alt="" crossOrigin="anonymous" />}
                 </PinPhoto>
                 <PinText>
                   <PinTitle>
