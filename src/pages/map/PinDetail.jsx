@@ -137,6 +137,11 @@ const PinDetail = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
 
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [nameDraft, setNameDraft] = useState('')
+  const [isSavingName, setIsSavingName] = useState(false)
+  const [nameError, setNameError] = useState('')
+
   const [isEditingNote, setIsEditingNote] = useState(false)
   const [noteDraft, setNoteDraft] = useState('')
   const [isSavingNote, setIsSavingNote] = useState(false)
@@ -275,6 +280,33 @@ const PinDetail = () => {
     )
   }
 
+  const startEditingName = () => {
+    setNameDraft(pin.place_name ?? '')
+    setNameError('')
+    setIsEditingName(true)
+  }
+
+  /* 5.2 는 장소명과 텍스트 기록을 함께 받는다. 한쪽만 고칠 때도 다른 쪽을
+     그대로 실어 보내야 지워지지 않는다. */
+  const saveName = async () => {
+    setIsSavingName(true)
+    setNameError('')
+
+    try {
+      const updated = await updatePin(pinID, {
+        placeName: nameDraft,
+        textNote: pin.text_note ?? '',
+      })
+
+      setPin((prev) => ({ ...prev, place_name: updated.place_name }))
+      setIsEditingName(false)
+    } catch (error) {
+      setNameError(error.message)
+    } finally {
+      setIsSavingName(false)
+    }
+  }
+
   const startEditingNote = () => {
     setNoteDraft(pin.text_note ?? '')
     setNoteError('')
@@ -286,9 +318,8 @@ const PinDetail = () => {
     setNoteError('')
 
     try {
-      // 5.2 는 장소명과 텍스트 기록을 함께 받는다. 장소명은 편집 UI 가 없어 그대로 보낸다.
       const updated = await updatePin(pinID, {
-        placeName: pin.place_name,
+        placeName: pin.place_name ?? '',
         textNote: noteDraft,
       })
 
@@ -445,7 +476,44 @@ const PinDetail = () => {
         <DetailContent>
           <PinIntro>
             <HeadingGroup>
-              <PinTitle>{title}</PinTitle>
+              {isEditingName ? (
+                <NoteEditor>
+                  <NameInput
+                    value={nameDraft}
+                    onChange={(event) => setNameDraft(event.target.value)}
+                    aria-label="장소 이름"
+                    placeholder="이 장소의 이름"
+                  />
+                  {nameError && <NoteError role="alert">{nameError}</NoteError>}
+                  <NoteActions>
+                    <NoteCancel
+                      type="button"
+                      onClick={() => setIsEditingName(false)}
+                      disabled={isSavingName}
+                    >
+                      취소
+                    </NoteCancel>
+                    <NoteSave
+                      type="button"
+                      onClick={saveName}
+                      disabled={isSavingName}
+                    >
+                      {isSavingName ? '저장 중...' : '저장'}
+                    </NoteSave>
+                  </NoteActions>
+                </NoteEditor>
+              ) : (
+                <TitleRow>
+                  <PinTitle>{title}</PinTitle>
+                  <EditNameButton
+                    type="button"
+                    aria-label="장소 이름 수정"
+                    onClick={startEditingName}
+                  >
+                    <img src={noteEditIcon} alt="" />
+                  </EditNameButton>
+                </TitleRow>
+              )}
               <PinMeta>
                 {pin.address}
                 {pin.address && pin.tagged_at && (
@@ -881,7 +949,14 @@ const HeadingGroup = styled.div`
   gap: 8px;
 `
 
+const TitleRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+`
+
 const PinTitle = styled.h1`
+  min-width: 0;
   color: var(--Text-Primary);
   font: var(--text-ui-h2);
   letter-spacing: -0.22px;
@@ -955,6 +1030,12 @@ const EditNoteButton = styled.button`
   }
 `
 
+/* 기록 수정 버튼과 같은 그림이다. 제목 옆에 서므로 여백만 다르게 준다. */
+const EditNameButton = styled(EditNoteButton)`
+  align-self: center;
+  margin: 0;
+`
+
 const NoteEditor = styled.div`
   display: flex;
   flex-direction: column;
@@ -970,6 +1051,22 @@ const NoteInput = styled.textarea`
   background: var(--Surface-Base);
   font: var(--text-ui-body-m);
   resize: none;
+  outline: none;
+
+  &:focus {
+    border-color: var(--Primary-Cognac);
+  }
+`
+
+/* 한 줄이라 textarea 대신 input 이다. 생김새는 텍스트 기록과 같게 둔다. */
+const NameInput = styled.input`
+  width: 100%;
+  border: 1px solid var(--Border-Default);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: var(--Text-Primary);
+  background: var(--Surface-Base);
+  font: var(--text-ui-body-m);
   outline: none;
 
   &:focus {

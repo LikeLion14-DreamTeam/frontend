@@ -99,8 +99,28 @@ const FocusSelectedPin = ({ latitude, longitude }) => {
   const map = useMap()
   const core = useMapsLibrary('core')
 
+  /*
+   * 지도가 자리를 잡기 전에는 투영(projection)이 없다. 그때 옮기면 핀을 아래로
+   * 내리는 계산을 못 해 핀이 화면 한가운데에 서 버린다. 핀 상세를 보다 뒤로
+   * 왔을 때처럼 지도와 선택이 같이 살아나는 경우가 그렇다.
+   */
+  const [isProjectionReady, setIsProjectionReady] = useState(false)
+
   useEffect(() => {
-    if (!map) return undefined
+    if (!map || isProjectionReady) return undefined
+
+    if (map.getProjection()) {
+      setIsProjectionReady(true)
+      return undefined
+    }
+
+    const listener = map.addListener('idle', () => setIsProjectionReady(true))
+
+    return () => listener.remove()
+  }, [isProjectionReady, map])
+
+  useEffect(() => {
+    if (!map || !core || !isProjectionReady) return undefined
 
     const startCenter = map.getCenter()
     const startZoom = map.getZoom()
@@ -163,7 +183,7 @@ const FocusSelectedPin = ({ latitude, longitude }) => {
 
     // 다른 핀을 고르면 진행 중이던 이동을 멈추고 새로 시작한다.
     return () => cancelAnimationFrame(frame)
-  }, [core, latitude, longitude, map])
+  }, [core, isProjectionReady, latitude, longitude, map])
 
   return null
 }
