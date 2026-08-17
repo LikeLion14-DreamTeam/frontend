@@ -13,10 +13,23 @@ const USE_MOCK = import.meta.env.VITE_USE_MOCK_API === 'true'
  * 사진과 음성이 함께 쓰는 공통 엔드포인트라 features 아래가 아니라 여기에 둔다.
  */
 
-/** mock 전용. 업로드한 파일의 미리보기 URL 을 file_id 로 찾을 수 있게 들고 있다. */
+/** mock/데모 전용. 업로드한 파일의 미리보기 URL 을 file_id 로 찾을 수 있게 들고 있다. */
 const mockUploadedUrls = new Map()
 
 export const getMockUploadedUrl = (fileId) => mockUploadedUrls.get(fileId)
+
+const createLocalPreviewUrl = (file) =>
+  new Promise((resolve) => {
+    if (typeof FileReader === 'undefined') {
+      resolve(URL.createObjectURL(file))
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = () => resolve(URL.createObjectURL(file))
+    reader.readAsDataURL(file)
+  })
 
 /** 1단계. 사전 서명 URL 발급 */
 export const createUpload = async ({ fileType, contentType }) => {
@@ -45,7 +58,7 @@ export const createUpload = async ({ fileType, contentType }) => {
 export const uploadFile = async ({ uploadUrl, fileId, file }) => {
   if (USE_MOCK) {
     // 실제로 올리지 않고 화면에 보여줄 미리보기 주소만 기억해둔다.
-    mockUploadedUrls.set(fileId, URL.createObjectURL(file))
+    mockUploadedUrls.set(fileId, await createLocalPreviewUrl(file))
     return null
   }
 
@@ -58,6 +71,10 @@ export const uploadFile = async ({ uploadUrl, fileId, file }) => {
   if (!response.ok) {
     throw new Error('파일을 업로드하지 못했습니다.')
   }
+
+  // 데모 데이터는 서버에 없는 핀이라, 실서버 업로드 뒤에도 화면 표시용 URL을
+  // 프론트 메모리에 보관해 둔다.
+  mockUploadedUrls.set(fileId, await createLocalPreviewUrl(file))
 
   return null
 }

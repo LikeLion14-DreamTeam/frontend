@@ -5,6 +5,15 @@ import {
   deleteMockPhotobookBySegment,
   updateMockPhotobookNameBySegment,
 } from '../photobooks/photobookMock'
+import {
+  deleteMcmDemoTrip,
+  getMcmDemoCountryStamps,
+  getMcmDemoTripList,
+  getMcmDemoTripPins,
+  getMcmDemoTripSummary,
+  isMcmDemoSegmentId,
+  updateMcmDemoTrip,
+} from '../demo/mcmDemoData'
 import { mockPinStore } from '../pins/pinMock'
 import {
   getMockPhotoCount,
@@ -27,6 +36,29 @@ const mockNotFound = () =>
     status: 404,
     code: 'NOT_FOUND',
     message: '여행 구간을 찾을 수 없습니다.',
+  })
+
+const prependDemoItems = (items, demoItems, key) => {
+  const demoKeys = new Set(demoItems.map((item) => String(item[key])))
+
+  return [
+    ...demoItems,
+    ...(items ?? []).filter((item) => !demoKeys.has(String(item?.[key]))),
+  ]
+}
+
+const sortCountryStamps = (stamps) =>
+  [...stamps].sort((left, right) => {
+    const leftTime = left?.created_at
+      ? new Date(left.created_at).getTime()
+      : null
+    const rightTime = right?.created_at
+      ? new Date(right.created_at).getTime()
+      : null
+
+    if (leftTime == null || Number.isNaN(leftTime)) return 1
+    if (rightTime == null || Number.isNaN(rightTime)) return -1
+    return leftTime - rightTime
   })
 
 const getMockStampImageId = (countryCode) => {
@@ -314,13 +346,13 @@ export const endCurrentTrip = async ({ name, endAt } = {}) => {
 export const getCountryStamps = async () => {
   if (USE_MOCK) {
     ensureMockCountryStamps()
-    const stamps = Object.values(mockPinStore.countryStamps)
-      .sort(
-        (left, right) =>
-          new Date(left.created_at) - new Date(right.created_at) ||
-          left.country_name.localeCompare(right.country_name, 'ko'),
-      )
-      .map((stamp) => ({ ...stamp, cities: [...(stamp.cities ?? [])] }))
+    const mockStamps = Object.values(mockPinStore.countryStamps).map((stamp) => ({
+      ...stamp,
+      cities: [...(stamp.cities ?? [])],
+    }))
+    const stamps = sortCountryStamps(
+      prependDemoItems(mockStamps, getMcmDemoCountryStamps(), 'country_code'),
+    )
 
     // 새 도장 연출은 생성 직후의 첫 여권 조회에서만 쓴다.
     Object.values(mockPinStore.countryStamps).forEach((stamp) => {
@@ -338,16 +370,9 @@ export const getCountryStamps = async () => {
 
   return {
     ...response,
-    stamps: [...response.stamps].sort((left, right) => {
-      const leftTime = left?.created_at ? new Date(left.created_at).getTime() : null
-      const rightTime = right?.created_at
-        ? new Date(right.created_at).getTime()
-        : null
-
-      if (leftTime == null || Number.isNaN(leftTime)) return 1
-      if (rightTime == null || Number.isNaN(rightTime)) return -1
-      return leftTime - rightTime
-    }),
+    stamps: sortCountryStamps(
+      prependDemoItems(response.stamps, getMcmDemoCountryStamps(), 'country_code'),
+    ),
   }
 }
 
@@ -355,27 +380,40 @@ export const getCountryStamps = async () => {
 export const getTrips = async ({ limit = 20 } = {}) => {
   if (USE_MOCK) {
     return {
-      trips: Object.values(mockTripStore.trips).map(
-        ({ segment_id, name, start_at, end_at, countries }) => ({
-          segment_id,
-          name,
-          start_at,
-          end_at,
-          countries,
-        }),
+      trips: prependDemoItems(
+        Object.values(mockTripStore.trips).map(
+          ({ segment_id, name, start_at, end_at, countries }) => ({
+            segment_id,
+            name,
+            start_at,
+            end_at,
+            countries,
+          }),
+        ),
+        getMcmDemoTripList(),
+        'segment_id',
       ),
       next_cursor: null,
     }
   }
 
-  return fetchAllPages(
+  const response = await fetchAllPages(
     (cursor) => apiClient.get('/trips', { params: { cursor, limit } }),
     'trips',
   )
+
+  return {
+    ...response,
+    trips: prependDemoItems(response.trips, getMcmDemoTripList(), 'segment_id'),
+  }
 }
 
 /** 4.2 여행 구간 상세(요약) 조회 */
 export const getTrip = async (segmentId) => {
+  const demoTrip = getMcmDemoTripSummary(segmentId)
+  if (demoTrip) return demoTrip
+  if (isMcmDemoSegmentId(segmentId)) throw mockNotFound()
+
   if (USE_MOCK) {
     return buildMockTripSummary(segmentId)
   }
@@ -393,6 +431,18 @@ export const updateTrip = async (
   segmentId,
   { name, startAt, endAt, pinInclusions },
 ) => {
+  if (isMcmDemoSegmentId(segmentId)) {
+    const updated = updateMcmDemoTrip(segmentId, {
+      name,
+      startAt,
+      endAt,
+      pinInclusions,
+    })
+
+    if (!updated) throw mockNotFound()
+    return updated
+  }
+
   if (USE_MOCK) {
     const trip = mockTripStore.trips[segmentId]
     if (!trip) throw mockNotFound()
@@ -427,6 +477,11 @@ export const updateTrip = async (
  * 204 No Content 라 반환값이 없다.
  */
 export const deleteTrip = async (segmentId) => {
+  if (isMcmDemoSegmentId(segmentId)) {
+    if (!deleteMcmDemoTrip(segmentId)) throw mockNotFound()
+    return null
+  }
+
   if (USE_MOCK) {
     if (!mockTripStore.trips[segmentId]) throw mockNotFound()
 
@@ -454,6 +509,15 @@ export const deleteTrip = async (segmentId) => {
  * 제외된 핀도 included_in_segment: false 로 함께 온다.
  */
 export const getTripPins = async (segmentId, { limit = 20 } = {}) => {
+  const demoPins = getMcmDemoTripPins(segmentId)
+  if (demoPins) {
+    return {
+      pins: demoPins.slice(0, limit),
+      next_cursor: null,
+    }
+  }
+  if (isMcmDemoSegmentId(segmentId)) throw mockNotFound()
+
   if (USE_MOCK) {
     if (!mockTripStore.trips[segmentId]) throw mockNotFound()
 
