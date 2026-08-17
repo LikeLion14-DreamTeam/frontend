@@ -4,6 +4,7 @@ import barcelonaCover from '../../assets/images/onboarding-selection/ab-4-a.webp
 import streetPhoto from '../../assets/images/onboarding-selection/mood-2-01.webp'
 import tokyoCover from '../../assets/images/onboarding-selection/mood-2-08.webp'
 import { ApiError } from '../../api/errors'
+import { mockTripStore } from '../trips/tripMock'
 
 const MOCK_PHOTOBOOKS = [
   {
@@ -301,7 +302,16 @@ export const getMockPhotobook = (photobookId) => {
   return cloneDetail({ ...summary, ...detail })
 }
 
-/** API 명세 6.3과 동일하게 포토북 이름만 수정한다. */
+export const updateMockPhotobookNameBySegment = (segmentId, name) => {
+  const id = Number(segmentId)
+  const summary = MOCK_PHOTOBOOKS.find(
+    (photobook) => photobook.segment_id === id,
+  )
+
+  if (summary) summary.name = name
+}
+
+/** API 명세 6.3과 동일하게 포토북 이름을 수정하고 연결된 구간명도 맞춘다. */
 export const updateMockPhotobookName = (photobookId, name) => {
   const id = Number(photobookId)
   const summary = MOCK_PHOTOBOOKS.find(
@@ -327,6 +337,10 @@ export const updateMockPhotobookName = (photobookId, name) => {
   }
 
   summary.name = nextName
+  if (summary.segment_id) {
+    const linkedTrip = mockTripStore.trips[summary.segment_id]
+    if (linkedTrip) linkedTrip.name = nextName
+  }
 
   return {
     photobook_id: id,

@@ -10,6 +10,10 @@ import deleteWarningIcon from '../../assets/icons/delete-warning.svg'
 import editBackIcon from '../../assets/icons/trip-edit-back.svg'
 import selectChevronIcon from '../../assets/icons/trip-select-chevron.svg'
 import {
+  getPhotobook,
+  updatePhotobookName,
+} from '../../features/photobooks/photobookApi'
+import {
   deleteTrip,
   getTrip,
   getTripPins,
@@ -131,16 +135,19 @@ const TripSegmentEdit = () => {
       setErrorMessage('')
 
       try {
-        const [tripData, pinData] = await Promise.all([
+        const [tripData, pinData, photobookData] = await Promise.all([
           getTrip(segmentId),
           getTripPins(segmentId),
+          photobookId ? getPhotobook(photobookId).catch(() => null) : null,
         ])
 
         if (ignore) return
 
+        const displayName = photobookData?.name?.trim() || tripData.name
+
         setTrip(tripData)
         setPins(pinData.pins)
-        setName(tripData.name)
+        setName(displayName)
         setStartDate(toDateInputValue(tripData.start_at))
         setEndDate(toDateInputValue(tripData.end_at))
         setIncludedIds(
@@ -161,7 +168,7 @@ const TripSegmentEdit = () => {
     return () => {
       ignore = true
     }
-  }, [segmentId])
+  }, [photobookId, segmentId])
 
   const includedSet = useMemo(() => new Set(includedIds), [includedIds])
 
@@ -248,15 +255,18 @@ const TripSegmentEdit = () => {
     setErrorMessage('')
 
     try {
-      await updateTrip(segmentId, {
-        name,
-        startAt: toIsoWithOriginalTime(startDate, trip.start_at),
-        endAt: toIsoWithOriginalTime(endDate, trip.end_at),
-        pinInclusions: pins.map((pin) => ({
-          pin_id: pin.pin_id,
-          included_in_segment: includedSet.has(pin.pin_id),
-        })),
-      })
+      await Promise.all([
+        updateTrip(segmentId, {
+          name,
+          startAt: toIsoWithOriginalTime(startDate, trip.start_at),
+          endAt: toIsoWithOriginalTime(endDate, trip.end_at),
+          pinInclusions: pins.map((pin) => ({
+            pin_id: pin.pin_id,
+            included_in_segment: includedSet.has(pin.pin_id),
+          })),
+        }),
+        photobookId ? updatePhotobookName(photobookId, name) : null,
+      ])
 
       navigate(managementTo)
     } catch (error) {
