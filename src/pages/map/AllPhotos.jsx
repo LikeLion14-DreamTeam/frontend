@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import styled from 'styled-components'
+import PhotoPreviewOverlay from '../../components/common/PhotoPreviewOverlay'
 import Tile from '../../components/common/Tile'
 import backIcon from '../../assets/icons/Back.svg'
 import {
@@ -48,6 +49,8 @@ const AllPhotos = () => {
   const [addResult, setAddResult] = useState(null)
   const [addError, setAddError] = useState('')
 
+  /** 크게 보고 있는 사진의 자리. 없으면 -1 */
+  const [previewIndex, setPreviewIndex] = useState(-1)
   const [isSelectMode, setIsSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState([])
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
@@ -244,12 +247,12 @@ const AllPhotos = () => {
               {photos.map((photo, index) => (
                 <PhotoTile
                   key={photo.photo_id}
-                  interactive={isSelectMode}
+                  interactive
                   selected={selectedIds.includes(photo.photo_id)}
                   onClick={
                     isSelectMode
                       ? () => toggleSelected(photo.photo_id)
-                      : undefined
+                      : () => setPreviewIndex(index)
                   }
                   src={photo.file_path}
                   alt={`${index + 1}번째 사진`}
@@ -291,6 +294,19 @@ const AllPhotos = () => {
             </DeleteButton>
           )}
         </SelectionBar>
+      )}
+
+      {/* 선택 모드에서는 고르는 게 우선이라 크게 보기를 띄우지 않는다. */}
+      {!isSelectMode && previewIndex >= 0 && (
+        <PhotoPreviewOverlay
+          photos={photos.map((photo) => ({
+            id: photo.photo_id,
+            url: photo.file_path,
+          }))}
+          index={previewIndex}
+          onIndexChange={setPreviewIndex}
+          onClose={() => setPreviewIndex(-1)}
+        />
       )}
     </Page>
   )
