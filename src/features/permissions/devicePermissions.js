@@ -159,3 +159,30 @@ export const requestDevicePermission = async (
 
   return getMediaPermission(permissionType, navigatorObject)
 }
+
+/**
+ * 이 기기에서 위치 권한을 받은 적이 있는지 남겨둔다.
+ *
+ * Safari 는 Permissions API 로 위치 상태를 알려주지 않아 조회가 늘 미결정으로
+ * 나온다. 그때 이 기록이 없으면 이미 허용한 사용자도 매번 권한 화면으로
+ * 되돌아간다. 권한은 기기마다 다르므로 계정이 아니라 기기에 남긴다.
+ *
+ * 브라우저가 상태를 알려주는 경우(크롬 등)에는 이 값을 보지 않는다.
+ */
+const LOCATION_GRANTED_KEY = 'orte_location_granted'
+
+export const rememberLocationGranted = () => {
+  try {
+    globalThis.localStorage?.setItem(LOCATION_GRANTED_KEY, 'true')
+  } catch {
+    // 저장이 막힌 환경(시크릿 모드 등)에서는 기억하지 않는다.
+  }
+}
+
+export const hasRememberedLocationGrant = () => {
+  try {
+    return globalThis.localStorage?.getItem(LOCATION_GRANTED_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
