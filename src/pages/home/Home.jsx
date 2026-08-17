@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import ConfirmationModal from '../../components/common/ConfirmationModal'
 import NavBar from '../../components/layout/NavBar'
+import useSwipeNavigation from '../../hooks/useSwipeNavigation'
 import {
   endCurrentTrip,
   getCountryStamps,
@@ -70,42 +71,6 @@ const recordPassportEvent = (name, payload = {}) => {
 const STAMPS_PER_SIDE = 4
 const STAMPS_PER_SPREAD = STAMPS_PER_SIDE * 2
 
-/** 이만큼 가로로 움직여야 넘긴 것으로 본다. */
-const SWIPE_THRESHOLD = 40
-
-/**
- * 좌우 스와이프 핸들러를 만든다. 여정 카드와 여권이 같은 방식으로 넘어간다.
- *
- * @param startRef 터치 시작점을 담아둘 ref
- * @param onMove 넘길 방향(-1 이전 / 1 다음)을 받는 콜백
- */
-const createSwipeHandlers = (startRef, onMove) => ({
-  onTouchStart: (event) => {
-    const [touch] = event.touches
-    startRef.current = { x: touch.clientX, y: touch.clientY }
-  },
-
-  onTouchEnd: (event) => {
-    const start = startRef.current
-    if (!start) return
-    startRef.current = null
-
-    const [touch] = event.changedTouches
-    const movedX = touch.clientX - start.x
-    const movedY = touch.clientY - start.y
-
-    // 세로로 더 많이 움직였으면 페이지를 스크롤한 것이지 넘긴 게 아니다.
-    if (Math.abs(movedX) < SWIPE_THRESHOLD) return
-    if (Math.abs(movedX) <= Math.abs(movedY)) return
-
-    onMove(movedX < 0 ? 1 : -1)
-  },
-
-  onTouchCancel: () => {
-    startRef.current = null
-  },
-})
-
 /** 진행 중인 여정 영역에서 좌우로 넘길 수 있는 카드 */
 const JOURNEY_CARD = 'journey'
 const LAST_TAGGED_CARD = 'lastTagged'
@@ -164,17 +129,13 @@ const Home = () => {
   const [tripError, setTripError] = useState('')
   const [stamps, setStamps] = useState([])
   const [isStampsLoading, setIsStampsLoading] = useState(true)
-  const [pageIndex, setPageIndex] = useState(0)
   const [isEditingName, setIsEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
   const [isSavingName, setIsSavingName] = useState(false)
   const [nameError, setNameError] = useState('')
-  const [journeyIndex, setJourneyIndex] = useState(0)
   const [isEndingTrip, setIsEndingTrip] = useState(false)
   const [isConfirmingEnd, setIsConfirmingEnd] = useState(false)
   const [endError, setEndError] = useState('')
-  const passportSwipeStart = useRef(null)
-  const journeySwipeStart = useRef(null)
 
   useEffect(() => {
     let ignore = false
@@ -232,6 +193,14 @@ const Home = () => {
     0,
   )
   const passportPages = [PASSPORT_COVER, ...stampSpreads]
+
+  // 여권 면과 여정 카드는 같은 방식으로 좌우로 넘긴다.
+  const {
+    index: pageIndex,
+    setIndex: setPageIndex,
+    handlers: passportSwipe,
+  } = useSwipeNavigation(passportPages.length)
+
   const isCoverPage = pageIndex === 0
   // 표지가 넘어가는 동안 그 아래에 첫 도장 면이 미리 깔려 있어야 한다.
   const spreadIndex = Math.max(0, pageIndex - 1)
@@ -240,20 +209,14 @@ const Home = () => {
   const journeyCards = hasPins
     ? [JOURNEY_CARD, LAST_TAGGED_CARD]
     : [LAST_TAGGED_CARD]
+  const {
+    index: journeyIndex,
+    setIndex: setJourneyIndex,
+    handlers: journeySwipe,
+  } = useSwipeNavigation(journeyCards.length)
+
   const currentJourneyCard = journeyCards[journeyIndex] ?? journeyCards[0]
 
-  const moveWithin = (setIndex, length) => (step) =>
-    setIndex((current) => Math.min(Math.max(current + step, 0), length - 1))
-
-  const passportSwipe = createSwipeHandlers(
-    passportSwipeStart,
-    moveWithin(setPageIndex, passportPages.length),
-  )
-
-  const journeySwipe = createSwipeHandlers(
-    journeySwipeStart,
-    moveWithin(setJourneyIndex, journeyCards.length),
-  )
 
   const handleEndTrip = async () => {
     setIsEndingTrip(true)
