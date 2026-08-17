@@ -1,6 +1,6 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import styled from 'styled-components'
-import { Map, Marker, useMapsLibrary } from '@vis.gl/react-google-maps'
+import { Map, Marker, useMap, useMapsLibrary } from '@vis.gl/react-google-maps'
 import mapPinIcon from '../../assets/map/map-pin.svg'
 import { MAP_STYLES } from './mapStyles'
 
@@ -9,6 +9,41 @@ const MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID || 'DEMO_MAP_ID'
 const HAS_API_KEY = Boolean(import.meta.env.VITE_GOOGLE_MAPS_API_KEY)
 
 const DEFAULT_CENTER = { lat: 37.5665, lng: 126.978 }
+
+/**
+ * 한 지점을 들여다보는 배율.
+ *
+ * 영역에 맞출 때의 상한이자, 핀 하나를 골랐을 때 당기는 단계다. 두 값이 같아야
+ * 개요에서 핀을 골라도 배율이 튀지 않는다. 길과 골목이 드러나는 단계라
+ * 주요 지도 앱들이 장소를 고를 때 잡는 정도와 비슷하다.
+ *
+ * 영역 맞춤에 상한이 필요한 이유는, 핀이 한 골목에 몰려 있으면 딱 맞추느라
+ * 건물 단위까지 파고들어 첫 화면에서 여기가 어디인지 알 수 없기 때문이다.
+ */
+export const FOCUS_ZOOM = 17
+
+/**
+ * 영역 맞춤이 너무 깊게 파고들지 않도록 첫 배치에서 한 번만 배율을 눌러 준다.
+ *
+ * `fitBounds` 에는 상한 옵션이 없어서, 지도가 자리를 잡은 뒤(idle) 확인한다.
+ * 이후 사용자가 직접 확대하는 것까지 막으면 안 되므로 한 번 보고 손을 뗀다.
+ */
+const FitZoomLimit = ({ maxZoom }) => {
+  const map = useMap()
+
+  useEffect(() => {
+    if (!map) return undefined
+
+    const listener = map.addListener('idle', () => {
+      if ((map.getZoom() ?? 0) > maxZoom) map.setZoom(maxZoom)
+      listener.remove()
+    })
+
+    return () => listener.remove()
+  }, [map, maxZoom])
+
+  return null
+}
 
 /* 마커가 화면 가장자리에 붙지 않도록 두는 여백. 위경도가 아니라 화면 픽셀이다.
    위경도로 주면 도 단위라 도시 하나짜리 여정도 나라 단위로 벌어진다. */
@@ -67,6 +102,8 @@ const getBounds = (markers) => {
  * - `bounds` — `{ north, south, east, west, padding }`. 주면 이 영역이 다 보이게
  *   배율을 맞춘다. `center`·`zoom` 보다 우선한다. 마커를 children 으로 직접
  *   그리는 화면에서 쓴다.
+ * - `maxFitZoom` — 영역에 맞출 때의 배율 상한. 핀이 몰려 있어도 이보다 깊이
+ *   들어가지 않는다. 사용자가 직접 확대하는 것은 막지 않는다.
  * - `children` — `<Map>` 내부에 그대로 들어간다(폴리라인 등 추가할 때).
  * - `styles` — 앱 지도 테마가 기본값이다. 구글 클라우드 스타일을 쓰려면 `null`.
  * - `.env` 에 API 키가 없으면 Placeholder 박스를 렌더한다.
@@ -78,6 +115,7 @@ const GoogleMap = ({
   zoom = 12,
   height = '470px',
   styles = MAP_STYLES,
+  maxFitZoom = FOCUS_ZOOM,
   borderRadius = '4px',
   bordered = true,
   mapOptions = {},
@@ -143,6 +181,9 @@ const GoogleMap = ({
         {...viewProps}
         {...mapOptions}
       >
+        {/* 영역에 맞출 때만 걸린다. 중심·배율을 직접 준 경우는 그대로 둔다. */}
+        {fitBounds && <FitZoomLimit maxZoom={maxFitZoom} />}
+
         {/* AdvancedMarker 는 Map ID 를 요구해 테마와 같이 못 쓴다. */}
         {markers.map(({ id, name, lat, lng }, index) => (
           <Marker

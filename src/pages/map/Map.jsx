@@ -9,7 +9,7 @@ import {
   useMapsLibrary,
 } from '@vis.gl/react-google-maps'
 import Button from '../../components/common/Button'
-import GoogleMap from '../../components/common/GoogleMap'
+import GoogleMap, { FOCUS_ZOOM } from '../../components/common/GoogleMap'
 import SnapSheet from '../../components/common/SnapSheet'
 import NavBar from '../../components/layout/NavBar'
 import currentPositionSvg from '../../assets/map/current-position.svg?raw'
@@ -58,9 +58,8 @@ const ACTIVE_PIN_SIZE = { width: 48, height: 48 }
 const FIT_PADDING = { top: 110, right: 48, bottom: 150, left: 48 }
 
 /* 핀을 고르면 이 배율까지 확대한다. 이미 더 당겨 봤다면 그대로 둔다.
-   길 이름과 골목이 드러나는 단계로, 구글·애플 지도가 장소를 고를 때 잡는 정도다.
-   내 위치로 갈 때와 같은 값이라 둘 사이를 오가도 배율이 튀지 않는다. */
-const SELECTED_PIN_ZOOM = 17
+   영역 맞춤 상한과 같은 값이라, 개요에서 핀을 골라도 배율이 튀지 않는다. */
+const SELECTED_PIN_ZOOM = FOCUS_ZOOM
 
 /* 핀 시트(높이 281 + 아래 여백 75)가 화면 아래를 가린다.
    가려지지 않는 영역의 가운데에 오도록 그 절반만큼 위로 올린다. */
