@@ -114,6 +114,7 @@ const getProductRegisteredDate = (registeredAt) => {
 const settings = [
   { label: '위치 권한', permissionType: 'location' },
   { label: '카메라 권한', permissionType: 'camera' },
+  { label: '마이크 권한', permissionType: 'microphone' },
 ]
 
 const getSettingStateLabel = (permissionType, status) => {
@@ -167,6 +168,7 @@ const MyPage = () => {
   const [permissionStatuses, setPermissionStatuses] = useState(() => ({
     location: DEVICE_PERMISSION_STATUS.IDLE,
     camera: DEVICE_PERMISSION_STATUS.IDLE,
+    microphone: DEVICE_PERMISSION_STATUS.IDLE,
   }))
   const savedTasteAxisValuesRef = useRef(new Map())
   const savingTasteAxisCodesRef = useRef(new Set())
@@ -283,7 +285,7 @@ const MyPage = () => {
 
     const loadPermissionStatuses = async () => {
       const permissionEntries = await Promise.all(
-        ['location', 'camera'].map(async (permissionType) => [
+        ['location', 'camera', 'microphone'].map(async (permissionType) => [
           permissionType,
           await getCurrentPermissionStatus(permissionType),
         ]),
