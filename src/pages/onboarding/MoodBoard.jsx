@@ -9,6 +9,7 @@ import { updateMyAccount } from '../../features/auth/authApi'
 import { getAuthenticatedEntryPath } from '../../features/auth/authRoutes'
 import useAuthStore from '../../features/auth/useAuthStore'
 import { saveSelectionRound } from '../../features/onboarding/selectionPhotoApi'
+import { markTasteProfileLearned } from '../../features/onboarding/tasteProfileApi'
 import {
   MOODBOARD_PHOTO_ROUNDS,
   selectRandomPhotoSets,
@@ -83,6 +84,8 @@ const MoodBoard = () => {
 
       // 서버가 아직 이 단계면 그쪽이 알려주는 라운드에 머문다.
       if (await syncAfterSave()) return
+
+      await markTasteProfileLearned()
 
       if (isRelearning) {
         navigate('/mypage', {
