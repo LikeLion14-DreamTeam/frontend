@@ -26,8 +26,17 @@ const MapOverlay = ({ latitude, longitude, children }) => {
 
     const overlay = new maps.OverlayView()
 
-    // 마커보다 위에 있고 클릭도 받는 층이다.
-    overlay.onAdd = () => overlay.getPanes()?.floatPane.appendChild(container)
+    /*
+     * 마커보다 위에 있고 클릭도 받는 층이다.
+     *
+     * 다만 지도가 자기 위에서 일어난 클릭·끌기를 먼저 가져가 버려, 그대로 두면
+     * 안에 둔 버튼이 눌리지 않고 지도만 반응한다. 이 층에서 난 일은 지도가
+     * 건드리지 않도록 막아 둔다.
+     */
+    overlay.onAdd = () => {
+      overlay.getPanes()?.floatPane.appendChild(container)
+      maps.OverlayView.preventMapHitsAndGesturesFrom(container)
+    }
     overlay.onRemove = () => container.remove()
 
     overlay.draw = () => {
