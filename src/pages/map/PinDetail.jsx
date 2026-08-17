@@ -559,18 +559,18 @@ const PinDetail = () => {
             <PhotoGrid>
               <Photo $tone="main">
                 {previewPhotos[0] && (
-                  <PhotoImage src={previewPhotos[0].file_path} alt="" />
+                  <PhotoImage src={previewPhotos[0].file_path} alt="" crossOrigin="anonymous" />
                 )}
               </Photo>
               <PhotoStack>
                 <Photo $tone="light">
                   {previewPhotos[1] && (
-                    <PhotoImage src={previewPhotos[1].file_path} alt="" />
+                    <PhotoImage src={previewPhotos[1].file_path} alt="" crossOrigin="anonymous" />
                   )}
                 </Photo>
                 <Photo $tone="dark">
                   {previewPhotos[2] && (
-                    <PhotoImage src={previewPhotos[2].file_path} alt="" />
+                    <PhotoImage src={previewPhotos[2].file_path} alt="" crossOrigin="anonymous" />
                   )}
                   {hiddenPhotoCount > 0 && (
                     <>
@@ -635,7 +635,7 @@ const PinDetail = () => {
                   key={photo.photo_id}
                   $tone={['soft', 'warm', 'main'][index] ?? 'main'}
                 >
-                  <PhotoImage src={photo.url} alt="" />
+                  <PhotoImage src={photo.url} alt="" crossOrigin="anonymous" />
                 </SuggestedPhoto>
               ))}
             </SuggestedGrid>

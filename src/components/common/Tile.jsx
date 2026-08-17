@@ -21,6 +21,7 @@ const Tile = ({
   interactive = true,
   src,
   alt = '',
+  crossOrigin,
   ...rest
 }) => {
   return (
@@ -37,6 +38,7 @@ const Tile = ({
           key={src}
           src={src}
           alt={alt}
+          crossOrigin={crossOrigin}
           onError={(event) => {
             event.currentTarget.hidden = true
           }}

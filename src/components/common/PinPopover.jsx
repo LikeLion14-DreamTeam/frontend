@@ -66,7 +66,7 @@ const PinPopover = ({
           <PhotoRow $gap={row.gap}>
             {shown.map((photo) => (
               <Photo key={photo.photo_id} $height={row.height}>
-                {photo.url && <PhotoImage src={photo.url} alt="" />}
+                {photo.url && <PhotoImage src={photo.url} alt="" crossOrigin="anonymous" />}
               </Photo>
             ))}
           </PhotoRow>
