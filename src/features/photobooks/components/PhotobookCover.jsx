@@ -1,5 +1,8 @@
+import { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
 import coverSeal from '../../../assets/photobooks/cover-seal.svg'
+
+const IMAGE_RETRY_DELAYS = [900, 1500, 2500]
 
 const PhotobookCover = ({
   className,
@@ -7,9 +10,49 @@ const PhotobookCover = ({
   alt = '',
   isLoading = false,
 }) => {
+  const [retryCount, setRetryCount] = useState(0)
+  const retryTimerRef = useRef(null)
+
+  useEffect(() => {
+    if (retryTimerRef.current) {
+      window.clearTimeout(retryTimerRef.current)
+      retryTimerRef.current = null
+    }
+
+    setRetryCount(0)
+  }, [coverUrl])
+
+  useEffect(
+    () => () => {
+      if (retryTimerRef.current) {
+        window.clearTimeout(retryTimerRef.current)
+      }
+    },
+    [],
+  )
+
+  const retryCoverImage = () => {
+    if (retryCount >= IMAGE_RETRY_DELAYS.length) return
+    if (retryTimerRef.current) return
+
+    retryTimerRef.current = window.setTimeout(() => {
+      retryTimerRef.current = null
+      setRetryCount((current) =>
+        current >= IMAGE_RETRY_DELAYS.length ? current : current + 1,
+      )
+    }, IMAGE_RETRY_DELAYS[retryCount])
+  }
+
   return (
     <Cover className={className} $hasImage={Boolean(coverUrl)}>
-      {coverUrl ? <CoverImage src={coverUrl} alt={alt} /> : null}
+      {coverUrl ? (
+        <CoverImage
+          key={`${coverUrl}-${retryCount}`}
+          src={coverUrl}
+          alt={alt}
+          onError={retryCoverImage}
+        />
+      ) : null}
 
       <Spine aria-hidden="true" />
       <Seal src={coverSeal} alt="" aria-hidden="true" />

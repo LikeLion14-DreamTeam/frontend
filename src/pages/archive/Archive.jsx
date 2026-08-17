@@ -13,6 +13,8 @@ const SORT = {
   photos: 'photos',
 }
 
+const COVER_READY_RETRY_DELAYS = [1200, 1800, 2600, 4000, 6000]
+
 const pad2 = (value) => String(value).padStart(2, '0')
 
 const formatDate = (value) => {
@@ -56,6 +58,9 @@ const toListItem = (photobook) => ({
   photoCount: getCount(photobook.photo_count),
 })
 
+const needsCoverReadyRetry = (photobooks) =>
+  photobooks.some((photobook) => !photobook.cover_photo_url)
+
 const Archive = () => {
   const navigate = useNavigate()
   const [sortBy, setSortBy] = useState(SORT.latest)
@@ -67,37 +72,111 @@ const Archive = () => {
 
   useEffect(() => {
     let ignore = false
+    let retryTimer = null
+    let retryIndex = 0
 
-    const loadPhotobooks = async () => {
-      setIsLoading(true)
-      setErrorMessage('')
+    const loadPhotobooks = async ({ showLoading, preserveCurrent } = {}) => {
+      if (showLoading) setIsLoading(true)
+      if (!preserveCurrent) setErrorMessage('')
 
       try {
         const photobookData = await getPhotobooks()
+        const nextPhotobooks = Array.isArray(photobookData.photobooks)
+          ? photobookData.photobooks
+          : []
 
         if (!ignore) {
-          setPhotobooks(
-            Array.isArray(photobookData.photobooks)
-              ? photobookData.photobooks
-              : [],
-          )
+          setPhotobooks(nextPhotobooks)
+          setErrorMessage('')
         }
+
+        return nextPhotobooks
       } catch (error) {
         if (ignore) return
+        if (preserveCurrent) return null
 
         setPhotobooks([])
         setErrorMessage(
           error.message ?? '포토북 목록을 불러오지 못했습니다.',
         )
       } finally {
-        if (!ignore) setIsLoading(false)
+        if (!ignore && showLoading) setIsLoading(false)
       }
     }
 
-    loadPhotobooks()
+    const refreshMissingCovers = async (nextPhotobooks) => {
+      const missingCoverIds = nextPhotobooks
+        .filter(
+          (photobook) =>
+            !photobook.cover_photo_url &&
+            getCount(photobook.photo_count) > 0,
+        )
+        .map((photobook) => photobook.photobook_id)
+
+      if (missingCoverIds.length === 0) return nextPhotobooks
+
+      const results = await Promise.allSettled(
+        missingCoverIds.map(async (photobookId) => ({
+          photobookId,
+          updated: await refreshPhotobookCover(photobookId),
+        })),
+      )
+
+      if (ignore) return null
+
+      const coverUrlsById = new Map()
+
+      results.forEach((result) => {
+        if (result.status !== 'fulfilled') return
+
+        const { photobookId, updated } = result.value
+        if (updated.cover_photo_url) {
+          coverUrlsById.set(photobookId, updated.cover_photo_url)
+        }
+      })
+
+      if (coverUrlsById.size === 0) return nextPhotobooks
+
+      const refreshedPhotobooks = nextPhotobooks.map((photobook) => {
+        const coverUrl = coverUrlsById.get(photobook.photobook_id)
+        return coverUrl
+          ? { ...photobook, cover_photo_url: coverUrl }
+          : photobook
+      })
+
+      setPhotobooks(refreshedPhotobooks)
+      return refreshedPhotobooks
+    }
+
+    const retryUntilCoversReady = async (nextPhotobooks) => {
+      if (!nextPhotobooks) return
+
+      const refreshedPhotobooks = await refreshMissingCovers(nextPhotobooks)
+
+      if (!refreshedPhotobooks) return
+      if (!needsCoverReadyRetry(refreshedPhotobooks)) return
+      if (retryIndex >= COVER_READY_RETRY_DELAYS.length) return
+
+      retryTimer = window.setTimeout(async () => {
+        retryIndex += 1
+        const latestPhotobooks = await loadPhotobooks({
+          showLoading: false,
+          preserveCurrent: true,
+        })
+
+        if (!ignore && latestPhotobooks) {
+          retryUntilCoversReady(latestPhotobooks)
+        }
+      }, COVER_READY_RETRY_DELAYS[retryIndex])
+    }
+
+    loadPhotobooks({ showLoading: true }).then((nextPhotobooks) => {
+      if (!ignore) retryUntilCoversReady(nextPhotobooks)
+    })
 
     return () => {
       ignore = true
+      if (retryTimer) window.clearTimeout(retryTimer)
     }
   }, [])
 
