@@ -841,7 +841,7 @@ const LastTaggedBody = styled.div`
   width: ${lastTaggedScale(307)};
   display: flex;
   flex-direction: column;
-  gap: ${lastTaggedScale(85)};
+  gap: ${lastTaggedScale(105)};
   align-items: flex-start;
 `
 
@@ -866,19 +866,28 @@ const ProductTaggedAt = styled.p`
   font: 400 ${lastTaggedScale(11)}/normal var(--font-sans);
 `
 
-/* 시안에서 카드 폭을 다 쓰지 않는 작은 알약 모양이다. */
 const StartJourneyLink = styled(Link)`
-  width: ${lastTaggedScale(136)};
-  height: ${lastTaggedScale(37)};
+  width: auto;
+  height: ${lastTaggedScale(14)};
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: ${lastTaggedScale(22)};
-  background: #f5eee4;
-  color: var(--Text-Primary);
-  font: 500 ${lastTaggedScale(12)}/normal var(--font-sans);
+  gap: ${lastTaggedScale(8)};
+  background: transparent;
+  color: var(--Accent-Gold);
+  font: 500 ${lastTaggedScale(12)}/${lastTaggedScale(14)} var(--font-sans);
   text-decoration: none;
   white-space: nowrap;
+
+  &::after {
+    width: ${lastTaggedScale(8)};
+    height: ${lastTaggedScale(8)};
+    flex: none;
+    border-top: ${lastTaggedScale(2)} solid currentColor;
+    border-right: ${lastTaggedScale(2)} solid currentColor;
+    content: '';
+    transform: rotate(45deg);
+  }
 `
 
 /* 시안의 도시명 자리에 여정 이름이 들어간다. 나라 줄은 없다. */
