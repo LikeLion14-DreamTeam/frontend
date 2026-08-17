@@ -4,6 +4,7 @@ import styled from 'styled-components'
 import Card from '../../components/common/Card'
 import Header from '../../components/layout/Header'
 import NavBar from '../../components/layout/NavBar'
+import { getPhotobook } from '../../features/photobooks/photobookApi'
 import { getTrip, getTripPins } from '../../features/trips/tripApi'
 
 // 아직 포토북에서 넘어오는 경로가 없어 segmentId 가 비면 이 값을 쓴다.
@@ -91,14 +92,18 @@ const TripManagement = () => {
       setErrorMessage('')
 
       try {
-        const [tripData, pinData] = await Promise.all([
+        const [tripData, pinData, photobookData] = await Promise.all([
           getTrip(segmentId),
           getTripPins(segmentId),
+          photobookId ? getPhotobook(photobookId).catch(() => null) : null,
         ])
 
         if (ignore) return
 
-        setTrip(tripData)
+        setTrip({
+          ...tripData,
+          name: photobookData?.name?.trim() || tripData.name,
+        })
         setPins(pinData.pins)
       } catch (error) {
         if (ignore) return
@@ -113,7 +118,7 @@ const TripManagement = () => {
     return () => {
       ignore = true
     }
-  }, [segmentId])
+  }, [photobookId, segmentId])
 
   const settings = trip
     ? [

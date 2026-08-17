@@ -1,7 +1,10 @@
 import apiClient from '../../api/client'
 import { ApiError } from '../../api/errors'
 import { fetchAllPages } from '../../api/pagination'
-import { deleteMockPhotobookBySegment } from '../photobooks/photobookMock'
+import {
+  deleteMockPhotobookBySegment,
+  updateMockPhotobookNameBySegment,
+} from '../photobooks/photobookMock'
 import { mockPinStore } from '../pins/pinMock'
 import {
   getMockPhotoCount,
@@ -395,6 +398,7 @@ export const updateTrip = async (
     if (!trip) throw mockNotFound()
 
     trip.name = name
+    updateMockPhotobookNameBySegment(segmentId, name)
     if (startAt) trip.start_at = startAt
     if (endAt) trip.end_at = endAt
 
