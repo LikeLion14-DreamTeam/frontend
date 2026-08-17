@@ -33,8 +33,8 @@ import {
   getTrips,
 } from '../../features/trips/tripApi'
 
-// 여정을 아직 못 받았을 때 잠깐 보여줄 위치.
-const DEFAULT_CENTER = { lat: 48.8569, lng: 2.3376 }
+// 위치 권한을 받을 수 없을 때만 쓰는 마지막 fallback.
+const FALLBACK_CENTER = { lat: 37.5665, lng: 126.978 }
 
 /* 여정을 볼 때 배율. 핀이 하나뿐이라 영역을 못 잡을 때만 쓰인다. */
 const DEFAULT_ZOOM = 13.3
@@ -271,7 +271,7 @@ const MapPage = () => {
   }
   const [selectedPinId, setSelectedPinId] = useState(null)
   const [dropdownOpen, setDropdownOpen] = useState(false)
-  const [mapCenter, setMapCenter] = useState(DEFAULT_CENTER)
+  const [mapCenter, setMapCenter] = useState(null)
   /** 영역(mapBounds)을 못 잡을 때 쓰는 배율 */
   const [mapZoom, setMapZoom] = useState(DEFAULT_ZOOM)
   /** 핀이 둘 이상일 때만 쓴다. null 이면 mapCenter 로 잡는다. */
@@ -281,6 +281,7 @@ const MapPage = () => {
   const [currentPosition, setCurrentPosition] = useState(null)
   const [heading, setHeading] = useState(0)
   const compassStartedRef = useRef(false)
+  const hasInitialMapViewRef = useRef(false)
 
   /**
    * 나침반 값. iOS 는 `webkitCompassHeading`(북쪽 기준 시계방향)을 그대로 주고,
@@ -338,11 +339,26 @@ const MapPage = () => {
    * 권한을 거부하면 마커를 그리지 않는다.
    */
   useEffect(() => {
-    if (!navigator.geolocation) return undefined
+    if (!navigator.geolocation) {
+      setMapCenter(FALLBACK_CENTER)
+      setMapKey((current) => current + 1)
+      hasInitialMapViewRef.current = true
+      return undefined
+    }
 
     const watchId = navigator.geolocation.watchPosition(
       ({ coords }) => {
-        setCurrentPosition({ lat: coords.latitude, lng: coords.longitude })
+        const position = { lat: coords.latitude, lng: coords.longitude }
+
+        setCurrentPosition(position)
+
+        if (!hasInitialMapViewRef.current) {
+          hasInitialMapViewRef.current = true
+          setMapBounds(null)
+          setMapCenter(position)
+          setMapZoom(CURRENT_POSITION_ZOOM)
+          setMapKey((current) => current + 1)
+        }
 
         // 나침반이 붙어 있으면 그쪽이 더 정확하다. 없을 때만 이동 방향을 쓴다.
         // heading 은 움직일 때만 들어오므로 멈춰 있으면 마지막 방향을 유지한다.
@@ -354,7 +370,15 @@ const MapPage = () => {
           setHeading(coords.heading)
         }
       },
-      () => setCurrentPosition(null),
+      () => {
+        setCurrentPosition(null)
+
+        if (!hasInitialMapViewRef.current) {
+          hasInitialMapViewRef.current = true
+          setMapCenter(FALLBACK_CENTER)
+          setMapKey((current) => current + 1)
+        }
+      },
     )
 
     return () => navigator.geolocation.clearWatch(watchId)
@@ -532,6 +556,7 @@ const MapPage = () => {
     if (!first) return
 
     // 핀이 하나면 영역을 못 잡으니 그 핀을 가운데 둔다.
+    hasInitialMapViewRef.current = true
     setMapBounds(getPinBounds(mapPins))
     setMapCenter({ lat: first.latitude, lng: first.longitude })
     setMapZoom(DEFAULT_ZOOM)
@@ -709,70 +734,76 @@ const MapPage = () => {
     navigate(`/map?${query.toString()}`)
   }
 
+  const isMapReady = Boolean(mapBounds || mapCenter)
+
   return (
     <Page>
       <MapLayer>
-        <GoogleMap
-          key={mapKey}
-          bounds={mapBounds}
-          center={mapCenter}
-          zoom={mapZoom}
-          height="100%"
-          borderRadius="0"
-          bordered={false}
-          mapOptions={{
-            clickableIcons: false,
-            keyboardShortcuts: false,
-            minZoom: 3,
-            onClick: () => setSelectedPinId(null),
-          }}
-        >
-          <Polyline
-            path={routePath}
-            strokeColor="#c99a45"
-            strokeOpacity={0.92}
-            strokeWeight={3}
-          />
+        {isMapReady ? (
+          <GoogleMap
+            key={mapKey}
+            bounds={mapBounds}
+            center={mapCenter}
+            zoom={mapZoom}
+            height="100%"
+            borderRadius="0"
+            bordered={false}
+            mapOptions={{
+              clickableIcons: false,
+              keyboardShortcuts: false,
+              minZoom: 3,
+              onClick: () => setSelectedPinId(null),
+            }}
+          >
+            <Polyline
+              path={routePath}
+              strokeColor="#c99a45"
+              strokeOpacity={0.92}
+              strokeWeight={3}
+            />
 
-          {mapPins.map((pin) => {
-            const isSelected = pin.pin_id === selectedPinId
+            {mapPins.map((pin) => {
+              const isSelected = pin.pin_id === selectedPinId
 
-            return (
+              return (
+                <Marker
+                  key={pin.pin_id}
+                  position={{ lat: pin.latitude, lng: pin.longitude }}
+                  icon={
+                    isSelected
+                      ? centeredIcon(activePinIcon, ACTIVE_PIN_SIZE)
+                      : centeredIcon(pinIcon, PIN_SIZE)
+                  }
+                  title={pin.place_name || '이름 없는 장소'}
+                  zIndex={isSelected ? 3 : 2}
+                  onClick={() => setSelectedPinId(pin.pin_id)}
+                />
+              )
+            })}
+
+            {currentPosition && (
               <Marker
-                key={pin.pin_id}
-                position={{ lat: pin.latitude, lng: pin.longitude }}
-                icon={
-                  isSelected
-                    ? centeredIcon(activePinIcon, ACTIVE_PIN_SIZE)
-                    : centeredIcon(pinIcon, PIN_SIZE)
-                }
-                title={pin.place_name || '이름 없는 장소'}
-                zIndex={isSelected ? 3 : 2}
-                onClick={() => setSelectedPinId(pin.pin_id)}
+                position={currentPosition}
+                icon={centeredIcon(currentPositionIcon, {
+                  width: CURRENT_POSITION_BOX,
+                  height: CURRENT_POSITION_BOX,
+                })}
+                clickable={false}
+                title="현재 위치"
+                zIndex={1}
               />
-            )
-          })}
+            )}
 
-          {currentPosition && (
-            <Marker
-              position={currentPosition}
-              icon={centeredIcon(currentPositionIcon, {
-                width: CURRENT_POSITION_BOX,
-                height: CURRENT_POSITION_BOX,
-              })}
-              clickable={false}
-              title="현재 위치"
-              zIndex={1}
-            />
-          )}
-
-          {selectedPin && (
-            <FocusSelectedPin
-              latitude={selectedPin.latitude}
-              longitude={selectedPin.longitude}
-            />
-          )}
-        </GoogleMap>
+            {selectedPin && (
+              <FocusSelectedPin
+                latitude={selectedPin.latitude}
+                longitude={selectedPin.longitude}
+              />
+            )}
+          </GoogleMap>
+        ) : (
+          <MapBootPlaceholder aria-label="현재 위치 확인 중" />
+        )}
       </MapLayer>
 
       {dropdownOpen && (
@@ -964,6 +995,12 @@ const Page = styled.main`
 const MapLayer = styled.div`
   position: absolute;
   inset: 0;
+`
+
+const MapBootPlaceholder = styled.div`
+  width: 100%;
+  height: 100%;
+  background: var(--Map-Base);
 `
 
 const TripSelector = styled.button`
