@@ -760,8 +760,9 @@ const MapPage = () => {
                 width: CURRENT_POSITION_BOX,
                 height: CURRENT_POSITION_BOX,
               })}
+              clickable={false}
               title="현재 위치"
-              zIndex={4}
+              zIndex={1}
             />
           )}
 
