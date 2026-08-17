@@ -1,13 +1,8 @@
-import { useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import styled from 'styled-components'
-import Button from '../../components/common/Button'
 import PermissionStatusCard from '../../components/common/PermissionStatusCard'
 import { permissionStatusCardItems } from '../../components/common/PermissionStatusCard.constants'
 import Header from '../../components/layout/Header'
-import { updateMyAccount } from '../../features/auth/authApi'
-import { getAuthenticatedEntryPath } from '../../features/auth/authRoutes'
-import useAuthStore from '../../features/auth/useAuthStore'
 import { DEVICE_PERMISSION_STATUS } from '../../features/permissions/devicePermissions'
 
 const getDeniedGuideBadgeLabel = (permissionType, status) => {
@@ -23,39 +18,11 @@ const getDeniedGuideBadgeLabel = (permissionType, status) => {
 }
 
 const Permission = () => {
-  const navigate = useNavigate()
   const location = useLocation()
-  const user = useAuthStore((state) => state.user)
-  const setUser = useAuthStore((state) => state.setUser)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [errorMessage, setErrorMessage] = useState('')
   const visiblePermissionKeys =
     location.state?.visiblePermissionKeys ??
     permissionStatusCardItems.map(({ key }) => key)
   const permissionStatuses = location.state?.permissionStatuses
-
-  const handleContinue = async () => {
-    setIsSubmitting(true)
-    setErrorMessage('')
-
-    try {
-      const updatedAccount = await updateMyAccount({
-        onboarding_completed: user?.onboarding_completed ?? false,
-        permission_intro_shown: true,
-      })
-      const updatedUser = { ...(user ?? {}), ...updatedAccount }
-
-      setUser(updatedUser)
-      navigate(getAuthenticatedEntryPath(updatedUser), { replace: true })
-    } catch (error) {
-      setErrorMessage(
-        error.message ??
-          '권한 안내 확인 상태를 저장하지 못했습니다. 다시 시도해 주세요.',
-      )
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
 
   return (
     <>
@@ -89,30 +56,6 @@ const Permission = () => {
               })}
           </PermissionList>
         </Body>
-
-        <Footer>
-          {errorMessage && (
-            <ErrorMessage role="alert">{errorMessage}</ErrorMessage>
-          )}
-
-          <ActionArea>
-            <StartButton
-              type="button"
-              disabled={isSubmitting}
-              onClick={handleContinue}
-            >
-              {isSubmitting ? '저장 중...' : '시작하기'}
-            </StartButton>
-            <LaterButton
-              type="button"
-              $variant="ghost"
-              disabled={isSubmitting}
-              onClick={handleContinue}
-            >
-              이대로 둘러보기
-            </LaterButton>
-          </ActionArea>
-        </Footer>
       </PermissionWrapper>
     </>
   )
@@ -130,7 +73,6 @@ const PermissionWrapper = styled.main`
   padding: 26px 24px 40px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
   gap: 44px;
 `
 
@@ -163,32 +105,3 @@ const PermissionList = styled.div`
   gap: 12px;
 `
 
-const Footer = styled.section`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 20px;
-`
-
-const ErrorMessage = styled.p`
-  color: #b42318;
-  font: var(--text-ui-caption);
-  text-align: center;
-  word-break: keep-all;
-`
-
-const ActionArea = styled.div`
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-`
-
-const StartButton = styled(Button)`
-  font: var(--text-ui-button);
-`
-
-const LaterButton = styled(Button)`
-  font: var(--text-ui-button);
-`
