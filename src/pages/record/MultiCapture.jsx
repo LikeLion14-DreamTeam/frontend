@@ -307,11 +307,6 @@ const MultiCapture = () => {
           <GridLine style={{ top: '33.333%' }} aria-hidden="true" />
           <GridLine style={{ top: '66.666%' }} aria-hidden="true" />
 
-          <TagChip>
-            {queryTagId ? 'NFC 태그 인식됨' : '태그 없이 촬영 중'}
-          </TagChip>
-          <CountChip>{shots.length} 장</CountChip>
-
           <FlipButton
             type="button"
             aria-label={
@@ -512,35 +507,6 @@ const GridLine = styled.span`
       : 'left: 0; right: 0; height: 1px;'}
 `
 
-/* 뷰파인더 모서리 기준 위치. 화면이 짧아 뷰파인더가 줄어도 칩이 함께 따라간다. */
-const chipBase = `
-  position: absolute;
-  z-index: 1;
-  top: 11px;
-  display: inline-flex;
-  align-items: center;
-  background: rgb(36 28 22 / 60%);
-  font: var(--text-ui-label);
-  white-space: nowrap;
-`
-
-const TagChip = styled.span`
-  ${chipBase}
-  left: 8px;
-  padding: 7px 14px 7px 11px;
-  border-radius: 16px;
-  color: rgb(242 233 220 / 92%);
-`
-
-const CountChip = styled.span`
-  ${chipBase}
-  right: 8px;
-  padding: 6px 11px;
-  border-radius: 20px;
-  color: #f2e9dc;
-`
-
-/* 위쪽 칩들과 같은 가장자리 여백·바탕색을 쓴다. */
 const FlipButton = styled.button`
   position: absolute;
   z-index: 1;
