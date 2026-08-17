@@ -13,12 +13,29 @@ import {
   detectMobileOS,
   getCurrentPermissionStatus,
   getNfcIntroStatus,
+  rememberLocationGranted,
   requestDevicePermission,
 } from '../../features/permissions/devicePermissions'
 import { recordPermissionEvent } from '../../features/permissions/permissionApi'
 import privacyLockIcon from '../../assets/icons/privacy-lock.svg'
 
 const REQUEST_PERMISSION_TYPES = ['camera', 'location']
+
+/**
+ * 위치는 없으면 서비스가 성립하지 않는다. 핀·지도·여정이 모두 좌표 위에 선다.
+ * 그래서 허용 전에는 다음 화면으로 보내지 않고, 건너뛰기도 막는다.
+ */
+const REQUIRED_PERMISSION_TYPE = 'location'
+
+/** 실패 사유에 따라 무엇을 해야 하는지 다르게 안내한다. */
+const getRequiredPermissionMessage = (status) => {
+  if (status === DEVICE_PERMISSION_STATUS.DENIED) {
+    return '위치 권한을 허용해야 시작할 수 있어요. 브라우저 설정에서 이 사이트의 위치 접근을 허용한 뒤 다시 시도해 주세요.'
+  }
+
+  // 권한은 막히지 않았는데 값을 못 받은 경우다. 기기·OS 설정 쪽을 짚어준다.
+  return '위치를 확인하지 못했어요. 기기의 위치 서비스가 켜져 있는지 확인한 뒤 다시 시도해 주세요. (Mac 은 시스템 설정 → 개인정보 보호 및 보안 → 위치 서비스에서 브라우저를 켜야 합니다)'
+}
 
 const getBadgeLabel = (permissionType, status) => {
   if (status === DEVICE_PERMISSION_STATUS.CHECKING) {
@@ -144,6 +161,17 @@ const Permission = () => {
         )
       }
 
+      // 위치를 못 받았으면 여기서 멈춘다. 안내만 띄우고 다시 시도하게 둔다.
+      const requiredStatus = nextStatuses[REQUIRED_PERMISSION_TYPE]
+
+      if (requiredStatus !== DEVICE_PERMISSION_STATUS.GRANTED) {
+        setErrorMessage(getRequiredPermissionMessage(requiredStatus))
+        return
+      }
+
+      // Safari 는 나중에 권한 상태를 알려주지 않으므로 여기서 기기에 남겨둔다.
+      rememberLocationGranted()
+
       const updatedUser = await completePermissionIntro()
       const unavailablePermissionKeys = visiblePermissionItems
         .map(({ key }) => key)
@@ -172,24 +200,6 @@ const Permission = () => {
       setErrorMessage(
         error.message ??
           '권한 결과를 저장하지 못했습니다. 다시 시도해 주세요.',
-      )
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  const handleLater = async () => {
-    setIsSubmitting(true)
-    setErrorMessage('')
-
-    try {
-      const updatedUser = await completePermissionIntro()
-
-      navigate(getAuthenticatedEntryPath(updatedUser), { replace: true })
-    } catch (error) {
-      setErrorMessage(
-        error.message ??
-          '권한 안내 확인 상태를 저장하지 못했습니다. 다시 시도해 주세요.',
       )
     } finally {
       setIsSubmitting(false)
@@ -266,14 +276,6 @@ const Permission = () => {
             >
               {isSubmitting ? '권한 확인 중...' : '권한 허용하고 시작하기'}
             </StartButton>
-            <LaterButton
-              type="button"
-              $variant="ghost"
-              disabled={isSubmitting}
-              onClick={handleLater}
-            >
-              나중에 설정하기
-            </LaterButton>
           </ActionArea>
         </Footer>
       </PermissionWrapper>
@@ -387,6 +389,3 @@ const StartButton = styled(Button)`
   font: var(--text-ui-button);
 `
 
-const LaterButton = styled(Button)`
-  font: var(--text-ui-button);
-`
