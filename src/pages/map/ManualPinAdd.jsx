@@ -1,15 +1,109 @@
 import { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import { useNavigate } from 'react-router-dom'
+import { useMap } from '@vis.gl/react-google-maps'
 import Button from '../../components/common/Button'
 import GoogleMap from '../../components/common/GoogleMap'
 import SnapSheet from '../../components/common/SnapSheet'
 import NavBar from '../../components/layout/NavBar'
-import { reverseGeocode } from '../../features/pins/reverseGeocode'
+import {
+  geocodeAddress,
+  reverseGeocode,
+} from '../../features/pins/reverseGeocode'
 import crosshairIcon from '../../assets/map/manual-pin-crosshair.svg'
 import markerIcon from '../../assets/map/manual-pin-marker.svg'
 import searchIcon from '../../assets/map/manual-pin-search.svg'
 import recordPlusIcon from '../../assets/map/record-plus.png'
+
+/* 건물 하나를 찾았을 때 이보다 더 파고들지 않는다. 처음 배율과 같은 값이라
+   검색 전후로 보이는 정도가 크게 달라지지 않는다. */
+const SEARCH_MAX_ZOOM = 18
+
+/**
+ * 찾은 자리로 지도를 옮긴다.
+ *
+ * `GoogleMap` 은 중심을 `defaultCenter` 로 넘겨 처음 그릴 때만 반영한다.
+ * 나중에 옮기려면 지도를 직접 잡아야 해서 자식으로 둔다. 그리는 건 없다.
+ *
+ * 구글이 준 표시 영역(`viewport`)에 맞추면 나라를 찾으면 나라가, 도시를 찾으면
+ * 도시가 화면에 들어온다. 지도 상자는 위로 빼 두었으므로 그만큼 위쪽에 여백을
+ * 줘야 찾은 곳이 가려지지 않는다.
+ *
+ * 자리를 잡은 뒤에는 중심을 직접 읽어 알려 준다. 지도가 알려주기를 기다리면
+ * 옮겼는데도 선택 위치가 이전 자리에 머무를 수 있고, 여백을 준 만큼 중심이
+ * 밀리기 때문에 찍히는 자리와도 어긋난다.
+ */
+const PanToSearched = ({ result, fitPadding, onSettled }) => {
+  const map = useMap()
+
+  useEffect(() => {
+    if (!map || !result) return undefined
+
+    const center = { lat: result.latitude, lng: result.longitude }
+
+    if (!result.viewport) {
+      map.panTo(center)
+      onSettled(center)
+      return undefined
+    }
+
+    map.fitBounds(result.viewport, fitPadding)
+
+    /* `fitBounds` 에는 상한이 없다. 자리를 잡은 뒤 한 번만 눌러 준다. */
+    const listener = map.addListener('idle', () => {
+      if ((map.getZoom() ?? 0) > SEARCH_MAX_ZOOM) map.setZoom(SEARCH_MAX_ZOOM)
+
+      const settled = map.getCenter()
+      if (settled) onSettled({ lat: settled.lat(), lng: settled.lng() })
+
+      listener.remove()
+    })
+
+    return () => listener.remove()
+  }, [fitPadding, map, onSettled, result])
+
+  return null
+}
+
+/* 위는 안내 문구(67 에서 시작해 높이 24), 아래는 주소 시트와 하단
+   내비게이션(75)이 막는다. 핀을 찍을 자리는 그 사이 한가운데다. */
+const HINT_BOTTOM = 67 + 24
+const NAV_HEIGHT = 75
+const SHEET_HEIGHT = 191
+const SHEET_COLLAPSED_OFFSET = 137
+
+/** 찾은 곳이 가장자리에 붙지 않도록 두는 여백 */
+const FIT_MARGIN = 24
+
+/**
+ * 시트 상태에 따라 달라지는 지도 배치.
+ *
+ * `shift` — 지도를 위로 빼 놓을 거리. 지도의 중심은 늘 담긴 상자의 한가운데라,
+ * 상자를 화면에 딱 맞추면 중심이 시트 쪽으로 내려간다. 위로 늘려 두면 중심이
+ * 안내 문구와 시트 사이의 한가운데로 올라오고, 시트를 접어도 아래에 빈자리가
+ * 생기지 않는다. 접으면 가리는 만큼이 줄어드니 빼는 거리도 함께 줄인다.
+ *
+ * `fitPadding` — 검색한 곳을 맞출 때 비켜 둘 자리. `fitBounds` 는 상자 전체를
+ * 기준으로 삼는데, 위로 뺀 부분과 아래 시트·내비게이션은 눈에 보이지 않는다.
+ * 양쪽을 다 비켜 줘야 보이는 곳의 한가운데, 즉 핀 자리에 맞는다.
+ */
+const getMapLayout = (isSheetCollapsed) => {
+  const sheetVisible = isSheetCollapsed
+    ? SHEET_HEIGHT - SHEET_COLLAPSED_OFFSET
+    : SHEET_HEIGHT
+
+  const shift = NAV_HEIGHT + sheetVisible - HINT_BOTTOM
+
+  return {
+    shift,
+    fitPadding: {
+      top: shift + HINT_BOTTOM + FIT_MARGIN,
+      right: FIT_MARGIN,
+      bottom: NAV_HEIGHT + sheetVisible + FIT_MARGIN,
+      left: FIT_MARGIN,
+    },
+  }
+}
 
 /** 위치를 못 얻었을 때 시작 지점. 여기서 직접 옮겨 찍으면 된다. */
 const FALLBACK_CENTER = { lat: 37.5796, lng: 126.9849 }
@@ -47,6 +141,10 @@ const ManualPinAdd = () => {
   const [place, setPlace] = useState(null)
   const [isResolvingPlace, setIsResolvingPlace] = useState(false)
   const [address, setAddress] = useState('')
+  const [searchedResult, setSearchedResult] = useState(null)
+  const [isSearching, setIsSearching] = useState(false)
+  const [searchError, setSearchError] = useState('')
+  const [isSheetCollapsed, setIsSheetCollapsed] = useState(false)
 
   useEffect(() => {
     let ignore = false
@@ -108,6 +206,30 @@ const ManualPinAdd = () => {
     setSelectedCenter({ lat: center.lat, lng: center.lng })
   }
 
+  /* 입력한 주소를 좌표로 바꿔 지도를 옮긴다. 핀은 늘 지도 중심이라 따라온다. */
+  const handleSearch = async (event) => {
+    event.preventDefault()
+
+    const keyword = address.trim()
+    if (!keyword || isSearching) return
+
+    setIsSearching(true)
+    setSearchError('')
+
+    const found = await geocodeAddress(keyword)
+
+    setIsSearching(false)
+
+    if (!found) {
+      setSearchError('그 주소를 찾지 못했어요')
+      return
+    }
+
+    // 매번 새 객체를 넘겨야 같은 자리를 다시 검색해도 지도가 반응한다.
+    setSearchedResult({ ...found })
+    setAddress(found.address)
+  }
+
   const handleContinue = () => {
     if (!selectedCenter) return
 
@@ -122,9 +244,11 @@ const ManualPinAdd = () => {
     })
   }
 
+  const { shift: mapShift, fitPadding } = getMapLayout(isSheetCollapsed)
+
   return (
     <Page>
-      <MapLayer>
+      <MapLayer $shift={mapShift}>
         {initialCenter && (
           /*
            * 지도를 움직여 위치를 직접 맞추는 화면이라 건물이 구분되는 단계까지
@@ -142,19 +266,31 @@ const ManualPinAdd = () => {
               keyboardShortcuts: false,
               onCenterChanged: handleCenterChanged,
             }}
-          />
+          >
+            <PanToSearched
+              result={searchedResult}
+              fitPadding={fitPadding}
+              onSettled={setSelectedCenter}
+            />
+          </GoogleMap>
         )}
       </MapLayer>
 
-      <SearchBar>
+      <SearchBar onSubmit={handleSearch}>
         <SearchBarInner>
-          <SearchIcon src={searchIcon} alt="" aria-hidden="true" />
+          <SearchButton type="submit" aria-label="주소 검색" disabled={isSearching}>
+            <img src={searchIcon} alt="" />
+          </SearchButton>
           <SearchInput
             type="search"
             value={address}
-            onChange={(event) => setAddress(event.target.value)}
-            aria-label="선택 위치의 주소"
-            placeholder="주소 입력 (선택)"
+            onChange={(event) => {
+              setAddress(event.target.value)
+              setSearchError('')
+            }}
+            aria-label="주소 검색"
+            placeholder="주소를 입력하고 검색하세요"
+            enterKeyHint="search"
           />
         </SearchBarInner>
       </SearchBar>
@@ -170,20 +306,23 @@ const ManualPinAdd = () => {
       </CancelButton>
 
       <Hint>
-        {selectedCenter
-          ? '지도를 움직여 위치를 맞춰주세요'
-          : '현재 위치를 찾는 중...'}
+        {searchError ||
+          (isSearching && '주소를 찾는 중...') ||
+          (selectedCenter
+            ? '지도를 움직여 위치를 맞춰주세요'
+            : '현재 위치를 찾는 중...')}
       </Hint>
 
-      <CenterMarker aria-hidden="true">
+      <CenterMarker $shift={mapShift} aria-hidden="true">
         <MarkerIcon src={markerIcon} alt="" />
         <CrosshairIcon src={crosshairIcon} alt="" />
       </CenterMarker>
 
       <AddressSheet
         ariaLabel="선택한 위치"
-        collapsedOffset={137}
-        height={191}
+        collapsedOffset={SHEET_COLLAPSED_OFFSET}
+        height={SHEET_HEIGHT}
+        onCollapsedChange={setIsSheetCollapsed}
       >
         <LocationLabel>선택한 위치</LocationLabel>
         <LocationTitle>
@@ -223,26 +362,14 @@ const Page = styled.main`
   background: var(--Map-Base);
 `
 
-/* 위는 안내 문구(67 에서 시작해 높이 24), 아래는 주소 시트(191)와
-   하단 내비게이션(75)이 막는다. 핀을 찍을 자리는 그 사이 한가운데다. */
-const HINT_BOTTOM = 67 + 24
-const SHEET_TOP = 191 + 75
-
-/*
- * 지도를 위로 그만큼 빼서 놓는다.
- *
- * 지도의 중심은 늘 담긴 상자의 한가운데라, 상자를 화면에 딱 맞추면 중심이
- * 시트 쪽으로 내려간다. 위로 늘려 두면 중심이 두 상자 사이의 한가운데로
- * 올라오고, 시트를 접어도 아래에 빈자리가 생기지 않는다.
- */
-const MAP_SHIFT = SHEET_TOP - HINT_BOTTOM
-
 const MapLayer = styled.div`
   position: absolute;
-  top: ${-MAP_SHIFT}px;
+  top: ${({ $shift }) => `${-$shift}px`};
   right: 0;
   bottom: 0;
   left: 0;
+  /* 시트를 접고 펼 때 지도와 표시가 같이 미끄러지듯 따라간다. */
+  transition: top 240ms ease;
 `
 
 /* 지도 화면의 핀 추가 버튼과 같은 자리·크기다. */
@@ -252,7 +379,7 @@ const CANCEL_BUTTON_TOP = 19
 
 /* 지도 화면의 여정 선택 드롭바와 같은 자리·높이에 선다.
    두 화면을 오갈 때 같은 줄에 있어야 흔들리지 않는다. */
-const SearchBar = styled.div`
+const SearchBar = styled.form`
   position: absolute;
   z-index: 4;
   /* 지도 화면의 여정 선택 드롭바와 이어지는 이름이다. */
@@ -314,10 +441,26 @@ const SearchBarInner = styled.span`
   gap: 10px;
 `
 
-const SearchIcon = styled.img`
-  width: 18px;
-  height: 18px;
+/* 아이콘을 눌러도 검색되게 버튼으로 둔다. 모습은 그림 그대로다. */
+const SearchButton = styled.button`
   flex: 0 0 auto;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+
+  img {
+    width: 18px;
+    height: 18px;
+    display: block;
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.5;
+  }
 `
 
 const SearchInput = styled.input`
@@ -362,7 +505,8 @@ const Hint = styled.p`
 const CenterMarker = styled.div`
   position: absolute;
   z-index: 3;
-  top: calc(50% - ${MAP_SHIFT / 2 + 65}px);
+  top: ${({ $shift }) => `calc(50% - ${$shift / 2 + 65}px)`};
+  transition: top 240ms ease;
   left: 50%;
   width: 54px;
   height: 66px;

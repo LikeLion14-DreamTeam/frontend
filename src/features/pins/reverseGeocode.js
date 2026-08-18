@@ -105,3 +105,43 @@ export const reverseGeocode = async ({ latitude, longitude }) => {
     return null
   }
 }
+
+/**
+ * 주소나 장소 이름을 좌표로 바꾼다(지오코딩).
+ *
+ * 수동 핀 추가 화면의 주소 검색에 쓴다. 역지오코딩과 같은 지오코더를 쓰므로
+ * 켜야 하는 API 도 같다.
+ *
+ * @returns `{ latitude, longitude, address, viewport }`. 못 찾으면 null.
+ *   `viewport` 는 구글이 권장하는 표시 영역이다. 나라면 나라만큼, 건물이면
+ *   건물 주변만큼 잡혀 있어 그대로 지도에 맞추면 배율이 알아서 정해진다.
+ */
+export const geocodeAddress = async (query) => {
+  const keyword = query?.trim()
+  if (!keyword) return null
+
+  const geocoder = await loadGeocoder()
+  if (!geocoder) return null
+
+  try {
+    const { results } = await geocoder.geocode({
+      address: keyword,
+      language: 'ko',
+    })
+
+    const [best] = results
+    if (!best) return null
+
+    const { location, viewport } = best.geometry
+
+    return {
+      latitude: location.lat(),
+      longitude: location.lng(),
+      address: toReadableAddress(best.formatted_address),
+      viewport: viewport?.toJSON() ?? null,
+    }
+  } catch {
+    // 결과가 없거나(ZERO_RESULTS) 요청이 거절된 경우
+    return null
+  }
+}

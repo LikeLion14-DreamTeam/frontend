@@ -477,10 +477,13 @@ const ManualPinDetails = () => {
 
 export default ManualPinDetails
 
+/* 시안은 상태바 자리(58)까지 포함해 874 로 그렸는데, 브라우저가 이미 그
+   자리를 비켜 그린다. 그대로 두면 헤더 위에 빈 자리가 한 번 더 남는다.
+   아래 자리값들은 모두 시안에서 58 을 뺀 값이다. */
 const Page = styled.main`
   position: relative;
   width: min(100%, 402px);
-  min-height: max(874px, var(--app-viewport-height));
+  min-height: max(816px, var(--app-viewport-height));
   margin: 0 auto;
   overflow: hidden;
   background: var(--Background-Base);
@@ -501,7 +504,7 @@ const Background = styled.img`
 const Header = styled.header`
   position: absolute;
   z-index: 2;
-  top: 58px;
+  top: 0;
   right: 0;
   left: 0;
   height: 50px;
@@ -541,7 +544,7 @@ const HeaderTitle = styled.h1`
 const Content = styled.div`
   position: absolute;
   z-index: 1;
-  top: 136px;
+  top: 78px;
   left: 24px;
   width: calc(100% - 48px);
   display: flex;
@@ -821,7 +824,7 @@ const CharacterCount = styled.span`
 const AddPinButton = styled(Button)`
   position: absolute;
   z-index: 2;
-  top: 766px;
+  top: 708px;
   right: 24px;
   left: 24px;
   width: auto;
@@ -834,7 +837,7 @@ const AddPinButton = styled(Button)`
 const SaveError = styled.p`
   position: absolute;
   z-index: 3;
-  top: 827px;
+  top: 769px;
   right: 24px;
   left: 24px;
   color: #b42318;
