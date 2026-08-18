@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import styled from 'styled-components'
 import {
   Marker,
-  Polyline,
   useApiIsLoaded,
   useMap,
   useMapsLibrary,
@@ -11,6 +10,7 @@ import {
 import GoogleMap, { FOCUS_ZOOM } from '../../components/common/GoogleMap'
 import MapOverlay from '../../components/common/MapOverlay'
 import PinPopover from '../../components/common/PinPopover'
+import RoutePolyline from '../../components/common/RoutePolyline'
 import NavBar from '../../components/layout/NavBar'
 import currentPositionSvg from '../../assets/map/current-position.svg?raw'
 import dropdownCheckIcon from '../../assets/map/dropdown-check.svg'
@@ -763,12 +763,7 @@ const MapPage = () => {
               onClick: () => setSelectedPinId(null),
             }}
           >
-            <Polyline
-              path={routePath}
-              strokeColor="#c99a45"
-              strokeOpacity={0.92}
-              strokeWeight={3}
-            />
+            <RoutePolyline path={routePath} />
 
             {mapPins.map((pin) => {
               const isSelected = pin.pin_id === selectedPinId

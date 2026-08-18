@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Polyline } from '@vis.gl/react-google-maps'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import styled from 'styled-components'
 import noteEditIcon from '../../assets/map/note-edit.svg'
 import paperTexture from '../../assets/pin-save/manual-pin-form-bg.png'
 import GoogleMap, { FOCUS_ZOOM } from '../../components/common/GoogleMap'
+import RoutePolyline from '../../components/common/RoutePolyline'
 import Header from '../../components/layout/Header'
 import {
   PhotobookCityHeader,
@@ -475,14 +475,7 @@ const TripArchive = () => {
                       keyboardShortcuts: false,
                     }}
                   >
-                    {routePath.length > 1 ? (
-                      <Polyline
-                        path={routePath}
-                        strokeColor="#c99a45"
-                        strokeOpacity={0.92}
-                        strokeWeight={3}
-                      />
-                    ) : null}
+                    <RoutePolyline path={routePath} />
                   </GoogleMap>
                 ) : (
                   <MapPlaceholder>위치 정보가 없습니다.</MapPlaceholder>
