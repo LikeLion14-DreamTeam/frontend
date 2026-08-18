@@ -6,14 +6,14 @@ import {
   updateMockPhotobookNameBySegment,
 } from '../photobooks/photobookMock'
 import {
-  deleteMcmDemoTrip,
-  getMcmDemoCountryStamps,
-  getMcmDemoTripList,
-  getMcmDemoTripPins,
-  getMcmDemoTripSummary,
-  isMcmDemoSegmentId,
-  updateMcmDemoTrip,
-} from '../demo/mcmDemoData'
+  deleteDemoTrip,
+  getDemoCountryStamps,
+  getDemoTripList,
+  getDemoTripPins,
+  getDemoTripSummary,
+  isDemoSegmentId,
+  updateDemoTrip,
+} from '../demo/demoJourneyData'
 import { mockPinStore } from '../pins/pinMock'
 import {
   getMockPhotoCount,
@@ -351,7 +351,7 @@ export const getCountryStamps = async () => {
       cities: [...(stamp.cities ?? [])],
     }))
     const stamps = sortCountryStamps(
-      prependDemoItems(mockStamps, getMcmDemoCountryStamps(), 'country_code'),
+      prependDemoItems(mockStamps, getDemoCountryStamps(), 'country_code'),
     )
 
     // 새 도장 연출은 생성 직후의 첫 여권 조회에서만 쓴다.
@@ -371,7 +371,7 @@ export const getCountryStamps = async () => {
   return {
     ...response,
     stamps: sortCountryStamps(
-      prependDemoItems(response.stamps, getMcmDemoCountryStamps(), 'country_code'),
+      prependDemoItems(response.stamps, getDemoCountryStamps(), 'country_code'),
     ),
   }
 }
@@ -390,7 +390,7 @@ export const getTrips = async ({ limit = 20 } = {}) => {
             countries,
           }),
         ),
-        getMcmDemoTripList(),
+        getDemoTripList(),
         'segment_id',
       ),
       next_cursor: null,
@@ -404,15 +404,15 @@ export const getTrips = async ({ limit = 20 } = {}) => {
 
   return {
     ...response,
-    trips: prependDemoItems(response.trips, getMcmDemoTripList(), 'segment_id'),
+    trips: prependDemoItems(response.trips, getDemoTripList(), 'segment_id'),
   }
 }
 
 /** 4.2 여행 구간 상세(요약) 조회 */
 export const getTrip = async (segmentId) => {
-  const demoTrip = getMcmDemoTripSummary(segmentId)
+  const demoTrip = getDemoTripSummary(segmentId)
   if (demoTrip) return demoTrip
-  if (isMcmDemoSegmentId(segmentId)) throw mockNotFound()
+  if (isDemoSegmentId(segmentId)) throw mockNotFound()
 
   if (USE_MOCK) {
     return buildMockTripSummary(segmentId)
@@ -431,8 +431,8 @@ export const updateTrip = async (
   segmentId,
   { name, startAt, endAt, pinInclusions },
 ) => {
-  if (isMcmDemoSegmentId(segmentId)) {
-    const updated = updateMcmDemoTrip(segmentId, {
+  if (isDemoSegmentId(segmentId)) {
+    const updated = updateDemoTrip(segmentId, {
       name,
       startAt,
       endAt,
@@ -477,8 +477,8 @@ export const updateTrip = async (
  * 204 No Content 라 반환값이 없다.
  */
 export const deleteTrip = async (segmentId) => {
-  if (isMcmDemoSegmentId(segmentId)) {
-    if (!deleteMcmDemoTrip(segmentId)) throw mockNotFound()
+  if (isDemoSegmentId(segmentId)) {
+    if (!deleteDemoTrip(segmentId)) throw mockNotFound()
     return null
   }
 
@@ -509,14 +509,14 @@ export const deleteTrip = async (segmentId) => {
  * 제외된 핀도 included_in_segment: false 로 함께 온다.
  */
 export const getTripPins = async (segmentId, { limit = 20 } = {}) => {
-  const demoPins = getMcmDemoTripPins(segmentId)
+  const demoPins = getDemoTripPins(segmentId)
   if (demoPins) {
     return {
       pins: demoPins.slice(0, limit),
       next_cursor: null,
     }
   }
-  if (isMcmDemoSegmentId(segmentId)) throw mockNotFound()
+  if (isDemoSegmentId(segmentId)) throw mockNotFound()
 
   if (USE_MOCK) {
     if (!mockTripStore.trips[segmentId]) throw mockNotFound()
