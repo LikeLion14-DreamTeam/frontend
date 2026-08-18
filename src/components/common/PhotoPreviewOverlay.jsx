@@ -142,13 +142,20 @@ const PreviewStage = styled.div`
   position: relative;
   width: 100%;
   margin-top: 59px;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 `
 
 const PreviewPhoto = styled.img`
-  width: 100%;
-  aspect-ratio: 3 / 4;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
   display: block;
-  object-fit: cover;
+  object-fit: contain;
   background: #d5d5d5;
 `
 
