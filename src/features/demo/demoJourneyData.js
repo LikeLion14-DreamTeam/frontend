@@ -40,6 +40,7 @@ export const DKM_DEMO_PHOTOBOOK_ID = -9002
 export const DKM_DEMO_STAMP_CODE = 'DKM'
 
 export const DEMO_JOURNEY_STORAGE_KEY = 'orte:demo-journey-state:v2'
+export const DEMO_JOURNEY_CHANGED_EVENT = 'orte:demo-journey-changed'
 
 const LEGACY_STORAGE_KEYS = ['orte:mcm-demo-state:v1']
 
@@ -646,6 +647,10 @@ const persistDemoJourneyState = () => {
   } catch (error) {
     console.warn('Demo journey state could not be saved.', error)
   }
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(DEMO_JOURNEY_CHANGED_EVENT))
+  }
 }
 
 export const resetDemoJourneyData = ({ reload = true } = {}) => {
@@ -850,6 +855,17 @@ export const getDemoTripList = () =>
     const trip = demoJourneyState.trips[segmentId]
     return trip ? [clone(trip)] : []
   })
+
+export const getDemoAccountStats = () => {
+  const pins = getAllStoredDemoPins()
+  const visitedCities = new Set(pins.map((pin) => pin.city).filter(Boolean))
+
+  return {
+    pin_count: pins.length,
+    completed_trip_count: getDemoTripList().filter((trip) => trip.status).length,
+    visited_city_count: visitedCities.size,
+  }
+}
 
 export const getMcmDemoTripList = () =>
   getDemoTripList().filter((trip) => trip.segment_id === MCM_DEMO_SEGMENT_ID)
