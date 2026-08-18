@@ -376,7 +376,7 @@ const Home = () => {
                     </ProductIdentity>
 
                     <StartJourneyLink to="/record/multi-capture">
-                      {currentTrip ? '눌러서 여정 계속하기' : '눌러서 여정 시작하기'}
+                      {hasPins ? '눌러서 여정 계속하기' : '눌러서 여정 시작하기'}
                     </StartJourneyLink>
                   </LastTaggedBody>
                 </LastTaggedCard>
