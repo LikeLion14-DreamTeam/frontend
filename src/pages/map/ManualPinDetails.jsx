@@ -3,13 +3,13 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { uploadAudio } from '../../api/uploads'
 import Button from '../../components/common/Button'
-import { createPin } from '../../features/pins/pinApi'
+import { createPin, deletePin } from '../../features/pins/pinApi'
 import PhotoPreviewOverlay, {
   PreviewDeleteButton,
 } from '../../components/common/PhotoPreviewOverlay'
 import {
-  addCapturedPhotos,
   attachUploadedPhotos,
+  uploadCapturedPhotos,
 } from '../../features/pins/recordPhotos'
 import { reverseGeocode } from '../../features/pins/reverseGeocode'
 import useVoiceRecorder, {
@@ -211,6 +211,15 @@ const ManualPinDetails = () => {
         }
       }
 
+      /* 사진을 핀보다 먼저 올린다. 여기서 실패하면 핀은 아직 만들지 않은
+         상태라, 사진 없는 핀이 남지 않는다. */
+      if (photos.length > 0 && !uploadedPhotosRef.current) {
+        uploadedPhotosRef.current = await uploadCapturedPhotos(photos, {
+          latitude,
+          longitude,
+        })
+      }
+
       if (!createdPinIdRef.current) {
         // 아직 안 끝났으면 기다린다. 도시가 비면 방문 도시와 도장이 빠진다.
         const place = await resolveLocationDetails()
@@ -231,26 +240,23 @@ const ManualPinDetails = () => {
         createdPinIdRef.current = createdPin.pin_id
       }
 
-      if (photos.length > 0) {
-        let photoResult
-
-        if (uploadedPhotosRef.current) {
-          photoResult = await attachUploadedPhotos(
+      if (uploadedPhotosRef.current) {
+        /* 붙이는 데 실패하면 방금 만든 핀을 지운다. 사진 없는 핀을 남기지
+           않는다. 올려 둔 파일은 그대로라, 다시 시도하면 핀만 새로 만든다. */
+        try {
+          const photoResult = await attachUploadedPhotos(
             createdPinIdRef.current,
             uploadedPhotosRef.current,
           )
-        } else {
-          const uploadResult = await addCapturedPhotos(
-            createdPinIdRef.current,
-            photos,
-            { latitude, longitude },
-          )
-          uploadedPhotosRef.current = uploadResult.uploadedPhotos
-          photoResult = uploadResult.result
-        }
 
-        if ((photoResult.rejected?.length ?? 0) > 0) {
-          throw new Error('일부 사진을 핀에 첨부하지 못했습니다.')
+          if ((photoResult.rejected?.length ?? 0) > 0) {
+            throw new Error('일부 사진을 핀에 첨부하지 못했습니다.')
+          }
+        } catch (error) {
+          // 지우는 것까지 실패해도 알릴 것은 원래 오류다.
+          await deletePin(createdPinIdRef.current).catch(() => {})
+          createdPinIdRef.current = null
+          throw error
         }
       }
 
