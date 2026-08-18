@@ -1008,16 +1008,23 @@ const HeadingGroup = styled.div`
   gap: 8px;
 `
 
+/* 홈의 여정 이름과 같은 방식이다. 아이콘 아래끝을 제목 글자 아래끝에 맞춰
+   바로 옆에 붙인다. */
 const TitleRow = styled.div`
+  /* 제목이 길어 버튼이 오른쪽으로 밀릴 때, 아래 기록 수정 버튼과 같은 자리에서
+     멈추도록 그 버튼의 오른쪽 여백(12)만큼 남긴다. */
+  max-width: calc(100% - 12px);
   min-width: 0;
   display: flex;
-  align-items: center;
-  gap: 10px;
+  align-items: baseline;
+  gap: 8px;
 `
 
 const PinTitle = styled.h1`
   min-width: 0;
-  flex: 1 1 auto;
+  /* 늘어나지 않고 글에 맞춘다. 늘어나면 수정 버튼이 줄 끝으로 밀린다.
+     긴 제목은 여전히 줄어들며 말줄임으로 넘어간다. */
+  flex: 0 1 auto;
   overflow: hidden;
   color: var(--Text-Primary);
   font: var(--text-ui-h2);
@@ -1120,7 +1127,7 @@ const EditNoteButton = styled.button`
 
 /* 기록 수정 버튼과 같은 그림이다. 제목 옆에 서므로 여백만 다르게 준다. */
 const EditNameButton = styled(EditNoteButton)`
-  align-self: center;
+  align-self: baseline;
   margin: 0;
 `
 
