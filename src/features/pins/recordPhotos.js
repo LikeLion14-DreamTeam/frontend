@@ -1,5 +1,9 @@
 import { uploadPhoto } from '../../api/uploads'
 import { addPinPhotos } from './pinApi'
+import {
+  assertWithinPinPhotoLimit,
+  runPhotoBatches,
+} from './photoUploadQueue'
 
 /**
  * 아직 못 올린 사진을 올려 `{ [사진 id]: 첨부용 사진 }` 으로 모은다.
@@ -16,28 +20,45 @@ import { addPinPhotos } from './pinApi'
  */
 export const uploadCapturedPhotos = async (
   photos,
-  { latitude, longitude },
+  { latitude, longitude, onProgress },
   uploadedById = {},
 ) => {
-  const results = await Promise.allSettled(
-    photos
-      .filter((photo) => !uploadedById[photo.id])
-      .map(async (photo) => [
-        photo.id,
-        {
-          file_id: await uploadPhoto(photo.file),
-          captured_at: photo.capturedAt,
-          latitude,
-          longitude,
-        },
-      ]),
+  assertWithinPinPhotoLimit(photos)
+
+  const pendingPhotos = photos.filter((photo) => !uploadedById[photo.id])
+  const alreadyUploadedCount = photos.length - pendingPhotos.length
+  let uploaded = { ...uploadedById }
+
+  await runPhotoBatches(
+    pendingPhotos,
+    async (batch) => {
+      const results = await Promise.allSettled(
+        batch.map(async (photo) => [
+          photo.id,
+          {
+            file_id: await uploadPhoto(photo.file),
+            captured_at: photo.capturedAt,
+            latitude,
+            longitude,
+          },
+        ]),
+      )
+
+      const succeeded = results
+        .filter((result) => result.status === 'fulfilled')
+        .map((result) => result.value)
+
+      uploaded = { ...uploaded, ...Object.fromEntries(succeeded) }
+    },
+    {
+      onProgress,
+      phase: 'upload',
+      completedOffset: alreadyUploadedCount,
+      total: photos.length,
+    },
   )
 
-  const uploaded = results
-    .filter((result) => result.status === 'fulfilled')
-    .map((result) => result.value)
-
-  return { ...uploadedById, ...Object.fromEntries(uploaded) }
+  return uploaded
 }
 
 /** 올린 사진을 원래 순서대로 줄 세운다. 다시 시도해도 순서가 흐트러지지 않는다. */
@@ -45,5 +66,36 @@ export const orderUploadedPhotos = (photos, uploadedById) =>
   photos.map((photo) => uploadedById[photo.id]).filter(Boolean)
 
 /** 올려 둔 파일 ID 를 핀에 촬영 순서대로 첨부한다(5.5). */
-export const attachUploadedPhotos = (pinId, uploadedPhotos) =>
-  addPinPhotos(pinId, uploadedPhotos)
+export const attachUploadedPhotos = async (
+  pinId,
+  uploadedPhotos,
+  { onProgress } = {},
+) => {
+  assertWithinPinPhotoLimit(uploadedPhotos)
+
+  const results = await runPhotoBatches(
+    uploadedPhotos,
+    async (batch) => {
+      try {
+        return await addPinPhotos(pinId, batch)
+      } catch (error) {
+        return {
+          added: [],
+          rejected: batch.map((photo) => ({
+            file_id: photo.file_id,
+            reason: error.code ?? 'BATCH_UPLOAD_FAILED',
+          })),
+        }
+      }
+    },
+    { onProgress, phase: 'attach' },
+  )
+
+  return results.reduce(
+    (merged, result) => ({
+      added: [...merged.added, ...(result.added ?? [])],
+      rejected: [...merged.rejected, ...(result.rejected ?? [])],
+    }),
+    { added: [], rejected: [] },
+  )
+}

@@ -7,6 +7,7 @@ import ConfirmationModal from '../../components/common/ConfirmationModal'
 import GoogleMap from '../../components/common/GoogleMap'
 import SnapSheet from '../../components/common/SnapSheet'
 import PhotoPreviewOverlay from '../../components/common/PhotoPreviewOverlay'
+import PhotoUploadStatus from '../../components/common/PhotoUploadStatus'
 import VoiceMemoBar from '../../components/common/VoiceMemoBar'
 import activePinIcon from '../../assets/map/map-pin-active.svg'
 import deleteWarningIcon from '../../assets/icons/delete-warning.svg'
@@ -27,6 +28,10 @@ import {
   addNearbyPhotos,
   describeRejected,
 } from '../../features/pins/nearbyPhotos'
+import {
+  MAX_PIN_PHOTOS,
+  getRemainingPhotoCapacity,
+} from '../../features/pins/photoUploadQueue'
 import { getTrip, getTripPins } from '../../features/trips/tripApi'
 
 // 지도에서 넘어오는 경로가 아직 없어 pinID 가 비면 이 값을 쓴다.
@@ -169,6 +174,7 @@ const PinDetail = () => {
   const fileInputRef = useRef(null)
   const [isUploading, setIsUploading] = useState(false)
   const [addMessage, setAddMessage] = useState('')
+  const [uploadProgress, setUploadProgress] = useState(null)
 
   useEffect(() => {
     const updateViewportHeight = () => setViewportHeight(window.innerHeight)
@@ -371,12 +377,22 @@ const PinDetail = () => {
 
     setIsUploading(true)
     setAddMessage('')
+    setUploadProgress(null)
 
     try {
-      const { added, rejected } = await addNearbyPhotos(pinID, files)
+      const { added, rejected } = await addNearbyPhotos(pinID, files, {
+        currentPhotoCount: photos.length,
+        onProgress: setUploadProgress,
+      })
 
       const lines = []
-      if (added.length > 0) lines.push(`사진 ${added.length}장을 추가했어요.`)
+      if (added.length > 0) {
+        lines.push(
+          rejected.length > 0
+            ? `${files.length}장 중 ${added.length}장을 추가했어요.`
+            : `사진 ${added.length}장을 추가했어요.`,
+        )
+      }
       if (rejected.length > 0) {
         lines.push(
           `${rejected.length}장은 추가하지 못했어요 · ${describeRejected(rejected)}`,
@@ -390,6 +406,7 @@ const PinDetail = () => {
       setAddMessage(error.message)
     } finally {
       setIsUploading(false)
+      setUploadProgress(null)
     }
   }
 
@@ -663,6 +680,10 @@ const PinDetail = () => {
             <SectionHeading>
               <EditorialTitle>PHOTOS</EditorialTitle>
               <HeadingLine />
+              <PhotoCapacity>
+                {photos.length}/{MAX_PIN_PHOTOS} ·{' '}
+                {getRemainingPhotoCapacity(photos.length)}장 남음
+              </PhotoCapacity>
               <TextAction
                 type="button"
                 onClick={() => navigate('./photos')}
@@ -707,16 +728,22 @@ const PinDetail = () => {
               <AddPhotoButton
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-                aria-label="주변 사진 추가"
+                disabled={isUploading || photos.length >= MAX_PIN_PHOTOS}
+                aria-label={
+                  photos.length >= MAX_PIN_PHOTOS
+                    ? '사진을 최대 50장까지 추가했습니다'
+                    : '주변 사진 추가'
+                }
               >
                 <img src={photoAddIcon} alt="" />
               </AddPhotoButton>
             </PhotoGrid>
 
-            {(isUploading || addMessage) && (
+            {isUploading && <PhotoUploadStatus progress={uploadProgress} />}
+            {addMessage && <AddMessage role="status">{addMessage}</AddMessage>}
+            {photos.length >= MAX_PIN_PHOTOS && !addMessage && (
               <AddMessage role="status">
-                {isUploading ? '사진을 추가하는 중...' : addMessage}
+                한 핀에는 사진을 최대 {MAX_PIN_PHOTOS}장까지 추가할 수 있어요.
               </AddMessage>
             )}
           </PhotosSection>
@@ -1344,6 +1371,12 @@ const AddMessage = styled.p`
   color: var(--Text-Secondary);
   font: var(--text-ui-caption);
   word-break: keep-all;
+`
+
+const PhotoCapacity = styled.span`
+  flex: 0 0 auto;
+  color: var(--Text-Secondary);
+  font: var(--text-ui-caption);
 `
 
 const PhotoStack = styled.div`
