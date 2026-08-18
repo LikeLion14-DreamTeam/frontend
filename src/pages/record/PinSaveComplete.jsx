@@ -41,6 +41,18 @@ const formatRecordTime = (capturedAt) => {
   }).format(date)
 }
 
+/*
+ * 위치 권한은 허용했지만 기기가 좌표를 못 잡은 경우에 쓰는 문구.
+ *
+ * 좌표가 없으면 사진도 붙일 수 없어(5.5 반경 검사) 핀만 덩그러니 남는다.
+ * 그래서 만들기 전에 막고, 왜 안 되는지와 무엇을 하면 되는지 알려 준다.
+ */
+const NO_LOCATION_MESSAGE =
+  '지금 위치를 확인하지 못해 저장할 수 없어요. 위치를 찾은 뒤 다시 시도해주세요.'
+
+const LOCATE_FAILED_MESSAGE =
+  '여전히 위치를 확인하지 못했어요. 실내라면 창가로 나가 잠시 후 다시 시도해주세요.'
+
 const PinSaveComplete = () => {
   const navigate = useNavigate()
   const photos = useRecordDraftStore((draft) => draft.photos)
@@ -57,12 +69,15 @@ const PinSaveComplete = () => {
   const setLocationDetails = useRecordDraftStore(
     (draft) => draft.setLocationDetails,
   )
+  const setCoordinates = useRecordDraftStore((draft) => draft.setCoordinates)
   const clearDraft = useRecordDraftStore((draft) => draft.clearDraft)
 
   const [memo, setMemo] = useState(storedTextNote)
   const [placeName, setPlaceName] = useState(storedPlaceName)
   const [isVoiceSheetOpen, setIsVoiceSheetOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isLocating, setIsLocating] = useState(false)
+  const [locateError, setLocateError] = useState('')
   const [saveError, setSaveError] = useState('')
   const createdPinIdRef = useRef(null)
   const uploadedPhotosRef = useRef(null)
@@ -84,12 +99,14 @@ const PinSaveComplete = () => {
     handlers: photoSwipe,
   } = useSwipeNavigation(photos.length)
 
+  const hasLocation = latitude != null && longitude != null
+
   const record = {
     location:
       address ||
-      (latitude != null && longitude != null
+      (hasLocation
         ? `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`
-        : '위치 정보 없음'),
+        : '위치를 확인하지 못했어요'),
     // 촬영 시각은 지금 보고 있는 사진 기준이다.
     time: formatRecordTime(photos[photoIndex]?.capturedAt),
     photoCount: photos.length,
@@ -192,8 +209,37 @@ const PinSaveComplete = () => {
     navigate(`/record/multi-capture${tagQuery}`)
   }
 
+  const handleRetryLocation = () => {
+    if (isLocating || !navigator.geolocation) return
+
+    setIsLocating(true)
+    setLocateError('')
+
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setCoordinates({
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+        })
+        setIsLocating(false)
+      },
+      () => {
+        setLocateError(LOCATE_FAILED_MESSAGE)
+        setIsLocating(false)
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    )
+  }
+
   const handleSave = async () => {
     if (photos.length === 0 || isSaving) return
+
+    /* 좌표 없이 핀을 만들면 사진을 붙이지 못해 빈 핀만 남는다.
+       만들기 전에 막아야 되돌릴 것이 없다. */
+    if (!hasLocation) {
+      setSaveError(NO_LOCATION_MESSAGE)
+      return
+    }
 
     setIsSaving(true)
     setSaveError('')
@@ -341,6 +387,20 @@ const PinSaveComplete = () => {
           </NoteActions>
         </NoteField>
 
+        {/* 좌표가 없으면 저장 자체가 막히므로, 누르기 전에 미리 알린다. */}
+        {!hasLocation && (
+          <LocationNotice role="status">
+            <NoticeText>{locateError || NO_LOCATION_MESSAGE}</NoticeText>
+            <RetryButton
+              type="button"
+              onClick={handleRetryLocation}
+              disabled={isLocating}
+            >
+              {isLocating ? '위치 찾는 중...' : '위치 다시 찾기'}
+            </RetryButton>
+          </LocationNotice>
+        )}
+
         <Footer>
           <FooterButton
             type="button"
@@ -354,7 +414,7 @@ const PinSaveComplete = () => {
             type="button"
             $variant="primary"
             onClick={handleSave}
-            disabled={isSaving || photos.length === 0}
+            disabled={isSaving || photos.length === 0 || !hasLocation}
           >
             {isSaving ? '저장 중...' : '저장하고 홈으로'}
           </FooterButton>
@@ -714,6 +774,39 @@ const FooterButton = styled(Button)`
   width: auto;
   flex: 1 1 0;
   font: var(--text-ui-button);
+`
+
+const LocationNotice = styled.div`
+  margin-top: 16px;
+  border: 1px solid var(--Primary-Cognac);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgb(181 118 59 / 9%);
+`
+
+const NoticeText = styled.p`
+  color: var(--Text-Primary);
+  font: var(--text-ui-caption);
+  word-break: keep-all;
+`
+
+const RetryButton = styled.button`
+  min-height: 40px;
+  border: 0;
+  border-radius: 20px;
+  background: var(--Primary-Cognac);
+  color: var(--Text-Inverse);
+  font: var(--text-ui-caption);
+  cursor: pointer;
+
+  &:disabled {
+    background: var(--State-Disabled-Fill);
+    color: var(--State-Disabled-Text);
+    cursor: not-allowed;
+  }
 `
 
 const SaveError = styled.p`

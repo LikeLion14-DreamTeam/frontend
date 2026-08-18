@@ -57,6 +57,9 @@ const MultiCapture = () => {
   const setTagId = useRecordDraftStore((draft) => draft.setTagId)
   const setPhotos = useRecordDraftStore((draft) => draft.setPhotos)
   const setCoordinates = useRecordDraftStore((draft) => draft.setCoordinates)
+  const clearCoordinates = useRecordDraftStore(
+    (draft) => draft.clearCoordinates,
+  )
   const clearDraft = useRecordDraftStore((draft) => draft.clearDraft)
 
   const queryTagId = (
@@ -164,11 +167,13 @@ const MultiCapture = () => {
       })
   }, [queryTagId, setTagId])
 
+  /* 좌표를 못 받으면 표시를 세우지 않아, 촬영 화면에 다시 들어올 때마다
+     새로 물어본다. 실내에서 실패한 뒤 밖에 나가 이어 찍는 경우가 있다. */
   useEffect(() => {
     if (hasResolvedLocation) return
 
     if (!navigator.geolocation) {
-      setCoordinates({ latitude: null, longitude: null })
+      clearCoordinates()
       return
     }
 
@@ -179,13 +184,11 @@ const MultiCapture = () => {
           longitude: coords.longitude,
         })
       },
-      () => {
-        // 위치를 얻지 못해도 촬영과 핀 저장은 계속할 수 있다.
-        setCoordinates({ latitude: null, longitude: null })
-      },
+      // 촬영은 계속할 수 있다. 저장 화면에서 위치를 다시 찾으면 된다.
+      () => clearCoordinates(),
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
     )
-  }, [hasResolvedLocation, setCoordinates])
+  }, [clearCoordinates, hasResolvedLocation, setCoordinates])
 
   const handleFlipCamera = () => {
     setFacingMode((current) =>
