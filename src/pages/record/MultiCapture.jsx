@@ -34,8 +34,16 @@ const FRONT_CAMERA = 'user'
 
 const JPEG_QUALITY = 0.92
 
-/* 배율 버튼에 올릴 값. 기기가 지원하는 범위 안의 것만 쓴다. */
-const ZOOM_STEPS = [1, 2, 3]
+/* 배율 버튼에 올릴 값. 기기가 지원하는 범위 안의 것만 쓴다.
+   0.5 는 후면 광각을 여는 기기에서만 나타난다. */
+const ZOOM_STEPS = [0.5, 1, 2]
+
+/* 손짓으로 당길 수 있는 상한. 기기는 더 열어 주기도 하지만 그 위로는 센서에서
+   잘라낸 영역이 너무 작아져 알아보기 어렵다. */
+const MAX_ZOOM = 9
+
+/** `1x`, `2.4x` 처럼 다듬는다. 소수 첫째 자리까지만 본다. */
+const formatZoom = (value) => `${Number(value.toFixed(1))}x`
 
 // 저장 비율 3:4 고정. 뷰파인더도 같은 비율이라 보이는 그대로 찍힌다.
 const CAPTURE_RATIO = 3 / 4
@@ -81,9 +89,14 @@ const MultiCapture = () => {
   const [status, setStatus] = useState('starting')
   const [errorMessage, setErrorMessage] = useState('')
   const [facingMode, setFacingMode] = useState(BACK_CAMERA)
-  /* 기기가 배율을 지원할 때만 채워진다. 못 하면 버튼을 아예 그리지 않는다. */
+  /* 기기가 배율을 지원할 때만 채워진다. 못 하면 버튼도 손짓도 없다. */
   const [zoomSteps, setZoomSteps] = useState([])
   const [zoom, setZoom] = useState(1)
+  /** 지금 카메라가 받아주는 범위. 상한은 `MAX_ZOOM` 으로 한 번 더 누른다. */
+  const zoomRangeRef = useRef(null)
+  const zoomRef = useRef(1)
+  const pinchRef = useRef(null)
+  const zoomFrameRef = useRef(0)
   const [isConfirmingClose, setIsConfirmingClose] = useState(false)
   /** 빠르게 여러 번 전환했을 때 늦게 도착한 스트림을 버리기 위한 표식 */
   const streamRequestRef = useRef(0)
@@ -136,11 +149,17 @@ const MultiCapture = () => {
       const [videoTrack] = stream.getVideoTracks()
       const zoomRange = videoTrack?.getCapabilities?.().zoom
 
+      const range = zoomRange
+        ? { min: zoomRange.min, max: Math.min(zoomRange.max, MAX_ZOOM) }
+        : null
+
+      zoomRangeRef.current = range
+      zoomRef.current = 1
       setZoom(1)
       setZoomSteps(
-        zoomRange
+        range
           ? ZOOM_STEPS.filter(
-              (step) => step >= zoomRange.min && step <= zoomRange.max,
+              (step) => step >= range.min && step <= range.max,
             )
           : [],
       )
@@ -221,17 +240,71 @@ const MultiCapture = () => {
     )
   }, [clearCoordinates, hasResolvedLocation, setCoordinates])
 
-  const handleZoom = async (nextZoom) => {
-    const [track] = streamRef.current?.getVideoTracks() ?? []
-    if (!track) return
+  /**
+   * 배율을 기기에 넘긴다.
+   *
+   * 핀치는 손가락이 움직이는 내내 불리므로 실제 요청은 한 프레임에 한 번만
+   * 보낸다. 매번 보내면 카메라가 따라오지 못해 화면이 끊긴다.
+   */
+  const applyZoom = useCallback((value) => {
+    const range = zoomRangeRef.current
+    if (!range) return
 
-    try {
-      await track.applyConstraints({ advanced: [{ zoom: nextZoom }] })
-      setZoom(nextZoom)
-    } catch {
+    const next = Math.min(range.max, Math.max(range.min, value))
+
+    zoomRef.current = next
+    setZoom(next)
+
+    if (zoomFrameRef.current) return
+
+    zoomFrameRef.current = requestAnimationFrame(() => {
+      zoomFrameRef.current = 0
+
+      const [track] = streamRef.current?.getVideoTracks() ?? []
+      if (!track) return
+
       // 못 바꿔도 촬영은 그대로 할 수 있다.
+      track
+        .applyConstraints({ advanced: [{ zoom: zoomRef.current }] })
+        .catch(() => {})
+    })
+  }, [])
+
+  /* 손가락 두 개 사이 거리. 벌리면 커지고 오므리면 작아진다. */
+  const touchGap = (touches) =>
+    Math.hypot(
+      touches[0].clientX - touches[1].clientX,
+      touches[0].clientY - touches[1].clientY,
+    )
+
+  const handlePinchStart = (event) => {
+    if (event.touches.length !== 2 || !zoomRangeRef.current) return
+
+    pinchRef.current = {
+      gap: touchGap(event.touches),
+      startZoom: zoomRef.current,
     }
   }
+
+  const handlePinchMove = (event) => {
+    const pinch = pinchRef.current
+    if (!pinch || event.touches.length !== 2) return
+
+    const gap = touchGap(event.touches)
+    if (!gap) return
+
+    applyZoom(pinch.startZoom * (gap / pinch.gap))
+  }
+
+  const handlePinchEnd = () => {
+    pinchRef.current = null
+  }
+
+  /* 켜진 것으로 볼 단계. 지금 배율보다 크지 않은 것 중 가장 큰 값이다. */
+  const activeZoomStep = zoomSteps.reduce(
+    (best, step) => (step <= zoom + 0.001 ? step : best),
+    zoomSteps[0],
+  )
 
   const handleFlipCamera = () => {
     setFacingMode((current) =>
@@ -344,7 +417,12 @@ const MultiCapture = () => {
       <DarkSafeArea />
 
       <ViewfinderArea>
-        <Viewfinder>
+        <Viewfinder
+          onTouchStart={handlePinchStart}
+          onTouchMove={handlePinchMove}
+          onTouchEnd={handlePinchEnd}
+          onTouchCancel={handlePinchEnd}
+        >
           <Preview
             ref={videoRef}
             $mirrored={isFrontCamera}
@@ -360,17 +438,24 @@ const MultiCapture = () => {
 
           {zoomSteps.length > 1 && (
             <ZoomBar role="group" aria-label="배율">
-              {zoomSteps.map((step) => (
-                <ZoomButton
-                  key={step}
-                  type="button"
-                  $active={step === zoom}
-                  aria-pressed={step === zoom}
-                  onClick={() => handleZoom(step)}
-                >
-                  {step}x
-                </ZoomButton>
-              ))}
+              {zoomSteps.map((step) => {
+                /* 지금 배율 이하의 가장 큰 단계가 켜진다. 손짓으로 2.4배가 되면
+                   2x 버튼이 켜지고 글자가 그 값으로 바뀐다. */
+                const isActive = step === activeZoomStep
+
+                return (
+                  <ZoomButton
+                    key={step}
+                    type="button"
+                    $active={isActive}
+                    aria-pressed={isActive}
+                    aria-label={`${step}배`}
+                    onClick={() => applyZoom(step)}
+                  >
+                    {isActive ? formatZoom(zoom) : formatZoom(step)}
+                  </ZoomButton>
+                )
+              })}
             </ZoomBar>
           )}
 
@@ -516,6 +601,8 @@ const Viewfinder = styled.div`
   );
   aspect-ratio: 3 / 4;
   overflow: hidden;
+  /* 두 손가락 손짓을 브라우저에 넘기지 않는다. 넘기면 화면 자체가 확대된다. */
+  touch-action: none;
   /* 시안의 빈 뷰파인더 색은 #9c9c9c 지만, 폭이 소수점이라 영상이 채우고 남은
      0.x px 이 밝은 테두리처럼 보인다. 화면 배경색과 맞춰 눈에 띄지 않게 한다. */
   background: var(--Text-Primary);
@@ -539,26 +626,28 @@ const ViewfinderTint = styled.div`
   background: rgb(20 17 16 / 12%);
 `
 
-/* 뷰파인더 아래 가운데. 전환 버튼은 오른쪽 아래라 겹치지 않는다. */
+/* 뷰파인더 왼쪽 아래. 전환 버튼이 오른쪽 아래라 좌우로 나뉜다.
+   큰 배율이 위로 오도록 세로로 세운다. */
 const ZoomBar = styled.div`
   position: absolute;
   z-index: 4;
-  bottom: 12px;
-  left: 50%;
+  bottom: 8px;
+  left: 8px;
   padding: 4px;
   display: flex;
+  flex-direction: column-reverse;
   gap: 4px;
-  border-radius: 18px;
+  border-radius: 19px;
   background: rgb(0 0 0 / 40%);
-  transform: translateX(-50%);
 `
 
+/* 글자가 `2.4x` 로 늘어날 수 있어 폭을 고정하지 않고 최소만 잡는다. */
 const ZoomButton = styled.button`
-  width: 34px;
-  height: 28px;
-  padding: 0;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 6px;
   border: 0;
-  border-radius: 14px;
+  border-radius: 15px;
   background: ${({ $active }) => ($active ? 'rgb(255 255 255 / 92%)' : 'transparent')};
   color: ${({ $active }) => ($active ? 'var(--Text-Primary)' : '#fff')};
   font-family: var(--font-sans);
