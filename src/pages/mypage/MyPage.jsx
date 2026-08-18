@@ -1257,7 +1257,8 @@ const PreferenceLabels = styled.div`
 
 const PreferenceSlider = styled.input`
   width: 100%;
-  height: 20px;
+  /* Keep the 10px thumb visually unchanged while providing a mobile-friendly hit area. */
+  height: 44px;
   margin: 0;
   padding: 0;
   display: block;
