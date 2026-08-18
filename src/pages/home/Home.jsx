@@ -10,11 +10,11 @@ import {
   getCurrentTrip,
   updateCurrentTripName,
 } from '../../features/trips/tripApi'
-import journeyCardImage from '../../assets/home/journey-card.png'
+import journeyCardImage from '../../assets/home/journey-card.webp'
 import lastTaggedProductImage from '../../assets/home/last-tagged-product.webp'
 import noteEditIcon from '../../assets/map/note-edit.svg'
-import passportClosedImage from '../../assets/home/passport-closed.png'
-import passportOpenImage from '../../assets/home/passport-open.png'
+import passportClosedImage from '../../assets/home/passport-closed.webp'
+import passportOpenImage from '../../assets/home/passport-open.webp'
 
 /**
  * 진행 중인 여정 블록의 시안 값(폭 362px 기준)을 컨테이너 단위로 바꾼다.
@@ -772,7 +772,8 @@ const LastTaggedCard = styled.section`
   margin: 15px 6px 0;
   aspect-ratio: 350 / 228;
   overflow: hidden;
-  border-radius: ${lastTaggedScale(16)};
+  /* 데스크톱에서 카드 폭이 커져도 모바일 시안의 16px보다 둥글어지지 않게 한다. */
+  border-radius: min(${lastTaggedScale(16)}, 16px);
   background: linear-gradient(
     145.79deg,
     rgb(69 50 36) 0%,
