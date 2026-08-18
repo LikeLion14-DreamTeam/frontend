@@ -29,9 +29,11 @@ const SEARCH_MAX_ZOOM = 18
  * 도시가 화면에 들어온다. 지도 상자는 위로 빼 두었으므로 그만큼 위쪽에 여백을
  * 줘야 찾은 곳이 가려지지 않는다.
  *
- * 옮기면 `onCenterChanged` 가 이어져 선택 위치와 주소도 따라 바뀐다.
+ * 자리를 잡은 뒤에는 중심을 직접 읽어 알려 준다. 지도가 알려주기를 기다리면
+ * 옮겼는데도 선택 위치가 이전 자리에 머무를 수 있고, 여백을 준 만큼 중심이
+ * 밀리기 때문에 찍히는 자리와도 어긋난다.
  */
-const PanToSearched = ({ result }) => {
+const PanToSearched = ({ result, onSettled }) => {
   const map = useMap()
 
   useEffect(() => {
@@ -41,6 +43,7 @@ const PanToSearched = ({ result }) => {
 
     if (!result.viewport) {
       map.panTo(center)
+      onSettled(center)
       return undefined
     }
 
@@ -54,11 +57,15 @@ const PanToSearched = ({ result }) => {
     /* `fitBounds` 에는 상한이 없다. 자리를 잡은 뒤 한 번만 눌러 준다. */
     const listener = map.addListener('idle', () => {
       if ((map.getZoom() ?? 0) > SEARCH_MAX_ZOOM) map.setZoom(SEARCH_MAX_ZOOM)
+
+      const settled = map.getCenter()
+      if (settled) onSettled({ lat: settled.lat(), lng: settled.lng() })
+
       listener.remove()
     })
 
     return () => listener.remove()
-  }, [map, result])
+  }, [map, onSettled, result])
 
   return null
 }
@@ -222,7 +229,10 @@ const ManualPinAdd = () => {
               onCenterChanged: handleCenterChanged,
             }}
           >
-            <PanToSearched result={searchedResult} />
+            <PanToSearched
+              result={searchedResult}
+              onSettled={setSelectedCenter}
+            />
           </GoogleMap>
         )}
       </MapLayer>
