@@ -10,11 +10,11 @@ import {
   getCurrentTrip,
   updateCurrentTripName,
 } from '../../features/trips/tripApi'
-import journeyCardImage from '../../assets/home/journey-card.png'
+import journeyCardImage from '../../assets/home/journey-card.webp'
 import lastTaggedProductImage from '../../assets/home/last-tagged-product.webp'
 import noteEditIcon from '../../assets/map/note-edit.svg'
-import passportClosedImage from '../../assets/home/passport-closed.png'
-import passportOpenImage from '../../assets/home/passport-open.png'
+import passportClosedImage from '../../assets/home/passport-closed.webp'
+import passportOpenImage from '../../assets/home/passport-open.webp'
 
 /**
  * 진행 중인 여정 블록의 시안 값(폭 362px 기준)을 컨테이너 단위로 바꾼다.
