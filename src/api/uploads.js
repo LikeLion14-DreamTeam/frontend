@@ -16,6 +16,38 @@ const USE_MOCK = import.meta.env.VITE_USE_MOCK_API === 'true'
 /** mock/데모 전용. 업로드한 파일의 미리보기 URL 을 file_id 로 찾을 수 있게 들고 있다. */
 const mockUploadedUrls = new Map()
 
+/**
+ * 일부 브라우저·공유 경로에서는 이미지 파일이어도 `File.type` 을 비워 둔다.
+ * 이때는 파일명 확장자로, 업로드 API와 스토리지 PUT에 쓸 MIME 타입을 보완한다.
+ */
+const IMAGE_CONTENT_TYPES = {
+  avif: 'image/avif',
+  bmp: 'image/bmp',
+  gif: 'image/gif',
+  heic: 'image/heic',
+  heif: 'image/heif',
+  jpeg: 'image/jpeg',
+  jpg: 'image/jpeg',
+  png: 'image/png',
+  svg: 'image/svg+xml',
+  tif: 'image/tiff',
+  tiff: 'image/tiff',
+  webp: 'image/webp',
+}
+
+const getPhotoContentType = (file) => {
+  if (file.type?.trim()) return file.type
+
+  const extension = file.name.split('.').pop()?.toLowerCase()
+  const contentType = IMAGE_CONTENT_TYPES[extension]
+
+  if (!contentType) {
+    throw new Error('파일 형식을 확인할 수 없는 사진이 있어 업로드할 수 없습니다.')
+  }
+
+  return contentType
+}
+
 export const getMockUploadedUrl = (fileId) => mockUploadedUrls.get(fileId)
 
 const createLocalPreviewUrl = (file) =>
@@ -55,7 +87,7 @@ export const createUpload = async ({ fileType, contentType }) => {
  * 공통 apiClient 를 쓰면 baseURL 과 Authorization 헤더가 붙어 스토리지가 거부한다.
  * README 규칙 10번. 그래서 fetch 를 그대로 쓴다.
  */
-export const uploadFile = async ({ uploadUrl, fileId, file }) => {
+export const uploadFile = async ({ uploadUrl, fileId, file, contentType }) => {
   if (USE_MOCK) {
     // 실제로 올리지 않고 화면에 보여줄 미리보기 주소만 기억해둔다.
     mockUploadedUrls.set(fileId, await createLocalPreviewUrl(file))
@@ -64,7 +96,7 @@ export const uploadFile = async ({ uploadUrl, fileId, file }) => {
 
   const response = await fetch(uploadUrl, {
     method: 'PUT',
-    headers: { 'Content-Type': file.type },
+    headers: { 'Content-Type': contentType ?? file.type },
     body: file,
   })
 
@@ -81,12 +113,13 @@ export const uploadFile = async ({ uploadUrl, fileId, file }) => {
 
 /** 1~2단계를 묶어 실행하고 file_id 를 돌려준다. */
 export const uploadPhoto = async (file) => {
+  const contentType = getPhotoContentType(file)
   const { upload_url, file_id } = await createUpload({
     fileType: 'photo',
-    contentType: file.type,
+    contentType,
   })
 
-  await uploadFile({ uploadUrl: upload_url, fileId: file_id, file })
+  await uploadFile({ uploadUrl: upload_url, fileId: file_id, file, contentType })
 
   return file_id
 }
@@ -109,6 +142,7 @@ export const uploadAudio = async (file) => {
     uploadUrl: upload.upload_url,
     fileId: upload.file_id,
     file,
+    contentType: file.type || 'audio/webm',
   })
 
   return upload.file_id
