@@ -99,6 +99,7 @@ const DEMO_JOURNEYS = [
     stampName: '대왕김치만두',
     stampImageId: 'DKM',
     pinIds: DKM_PIN_IDS,
+    photobookPinNos: [1, 4, 5],
     photoCounts: {
       1: 12,
       2: 4,
@@ -193,7 +194,7 @@ const getUniqueCities = (orderedPins) => [
   ...new Set(orderedPins.map((pin) => pin.city).filter(Boolean)),
 ]
 
-const createTripPins = (orderedPins) =>
+const createTripPins = (journey, orderedPins) =>
   orderedPins.map((pin) => ({
     pin_id: pin.pin_id,
     place_name: pin.place_name,
@@ -201,6 +202,8 @@ const createTripPins = (orderedPins) =>
     longitude: pin.longitude,
     tagged_at: pin.tagged_at,
     included_in_segment: true,
+    included_in_photobook:
+      journey.photobookPinNos?.includes(pin.source_pin_no) ?? true,
   }))
 
 const createPhotoId = (journey, pinNo, slot) => {
@@ -489,7 +492,7 @@ const createInitialState = () => {
     const orderedPins = getOrderedPins(pins)
 
     Object.assign(state.pins, pins)
-    state.tripPins[journey.segmentId] = createTripPins(orderedPins)
+    state.tripPins[journey.segmentId] = createTripPins(journey, orderedPins)
 
     state.trips[journey.segmentId] = {
       segment_id: journey.segmentId,
@@ -536,7 +539,7 @@ const createInitialState = () => {
     voiceMemoId: -9502,
   })
 
-  return applyDkmAllAboutUpdates(state)
+  return applyDkmAllAboutUpdates(applySeededDkmPhotobookPins(state))
 }
 
 const applySeededDkmCoordinates = (state) => {
@@ -555,6 +558,21 @@ const applySeededDkmCoordinates = (state) => {
 
     tripPin.latitude = coordinates.latitude
     tripPin.longitude = coordinates.longitude
+  })
+
+  return state
+}
+
+const applySeededDkmPhotobookPins = (state) => {
+  const selectedPinNos = new Set(
+    JOURNEY_BY_SEGMENT_ID.get(DKM_DEMO_SEGMENT_ID)?.photobookPinNos ?? [],
+  )
+
+  ;(state.tripPins?.[DKM_DEMO_SEGMENT_ID] ?? []).forEach((tripPin) => {
+    const pin = state.pins?.[tripPin.pin_id]
+    if (!pin) return
+
+    tripPin.included_in_photobook = selectedPinNos.has(pin.source_pin_no)
   })
 
   return state
@@ -648,7 +666,9 @@ const loadInitialState = () => {
     const saved = JSON.parse(storage.getItem(DEMO_JOURNEY_STORAGE_KEY))
     if (saved?.state && saved.version === 2) {
       const state = reviveAssetUrls(
-        applyDkmAllAboutUpdates(applySeededDkmCoordinates(saved.state)),
+        applyDkmAllAboutUpdates(
+          applySeededDkmPhotobookPins(applySeededDkmCoordinates(saved.state)),
+        ),
       )
       if (seedPersistedRepresentativePhotos(state)) {
         storage.setItem(
@@ -778,6 +798,22 @@ const getAllTripPins = (segmentId) =>
 const getIncludedTripPins = (segmentId) =>
   getAllTripPins(segmentId).filter((pin) => pin.included_in_segment)
 
+// 포토북은 도시별로 최대 세 핀만 싣는다. 여정/지도에 보이는 핀은 제한하지 않는다.
+const getPhotobookTripPins = (segmentId) => {
+  const cityPinCounts = new Map()
+
+  return getIncludedTripPins(segmentId).filter((tripPin) => {
+    if (tripPin.included_in_photobook === false) return false
+
+    const city = demoJourneyState.pins[tripPin.pin_id]?.city ?? ''
+    const count = cityPinCounts.get(city) ?? 0
+    if (count >= 3) return false
+
+    cityPinCounts.set(city, count + 1)
+    return true
+  })
+}
+
 const getPinPhotoCount = (pinId) => demoJourneyState.photos[pinId]?.length ?? 0
 
 const getStoredDemoPinsForSegment = (segmentId) =>
@@ -861,6 +897,11 @@ const getIncludedVoiceMemoCount = (segmentId) =>
     (tripPin) => demoJourneyState.voiceMemos[tripPin.pin_id],
   ).length
 
+const getPhotobookPhotos = (segmentId) =>
+  getPhotobookTripPins(segmentId).flatMap(
+    (pin) => demoJourneyState.photos[pin.pin_id] ?? [],
+  )
+
 const syncPhotobookFromTrip = (segmentId) => {
   const trip = demoJourneyState.trips[segmentId]
   const photobook =
@@ -878,7 +919,7 @@ const ensurePhotobookCoverCandidate = (segmentId) => {
     demoJourneyState.photobooks[getPhotobookIdForSegment(segmentId)]
   if (!photobook) return
 
-  const candidates = getIncludedPhotos(segmentId).map((photo) => photo.file_path)
+  const candidates = getPhotobookPhotos(segmentId).map((photo) => photo.file_path)
   if (candidates.includes(photobook.cover_photo_url)) return
 
   photobook.cover_photo_url = candidates[0] ?? ''
@@ -1264,7 +1305,7 @@ const buildPhotobookSummary = (photobookId) => {
   const segmentId = getSegmentIdForPhotobook(resolvedPhotobookId)
   const cities = [
     ...new Set(
-      getIncludedTripPins(segmentId)
+      getPhotobookTripPins(segmentId)
         .map((tripPin) => demoJourneyState.pins[tripPin.pin_id]?.city)
         .filter(Boolean),
     ),
@@ -1273,7 +1314,7 @@ const buildPhotobookSummary = (photobookId) => {
   return {
     ...photobook,
     cities,
-    photo_count: getIncludedPhotoCount(segmentId),
+    photo_count: getPhotobookPhotos(segmentId).length,
   }
 }
 
@@ -1298,7 +1339,7 @@ export const getDemoPhotobook = (photobookId) => {
   const segmentId = getSegmentIdForPhotobook(resolvedPhotobookId)
   const groupedCities = []
 
-  getIncludedTripPins(segmentId).forEach((tripPin, index) => {
+  getPhotobookTripPins(segmentId).forEach((tripPin, index) => {
     const pin = demoJourneyState.pins[tripPin.pin_id]
     if (!pin) return
 
@@ -1351,8 +1392,10 @@ export const getDemoPhotobook = (photobookId) => {
   return clone({
     ...summary,
     total_days: getTotalDays(summary.start_at, summary.end_at),
-    pin_count: getIncludedTripPins(segmentId).length,
-    voice_memo_count: getIncludedVoiceMemoCount(segmentId),
+    pin_count: getPhotobookTripPins(segmentId).length,
+    voice_memo_count: getPhotobookTripPins(segmentId).filter(
+      (tripPin) => demoJourneyState.voiceMemos[tripPin.pin_id],
+    ).length,
     cities: groupedCities,
   })
 }
@@ -1399,12 +1442,12 @@ export const refreshDemoPhotobookCover = (photobookId) => {
   if (!photobook) return null
 
   const segmentId = getSegmentIdForPhotobook(resolvedPhotobookId)
-  const candidates = getIncludedPhotos(segmentId)
+  const candidates = getPhotobookPhotos(segmentId)
     .map((photo) => photo.file_path)
     .filter(Boolean)
     .filter((filePath) => filePath !== photobook.cover_photo_url)
 
-  const fallbackCandidates = getIncludedPhotos(segmentId)
+  const fallbackCandidates = getPhotobookPhotos(segmentId)
     .map((photo) => photo.file_path)
     .filter(Boolean)
 
