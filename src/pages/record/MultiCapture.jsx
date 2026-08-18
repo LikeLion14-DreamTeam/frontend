@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import styled, { createGlobalStyle } from 'styled-components'
 import trashIcon from '../../assets/icons/capture-trash.svg'
+import ConfirmationModal from '../../components/common/ConfirmationModal'
 import PhotoPreviewOverlay from '../../components/common/PhotoPreviewOverlay'
 import cameraFlipIcon from '../../assets/icons/camera-flip.svg'
 import { linkProduct } from '../../features/products/productApi'
@@ -79,6 +80,7 @@ const MultiCapture = () => {
   /* 기기가 배율을 지원할 때만 채워진다. 못 하면 버튼을 아예 그리지 않는다. */
   const [zoomSteps, setZoomSteps] = useState([])
   const [zoom, setZoom] = useState(1)
+  const [isConfirmingClose, setIsConfirmingClose] = useState(false)
   /** 빠르게 여러 번 전환했을 때 늦게 도착한 스트림을 버리기 위한 표식 */
   const streamRequestRef = useRef(0)
 
@@ -303,18 +305,23 @@ const MultiCapture = () => {
     setPreviewId(next?.id ?? null)
   }
 
-  const handleClose = () => {
-    if (
-      shots.length > 0 &&
-      !window.confirm('촬영한 사진을 모두 폐기하고 홈으로 이동할까요?')
-    ) {
-      return
-    }
-
+  const discardAndLeave = () => {
+    setIsConfirmingClose(false)
     stopStream()
     clearDraft()
     shots.forEach((shot) => URL.revokeObjectURL(shot.url))
     navigate('/', { replace: true })
+  }
+
+  /* 찍은 사진이 있으면 한 번 묻는다. 브라우저 기본 확인창(`window.confirm`)은
+     기기·상황에 따라 뜨지 않는 일이 있어 앱 안의 확인 시트를 쓴다. */
+  const handleClose = () => {
+    if (shots.length === 0) {
+      discardAndLeave()
+      return
+    }
+
+    setIsConfirmingClose(true)
   }
 
   const handleDone = () => {
@@ -438,6 +445,17 @@ const MultiCapture = () => {
           </PreviewDeleteButton>
         </PhotoPreviewOverlay>
       )}
+      <ConfirmationModal
+        open={isConfirmingClose}
+        title="촬영을 그만둘까요?"
+        confirmLabel="사진 지우고 나가기"
+        onConfirm={discardAndLeave}
+        onCancel={() => setIsConfirmingClose(false)}
+      >
+        <CloseWarning>
+          지금까지 찍은 {shots.length}장이 모두 사라져요. 되돌릴 수 없습니다.
+        </CloseWarning>
+      </ConfirmationModal>
     </CaptureShell>
   )
 }
@@ -540,6 +558,13 @@ const ZoomButton = styled.button`
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
+`
+
+const CloseWarning = styled.p`
+  color: var(--Text-Secondary);
+  font: var(--text-ui-body-m);
+  text-align: center;
+  word-break: keep-all;
 `
 
 const GridLine = styled.span`
