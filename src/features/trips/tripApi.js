@@ -5,6 +5,15 @@ import {
   deleteMockPhotobookBySegment,
   updateMockPhotobookNameBySegment,
 } from '../photobooks/photobookMock'
+import {
+  deleteDemoTrip,
+  getDemoCountryStamps,
+  getDemoTripList,
+  getDemoTripPins,
+  getDemoTripSummary,
+  isDemoSegmentId,
+  updateDemoTrip,
+} from '../demo/demoJourneyData'
 import { mockPinStore } from '../pins/pinMock'
 import {
   getMockPhotoCount,
@@ -29,9 +38,115 @@ const mockNotFound = () =>
     message: '여행 구간을 찾을 수 없습니다.',
   })
 
+const prependDemoItems = (items, demoItems, key) => {
+  const demoKeys = new Set(demoItems.map((item) => String(item[key])))
+
+  return [
+    ...demoItems,
+    ...(items ?? []).filter((item) => !demoKeys.has(String(item?.[key]))),
+  ]
+}
+
+const sortCountryStamps = (stamps) =>
+  [...stamps].sort((left, right) => {
+    const leftTime = left?.created_at
+      ? new Date(left.created_at).getTime()
+      : null
+    const rightTime = right?.created_at
+      ? new Date(right.created_at).getTime()
+      : null
+
+    if (leftTime == null || Number.isNaN(leftTime)) return 1
+    if (rightTime == null || Number.isNaN(rightTime)) return -1
+    return leftTime - rightTime
+  })
+
 const getMockStampImageId = (countryCode) => {
   const code = countryCode?.toUpperCase()
   return code ? `stamp-${code}` : 'stamp-default'
+}
+
+const getStampPinCount = (stamp) => {
+  const pinCount = Number(stamp?.pin_count)
+  if (Number.isFinite(pinCount)) return pinCount
+
+  return (stamp?.city_counts ?? []).reduce(
+    (total, { pin_count }) => total + (Number(pin_count) || 0),
+    0,
+  )
+}
+
+const addStampCityCounts = (counts, stamp) => {
+  if (Array.isArray(stamp?.city_counts) && stamp.city_counts.length > 0) {
+    stamp.city_counts.forEach(({ city, pin_count }) => {
+      if (!city) return
+      counts.set(city, (counts.get(city) ?? 0) + (Number(pin_count) || 0))
+    })
+    return
+  }
+
+  ;(stamp?.cities ?? []).forEach((city) => {
+    if (!city || counts.has(city)) return
+    counts.set(city, 0)
+  })
+}
+
+const buildMergedCountryStamp = (countryCode, stamps) => {
+  const cityCounts = new Map()
+  stamps.forEach((stamp) => addStampCityCounts(cityCounts, stamp))
+
+  const rankedCities = [...cityCounts.entries()].sort(
+    ([cityA, countA], [cityB, countB]) =>
+      countB - countA || cityA.localeCompare(cityB, 'ko'),
+  )
+
+  const createdAt = stamps.reduce((earliest, stamp) => {
+    const timestamp = stamp?.created_at
+    const time = timestamp ? new Date(timestamp).getTime() : Number.NaN
+    const earliestTime = earliest ? new Date(earliest).getTime() : Number.NaN
+
+    if (Number.isNaN(time)) return earliest
+    if (Number.isNaN(earliestTime)) return timestamp
+    return time < earliestTime ? timestamp : earliest
+  }, null)
+
+  return {
+    ...stamps[0],
+    country_code: countryCode,
+    country_name:
+      stamps.find((stamp) => stamp?.country_name)?.country_name ?? countryCode,
+    stamp_image_id:
+      stamps.find((stamp) => stamp?.stamp_image_id)?.stamp_image_id ??
+      getMockStampImageId(countryCode),
+    created_at: createdAt,
+    is_new: stamps.some((stamp) => stamp?.is_new),
+    pin_count: stamps.reduce(
+      (total, stamp) => total + getStampPinCount(stamp),
+      0,
+    ),
+    cities: rankedCities.slice(0, 3).map(([city]) => city),
+    city_counts: rankedCities.map(([city, pin_count]) => ({ city, pin_count })),
+    extra_city_count: Math.max(0, rankedCities.length - 3),
+    is_demo: stamps.some((stamp) => stamp?.is_demo),
+  }
+}
+
+const mergeCountryStamps = (items, demoItems) => {
+  const groupedStamps = new Map()
+
+  ;[...(items ?? []), ...(demoItems ?? [])].forEach((stamp) => {
+    const countryCode = stamp?.country_code?.toUpperCase()
+    if (!countryCode) return
+
+    groupedStamps.set(countryCode, [
+      ...(groupedStamps.get(countryCode) ?? []),
+      stamp,
+    ])
+  })
+
+  return [...groupedStamps.entries()].map(([countryCode, stamps]) =>
+    buildMergedCountryStamp(countryCode, stamps),
+  )
 }
 
 const getMockStampSummary = (stamp) => {
@@ -314,13 +429,13 @@ export const endCurrentTrip = async ({ name, endAt } = {}) => {
 export const getCountryStamps = async () => {
   if (USE_MOCK) {
     ensureMockCountryStamps()
-    const stamps = Object.values(mockPinStore.countryStamps)
-      .sort(
-        (left, right) =>
-          new Date(left.created_at) - new Date(right.created_at) ||
-          left.country_name.localeCompare(right.country_name, 'ko'),
-      )
-      .map((stamp) => ({ ...stamp, cities: [...(stamp.cities ?? [])] }))
+    const mockStamps = Object.values(mockPinStore.countryStamps).map((stamp) => ({
+      ...stamp,
+      cities: [...(stamp.cities ?? [])],
+    }))
+    const stamps = sortCountryStamps(
+      mergeCountryStamps(mockStamps, getDemoCountryStamps()),
+    )
 
     // 새 도장 연출은 생성 직후의 첫 여권 조회에서만 쓴다.
     Object.values(mockPinStore.countryStamps).forEach((stamp) => {
@@ -338,16 +453,9 @@ export const getCountryStamps = async () => {
 
   return {
     ...response,
-    stamps: [...response.stamps].sort((left, right) => {
-      const leftTime = left?.created_at ? new Date(left.created_at).getTime() : null
-      const rightTime = right?.created_at
-        ? new Date(right.created_at).getTime()
-        : null
-
-      if (leftTime == null || Number.isNaN(leftTime)) return 1
-      if (rightTime == null || Number.isNaN(rightTime)) return -1
-      return leftTime - rightTime
-    }),
+    stamps: sortCountryStamps(
+      mergeCountryStamps(response.stamps, getDemoCountryStamps()),
+    ),
   }
 }
 
@@ -355,27 +463,40 @@ export const getCountryStamps = async () => {
 export const getTrips = async ({ limit = 20 } = {}) => {
   if (USE_MOCK) {
     return {
-      trips: Object.values(mockTripStore.trips).map(
-        ({ segment_id, name, start_at, end_at, countries }) => ({
-          segment_id,
-          name,
-          start_at,
-          end_at,
-          countries,
-        }),
+      trips: prependDemoItems(
+        Object.values(mockTripStore.trips).map(
+          ({ segment_id, name, start_at, end_at, countries }) => ({
+            segment_id,
+            name,
+            start_at,
+            end_at,
+            countries,
+          }),
+        ),
+        getDemoTripList(),
+        'segment_id',
       ),
       next_cursor: null,
     }
   }
 
-  return fetchAllPages(
+  const response = await fetchAllPages(
     (cursor) => apiClient.get('/trips', { params: { cursor, limit } }),
     'trips',
   )
+
+  return {
+    ...response,
+    trips: prependDemoItems(response.trips, getDemoTripList(), 'segment_id'),
+  }
 }
 
 /** 4.2 여행 구간 상세(요약) 조회 */
 export const getTrip = async (segmentId) => {
+  const demoTrip = getDemoTripSummary(segmentId)
+  if (demoTrip) return demoTrip
+  if (isDemoSegmentId(segmentId)) throw mockNotFound()
+
   if (USE_MOCK) {
     return buildMockTripSummary(segmentId)
   }
@@ -393,6 +514,18 @@ export const updateTrip = async (
   segmentId,
   { name, startAt, endAt, pinInclusions },
 ) => {
+  if (isDemoSegmentId(segmentId)) {
+    const updated = updateDemoTrip(segmentId, {
+      name,
+      startAt,
+      endAt,
+      pinInclusions,
+    })
+
+    if (!updated) throw mockNotFound()
+    return updated
+  }
+
   if (USE_MOCK) {
     const trip = mockTripStore.trips[segmentId]
     if (!trip) throw mockNotFound()
@@ -427,6 +560,11 @@ export const updateTrip = async (
  * 204 No Content 라 반환값이 없다.
  */
 export const deleteTrip = async (segmentId) => {
+  if (isDemoSegmentId(segmentId)) {
+    if (!deleteDemoTrip(segmentId)) throw mockNotFound()
+    return null
+  }
+
   if (USE_MOCK) {
     if (!mockTripStore.trips[segmentId]) throw mockNotFound()
 
@@ -454,6 +592,15 @@ export const deleteTrip = async (segmentId) => {
  * 제외된 핀도 included_in_segment: false 로 함께 온다.
  */
 export const getTripPins = async (segmentId, { limit = 20 } = {}) => {
+  const demoPins = getDemoTripPins(segmentId)
+  if (demoPins) {
+    return {
+      pins: demoPins.slice(0, limit),
+      next_cursor: null,
+    }
+  }
+  if (isDemoSegmentId(segmentId)) throw mockNotFound()
+
   if (USE_MOCK) {
     if (!mockTripStore.trips[segmentId]) throw mockNotFound()
 

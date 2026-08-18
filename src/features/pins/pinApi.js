@@ -6,6 +6,17 @@ import {
   removeMockCountryStampIfEmpty,
   upsertMockCountryStamp,
 } from '../trips/tripApi'
+import {
+  addDemoPinPhotos,
+  deleteDemoPhoto,
+  getDemoPin,
+  getDemoPinPhotos,
+  getDemoPinsByCountry,
+  getDemoPinVoiceMemos,
+  isDemoPinId,
+  refreshDemoRepresentativePhotos,
+  updateDemoPin,
+} from '../demo/demoJourneyData'
 import { getMockPinLocation } from '../trips/tripMock'
 import { mockPinStore } from './pinMock'
 
@@ -18,6 +29,23 @@ const mockNotFound = () =>
     status: 404,
     code: 'NOT_FOUND',
     message: '핀을 찾을 수 없습니다.',
+  })
+
+const mergeCountryPins = (pins, demoPins) => {
+  const demoPinIds = new Set(demoPins.map((pin) => String(pin.pin_id)))
+
+  return [
+    ...demoPins,
+    ...(pins ?? []).filter((pin) => !demoPinIds.has(String(pin?.pin_id))),
+  ].sort((left, right) => new Date(left.tagged_at) - new Date(right.tagged_at))
+}
+
+const endedTripPinDeleteError = () =>
+  new ApiError({
+    status: 409,
+    code: 'USE_TRIP_EXCLUSION',
+    message:
+      '이미 종료된 여행의 핀은 삭제할 수 없습니다. 여행 구간 편집에서 제외해주세요.',
   })
 
 /** mock 전용. 대표사진은 is_pin_cover 로 표시된 사진에서 뽑는다. */
@@ -159,8 +187,10 @@ export const getPinsByCountry = async ({ countryCode, limit = 20 } = {}) => {
     })
   }
 
+  const demoPins = getDemoPinsByCountry(normalizedCountryCode)
+
   if (USE_MOCK) {
-    const pins = Object.values(mockPinStore.pins)
+    const mockPins = Object.values(mockPinStore.pins)
       .filter((pin) => {
         const location = getMockPinLocation(pin.pin_id)
         return (
@@ -181,12 +211,12 @@ export const getPinsByCountry = async ({ countryCode, limit = 20 } = {}) => {
       }))
 
     return {
-      pins: pins.slice(0, limit),
+      pins: mergeCountryPins(mockPins, demoPins).slice(0, limit),
       next_cursor: null,
     }
   }
 
-  return fetchAllPages(
+  const response = await fetchAllPages(
     (pageCursor) =>
       apiClient.get('/pins', {
         params: {
@@ -197,6 +227,11 @@ export const getPinsByCountry = async ({ countryCode, limit = 20 } = {}) => {
       }),
     'pins',
   )
+
+  return {
+    ...response,
+    pins: mergeCountryPins(response.pins, demoPins),
+  }
 }
 
 /**
@@ -245,6 +280,10 @@ export const getOngoingPins = async ({ limit = 20 } = {}) => {
  * `place_name` 은 사용자가 입력한 값이라 미입력 시 빈 문자열이다.
  */
 export const getPin = async (pinId) => {
+  const demoPin = getDemoPin(pinId)
+  if (demoPin) return demoPin
+  if (isDemoPinId(pinId)) throw mockNotFound()
+
   if (USE_MOCK) {
     return buildMockPinDetail(pinId)
   }
@@ -260,6 +299,12 @@ export const getPin = async (pinId) => {
  * 텍스트 기록을 빈 문자열로 저장하면 기록을 지운 것으로 처리한다.
  */
 export const updatePin = async (pinId, { placeName, textNote }) => {
+  if (isDemoPinId(pinId)) {
+    const updated = updateDemoPin(pinId, { placeName, textNote })
+    if (!updated) throw mockNotFound()
+    return updated
+  }
+
   if (USE_MOCK) {
     const pin = mockPinStore.pins[pinId]
     if (!pin) throw mockNotFound()
@@ -287,6 +332,15 @@ export const updatePin = async (pinId, { placeName, textNote }) => {
  * `is_pin_cover` 가 대표사진 표시다.
  */
 export const getPinPhotos = async (pinId, { limit = 50 } = {}) => {
+  const demoPhotos = getDemoPinPhotos(pinId)
+  if (demoPhotos) {
+    return {
+      photos: demoPhotos.slice(0, limit),
+      next_cursor: null,
+    }
+  }
+  if (isDemoPinId(pinId)) throw mockNotFound()
+
   if (USE_MOCK) {
     if (!mockPinStore.pins[pinId]) throw mockNotFound()
 
@@ -336,6 +390,17 @@ const PHOTO_RADIUS_METERS = 1000
  * file_id 는 `api/uploads` 의 2단계 업로드로 먼저 받아둔다.
  */
 export const addPinPhotos = async (pinId, photos) => {
+  if (isDemoPinId(pinId)) {
+    const result = addDemoPinPhotos(
+      pinId,
+      photos,
+      (fileId) => getMockUploadedUrl(fileId) ?? fileId,
+    )
+
+    if (!result) throw mockNotFound()
+    return result
+  }
+
   if (USE_MOCK) {
     const pin = mockPinStore.pins[pinId]
     if (!pin) throw mockNotFound()
@@ -398,6 +463,10 @@ export const addPinPhotos = async (pinId, photos) => {
  * 핀당 음성 메모는 하나라 배열이 아니라 `voice_memo` 객체 하나가 온다.
  */
 export const getPinVoiceMemos = async (pinId) => {
+  const demoVoiceMemo = getDemoPinVoiceMemos(pinId)
+  if (demoVoiceMemo) return demoVoiceMemo
+  if (isDemoPinId(pinId)) throw mockNotFound()
+
   if (USE_MOCK) {
     if (!mockPinStore.pins[pinId]) throw mockNotFound()
 
@@ -424,6 +493,8 @@ export const getPinVoiceMemos = async (pinId) => {
  * 항상 최대 3장을 유지한다. 204 No Content 라 반환값이 없다.
  */
 export const deletePhoto = async (photoId) => {
+  if (deleteDemoPhoto(photoId)) return null
+
   if (USE_MOCK) {
     const targetId = Number(photoId)
 
@@ -467,6 +538,12 @@ export const deletePhoto = async (photoId) => {
  * 간주하고, 그 상위 10장 안에서 무작위 3장을 다시 지정한다.
  */
 export const refreshRepresentativePhotos = async (pinId) => {
+  if (isDemoPinId(pinId)) {
+    const result = refreshDemoRepresentativePhotos(pinId)
+    if (!result) throw mockNotFound()
+    return result
+  }
+
   if (USE_MOCK) {
     const pin = mockPinStore.pins[pinId]
     if (!pin) throw mockNotFound()
@@ -508,17 +585,17 @@ export const refreshRepresentativePhotos = async (pinId) => {
  * segment_id 가 채워진 핀에 호출하면 409 CONFLICT (USE_TRIP_EXCLUSION) 이 온다.
  */
 export const deletePin = async (pinId) => {
+  if (isDemoPinId(pinId)) {
+    if (!getDemoPin(pinId)) throw mockNotFound()
+    throw endedTripPinDeleteError()
+  }
+
   if (USE_MOCK) {
     const pin = mockPinStore.pins[pinId]
     if (!pin) throw mockNotFound()
 
     if (pin.segment_id !== null) {
-      throw new ApiError({
-        status: 409,
-        code: 'USE_TRIP_EXCLUSION',
-        message:
-          '이미 종료된 여행의 핀은 삭제할 수 없습니다. 여행 구간 편집에서 제외해주세요.',
-      })
+      throw endedTripPinDeleteError()
     }
 
     const countryCode = getMockPinLocation(pin.pin_id)?.country_code

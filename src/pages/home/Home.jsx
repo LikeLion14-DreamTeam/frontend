@@ -33,14 +33,14 @@ const lastTaggedScale = (px) => `${((px / 350) * 100).toFixed(4)}cqw`
  * `address_components` 중 country 의 `short_name` 이 이 값이라, 응답 언어와
  * 무관하게 항상 같은 코드가 온다. 정적으로 58개를 나열하지 않고 폴더에서 모은다.
  */
-const stampModules = import.meta.glob('../../assets/stamps/*.webp', {
+const stampModules = import.meta.glob('../../assets/stamps/*.{webp,png}', {
   eager: true,
   import: 'default',
 })
 
 const stampByCountryCode = Object.fromEntries(
   Object.entries(stampModules).map(([path, url]) => [
-    path.slice(path.lastIndexOf('/') + 1, -'.webp'.length),
+    path.slice(path.lastIndexOf('/') + 1, path.lastIndexOf('.')),
     url,
   ]),
 )
