@@ -685,9 +685,16 @@ const TextInput = styled.input`
    테두리·높이는 여정 이름 입력과 맞춘다. */
 const DateInput = styled(TextInput)`
   padding: 0 12px;
+  /* 기본 모양을 끄지 않으면 아래 폭 지정이 먹지 않는다. */
+  appearance: none;
 
-  /* iOS 사파리는 date 입력에 제멋대로 높이를 준다. */
+  /*
+   * iOS 사파리는 값을 이 안쪽 요소에 그리는데, 칸 크기와 무관하게 자기 고유
+   * 폭을 가진다. 칸보다 넓게 잡히면 값이 오른쪽으로 밀리며 앞부터 잘려
+   * 2026. 08. 17. 이 26. 08. 17. 로 보인다. 칸에 맞춰 눌러 준다.
+   */
   &::-webkit-date-and-time-value {
+    width: 100%;
     text-align: left;
   }
 `
@@ -731,6 +738,14 @@ const RangeValue = styled.p`
   white-space: nowrap;
 `
 
+/*
+ * 보이는 글자는 위에서 직접 그리고, 이 요소는 목록을 띄우는 역할만 한다.
+ * 닫혀 있을 때는 `opacity` 로 감춘다.
+ *
+ * 색과 글꼴은 감춰진 상태와 무관하게 필요하다. 목록에 뜨는 `option` 이 이
+ * 값을 물려받기 때문이다. 투명하게 두면 데스크톱에서 항목 글자가 안 보이고,
+ * 글꼴이 없으면 목록 줄 높이가 상속값을 따라 지나치게 높아진다.
+ */
 const RangeSelect = styled.select`
   position: absolute;
   inset: 0;
@@ -738,12 +753,18 @@ const RangeSelect = styled.select`
   width: 100%;
   height: 100%;
   border: 0;
-  background: transparent;
-  color: transparent;
+  background: var(--Surface-Base);
+  color: var(--Text-Primary);
+  font: var(--text-ui-label);
   opacity: 0;
   appearance: none;
   cursor: pointer;
   outline: none;
+
+  option {
+    background: var(--Surface-Base);
+    color: var(--Text-Primary);
+  }
 `
 
 const ChevronIcon = styled.img`
