@@ -3,12 +3,14 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { uploadAudio } from '../../api/uploads'
 import Button from '../../components/common/Button'
+import ConfirmationModal from '../../components/common/ConfirmationModal'
 import { createPin, deletePin } from '../../features/pins/pinApi'
 import PhotoPreviewOverlay, {
   PreviewDeleteButton,
 } from '../../components/common/PhotoPreviewOverlay'
 import {
   attachUploadedPhotos,
+  orderUploadedPhotos,
   uploadCapturedPhotos,
 } from '../../features/pins/recordPhotos'
 import { reverseGeocode } from '../../features/pins/reverseGeocode'
@@ -67,12 +69,15 @@ const ManualPinDetails = () => {
   const [isVoiceSheetOpen, setIsVoiceSheetOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  /** 일부만 올라갔을 때 물어보려고 들고 있는 `{ total, uploaded }`. */
+  const [partialUpload, setPartialUpload] = useState(null)
   const [resolvedPlace, setResolvedPlace] = useState(null)
   const locationRequestRef = useRef(null)
   const photoInputRef = useRef(null)
   const photosRef = useRef([])
   const createdPinIdRef = useRef(null)
-  const uploadedPhotosRef = useRef(null)
+  const uploadedPhotosRef = useRef({})
+  const hasAllowedPartialSaveRef = useRef(false)
   const uploadedAudioRef = useRef(null)
   const {
     status: voiceStatus,
@@ -150,6 +155,8 @@ const ManualPinDetails = () => {
 
     if (selectedPhotos.length > 0) {
       setPhotos((current) => [...current, ...selectedPhotos])
+      // 새로 고른 사진은 아직 물어본 적이 없으니 다시 묻는다.
+      hasAllowedPartialSaveRef.current = false
     }
 
     event.target.value = ''
@@ -213,11 +220,35 @@ const ManualPinDetails = () => {
 
       /* 사진을 핀보다 먼저 올린다. 여기서 실패하면 핀은 아직 만들지 않은
          상태라, 사진 없는 핀이 남지 않는다. */
-      if (photos.length > 0 && !uploadedPhotosRef.current) {
-        uploadedPhotosRef.current = await uploadCapturedPhotos(photos, {
-          latitude,
-          longitude,
+      /* 빠진 사진을 두고 저장하기로 했으면 다시 올리지 않는다. */
+      if (photos.length > 0 && !hasAllowedPartialSaveRef.current) {
+        uploadedPhotosRef.current = await uploadCapturedPhotos(
+          photos,
+          { latitude, longitude },
+          uploadedPhotosRef.current,
+        )
+      }
+
+      const uploadedPhotos = orderUploadedPhotos(
+        photos,
+        uploadedPhotosRef.current,
+      )
+
+      if (photos.length > 0 && uploadedPhotos.length === 0) {
+        throw new Error('사진을 올리지 못했습니다. 잠시 후 다시 시도해주세요.')
+      }
+
+      /* 일부만 올라갔으면 이대로 저장할지 먼저 묻는다. 못 올린 사진은 핀에
+         들어가지 않으므로, 모르고 넘어가면 빠진 줄도 모른다. */
+      if (
+        uploadedPhotos.length < photos.length &&
+        !hasAllowedPartialSaveRef.current
+      ) {
+        setPartialUpload({
+          total: photos.length,
+          uploaded: uploadedPhotos.length,
         })
+        return
       }
 
       if (!createdPinIdRef.current) {
@@ -240,17 +271,17 @@ const ManualPinDetails = () => {
         createdPinIdRef.current = createdPin.pin_id
       }
 
-      if (uploadedPhotosRef.current) {
-        /* 붙이는 데 실패하면 방금 만든 핀을 지운다. 사진 없는 핀을 남기지
-           않는다. 올려 둔 파일은 그대로라, 다시 시도하면 핀만 새로 만든다. */
+      if (uploadedPhotos.length > 0) {
+        /* 한 장도 붙지 않았으면 사진 없는 핀이라 지운다. 한 장이라도 붙었으면
+           그대로 둔다. 올려 둔 파일은 그대로라, 다시 시도하면 핀만 새로 만든다. */
         try {
           const photoResult = await attachUploadedPhotos(
             createdPinIdRef.current,
-            uploadedPhotosRef.current,
+            uploadedPhotos,
           )
 
-          if ((photoResult.rejected?.length ?? 0) > 0) {
-            throw new Error('일부 사진을 핀에 첨부하지 못했습니다.')
+          if ((photoResult.added?.length ?? 0) === 0) {
+            throw new Error('사진을 핀에 등록하지 못했습니다.')
           }
         } catch (error) {
           // 지우는 것까지 실패해도 알릴 것은 원래 오류다.
@@ -268,6 +299,19 @@ const ManualPinDetails = () => {
     } finally {
       setIsSaving(false)
     }
+  }
+
+  /** 못 올린 사진을 포기하고 올라간 것만으로 핀을 만든다. */
+  const handleSaveWithoutMissingPhotos = () => {
+    hasAllowedPartialSaveRef.current = true
+    setPartialUpload(null)
+    void handleSave()
+  }
+
+  /** 못 올린 사진만 다시 올린다. 이미 올린 사진은 그대로 쓴다. */
+  const handleRetryMissingPhotos = () => {
+    setPartialUpload(null)
+    void handleSave()
   }
 
   return (
@@ -410,6 +454,23 @@ const ManualPinDetails = () => {
         {isSaving ? '저장 중...' : '핀 추가하기'}
       </AddPinButton>
       {saveError && <SaveError role="alert">{saveError}</SaveError>}
+
+      <ConfirmationModal
+        open={Boolean(partialUpload)}
+        title="일부 사진을 올리지 못했어요"
+        confirmLabel="이대로 저장하기"
+        cancelLabel="다시 시도"
+        closeOnBackdrop={false}
+        onConfirm={handleSaveWithoutMissingPhotos}
+        onCancel={handleRetryMissingPhotos}
+      >
+        <PartialUploadNotice>
+          {partialUpload &&
+            `${partialUpload.total}장 중 ${partialUpload.uploaded}장이 올라갔어요. 이대로 저장하면 나머지 ${
+              partialUpload.total - partialUpload.uploaded
+            }장은 핀에 들어가지 않습니다.`}
+        </PartialUploadNotice>
+      </ConfirmationModal>
 
       {isVoiceSheetOpen && (
         <ModalLayer>
@@ -883,6 +944,13 @@ const SaveError = styled.p`
   color: #b42318;
   font: var(--text-ui-caption);
   text-align: center;
+`
+
+const PartialUploadNotice = styled.p`
+  color: var(--Text-Secondary);
+  font: var(--text-ui-body-m);
+  text-align: center;
+  word-break: keep-all;
 `
 
 const ModalLayer = styled.div`
