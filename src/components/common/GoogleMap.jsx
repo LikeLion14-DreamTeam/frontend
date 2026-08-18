@@ -10,6 +10,21 @@ const HAS_API_KEY = Boolean(import.meta.env.VITE_GOOGLE_MAPS_API_KEY)
 
 const DEFAULT_CENTER = { lat: 37.5665, lng: 126.978 }
 
+/*
+ * 세계 밖은 보여주지 않는다.
+ *
+ * 그대로 두면 위아래로 벗어날 때 극지 너머의 빈 회색이 드러나고, 옆으로는
+ * 같은 세계가 반복해 이어진다. 85도는 메르카토르에서 그릴 수 있는 끝이다.
+ *
+ * `strictBounds` 는 이 영역이 늘 화면을 덮도록 축소까지 막는다. 최소 배율을
+ * 숫자로 정하지 않아도 화면 크기에 맞는 하한이 저절로 정해지고, 멀리 떨어진
+ * 핀도 영역에 맞출 수 있다.
+ */
+const WORLD_RESTRICTION = {
+  latLngBounds: { north: 85, south: -85, west: -180, east: 180 },
+  strictBounds: true,
+}
+
 /**
  * 한 지점을 들여다보는 배율.
  *
@@ -176,6 +191,7 @@ const GoogleMap = ({
          * 단계로 떨어져 여백이 필요 이상으로 남는다.
          */
         isFractionalZoomEnabled
+        restriction={WORLD_RESTRICTION}
         styles={styles}
         style={{ width: '100%', height: '100%' }}
         {...viewProps}
