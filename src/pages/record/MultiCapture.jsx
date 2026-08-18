@@ -637,21 +637,23 @@ const ZoomBar = styled.div`
   display: flex;
   flex-direction: column-reverse;
   gap: 4px;
-  border-radius: 19px;
+  border-radius: 22px;
   background: rgb(0 0 0 / 40%);
 `
 
-/* 글자가 `2.4x` 로 늘어날 수 있어 폭을 고정하지 않고 최소만 잡는다. */
+/* `2.4x` 까지 들어갈 만한 원으로 크기를 고정한다. 글자에 맞춰 늘리면 소수점이
+   붙고 떨어질 때마다 버튼이 커졌다 작아지며 줄 전체가 흔들린다. */
 const ZoomButton = styled.button`
-  min-width: 30px;
-  height: 30px;
-  padding: 0 6px;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  padding: 0;
   border: 0;
-  border-radius: 15px;
+  border-radius: 50%;
   background: ${({ $active }) => ($active ? 'rgb(255 255 255 / 92%)' : 'transparent')};
   color: ${({ $active }) => ($active ? 'var(--Text-Primary)' : '#fff')};
   font-family: var(--font-sans);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   cursor: pointer;
 `
