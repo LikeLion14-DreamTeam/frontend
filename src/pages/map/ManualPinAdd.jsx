@@ -192,7 +192,7 @@ const ManualPinAdd = () => {
         </ContinueButton>
       </AddressSheet>
 
-      <NavBar activeOverride="home" />
+      <NavBar activeOverride="map" />
     </Page>
   )
 }
@@ -215,19 +215,21 @@ const MapLayer = styled.div`
   inset: 0;
 `
 
+/* 지도 화면의 여정 선택 드롭바와 같은 자리·높이에 선다.
+   두 화면을 오갈 때 같은 줄에 있어야 흔들리지 않는다. */
 const SearchBar = styled.div`
   position: absolute;
   z-index: 4;
-  top: 50px;
-  right: 24px;
-  left: 24px;
-  height: 44px;
-  padding: 11px 14px;
+  top: 19px;
+  right: 13px;
+  left: 13px;
+  height: 40px;
+  padding: 6px 14px;
   display: flex;
   align-items: center;
   gap: 10px;
   overflow: hidden;
-  border-radius: 22px;
+  border-radius: 20px;
   background: var(--Surface-Base);
   box-shadow: var(--Effect-Card);
 `
@@ -257,16 +259,20 @@ const SearchInput = styled.input`
   }
 `
 
+/* 주소 입력칸(19 + 40) 아래 8px 에 붙는다. 칸이 줄어든 만큼 글자도 줄인다. */
 const Hint = styled.p`
   position: absolute;
   z-index: 4;
-  top: 110px;
+  top: 67px;
   left: 50%;
-  padding: 7px 12px;
-  border-radius: 14px;
+  padding: 5px 10px;
+  border-radius: 12px;
   background: rgb(36 28 22 / 68%);
   color: var(--Text-Inverse);
-  font: var(--text-ui-nav);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 14px;
   white-space: nowrap;
   transform: translateX(-50%);
 `
