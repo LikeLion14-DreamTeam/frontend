@@ -153,11 +153,18 @@ export const requestDevicePermission = async (
     return DEVICE_PERMISSION_STATUS.UNSUPPORTED
   }
 
-  if (permissionType === 'location') {
-    return getLocationPermission(navigatorObject)
+  const status =
+    permissionType === 'location'
+      ? await getLocationPermission(navigatorObject)
+      : await getMediaPermission(permissionType, navigatorObject)
+
+  if (status === DEVICE_PERMISSION_STATUS.GRANTED) {
+    rememberPermissionGranted(permissionType)
+  } else if (status === DEVICE_PERMISSION_STATUS.DENIED) {
+    forgetRememberedPermissionGrant(permissionType)
   }
 
-  return getMediaPermission(permissionType, navigatorObject)
+  return status
 }
 
 /**
@@ -169,20 +176,52 @@ export const requestDevicePermission = async (
  *
  * 브라우저가 상태를 알려주는 경우(크롬 등)에는 이 값을 보지 않는다.
  */
-const LOCATION_GRANTED_KEY = 'orte_location_granted'
+const GRANTED_PERMISSION_STORAGE_KEYS = {
+  camera: 'orte_camera_granted',
+  location: 'orte_location_granted',
+  microphone: 'orte_microphone_granted',
+}
 
-export const rememberLocationGranted = () => {
+export const rememberPermissionGranted = (permissionType) => {
+  const storageKey = GRANTED_PERMISSION_STORAGE_KEYS[permissionType]
+
+  if (!storageKey) return
+
   try {
-    globalThis.localStorage?.setItem(LOCATION_GRANTED_KEY, 'true')
+    globalThis.localStorage?.setItem(storageKey, 'true')
   } catch {
     // 저장이 막힌 환경(시크릿 모드 등)에서는 기억하지 않는다.
   }
 }
 
-export const hasRememberedLocationGrant = () => {
+export const forgetRememberedPermissionGrant = (permissionType) => {
+  const storageKey = GRANTED_PERMISSION_STORAGE_KEYS[permissionType]
+
+  if (!storageKey) return
+
   try {
-    return globalThis.localStorage?.getItem(LOCATION_GRANTED_KEY) === 'true'
+    globalThis.localStorage?.removeItem(storageKey)
+  } catch {
+    // 저장이 막힌 환경에서는 지울 값도 없다.
+  }
+}
+
+export const hasRememberedPermissionGrant = (permissionType) => {
+  const storageKey = GRANTED_PERMISSION_STORAGE_KEYS[permissionType]
+
+  if (!storageKey) return false
+
+  try {
+    return globalThis.localStorage?.getItem(storageKey) === 'true'
   } catch {
     return false
   }
+}
+
+export const rememberLocationGranted = () => {
+  rememberPermissionGranted('location')
+}
+
+export const hasRememberedLocationGrant = () => {
+  return hasRememberedPermissionGrant('location')
 }

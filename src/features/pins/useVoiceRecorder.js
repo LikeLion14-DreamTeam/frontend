@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  forgetRememberedPermissionGrant,
+  rememberPermissionGranted,
+} from '../permissions/devicePermissions'
 
 const AUDIO_TYPES = [
   'audio/webm;codecs=opus',
@@ -74,6 +78,7 @@ const useVoiceRecorder = () => {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      rememberPermissionGranted('microphone')
 
       if (cancelRequestedRef.current || !mountedRef.current) {
         stream.getTracks().forEach((track) => track.stop())
@@ -150,6 +155,10 @@ const useVoiceRecorder = () => {
           ? '마이크 권한이 거부되었습니다.'
           : '음성 녹음을 시작하지 못했습니다.',
       )
+
+      if (error.name === 'NotAllowedError') {
+        forgetRememberedPermissionGrant('microphone')
+      }
     } finally {
       isStartingRef.current = false
     }
