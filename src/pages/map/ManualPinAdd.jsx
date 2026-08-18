@@ -33,7 +33,7 @@ const SEARCH_MAX_ZOOM = 18
  * 옮겼는데도 선택 위치가 이전 자리에 머무를 수 있고, 여백을 준 만큼 중심이
  * 밀리기 때문에 찍히는 자리와도 어긋난다.
  */
-const PanToSearched = ({ result, onSettled }) => {
+const PanToSearched = ({ result, fitPadding, onSettled }) => {
   const map = useMap()
 
   useEffect(() => {
@@ -47,12 +47,7 @@ const PanToSearched = ({ result, onSettled }) => {
       return undefined
     }
 
-    map.fitBounds(result.viewport, {
-      top: MAP_SHIFT + 24,
-      right: 24,
-      bottom: 24,
-      left: 24,
-    })
+    map.fitBounds(result.viewport, fitPadding)
 
     /* `fitBounds` 에는 상한이 없다. 자리를 잡은 뒤 한 번만 눌러 준다. */
     const listener = map.addListener('idle', () => {
@@ -65,9 +60,49 @@ const PanToSearched = ({ result, onSettled }) => {
     })
 
     return () => listener.remove()
-  }, [map, onSettled, result])
+  }, [fitPadding, map, onSettled, result])
 
   return null
+}
+
+/* 위는 안내 문구(67 에서 시작해 높이 24), 아래는 주소 시트와 하단
+   내비게이션(75)이 막는다. 핀을 찍을 자리는 그 사이 한가운데다. */
+const HINT_BOTTOM = 67 + 24
+const NAV_HEIGHT = 75
+const SHEET_HEIGHT = 191
+const SHEET_COLLAPSED_OFFSET = 137
+
+/** 찾은 곳이 가장자리에 붙지 않도록 두는 여백 */
+const FIT_MARGIN = 24
+
+/**
+ * 시트 상태에 따라 달라지는 지도 배치.
+ *
+ * `shift` — 지도를 위로 빼 놓을 거리. 지도의 중심은 늘 담긴 상자의 한가운데라,
+ * 상자를 화면에 딱 맞추면 중심이 시트 쪽으로 내려간다. 위로 늘려 두면 중심이
+ * 안내 문구와 시트 사이의 한가운데로 올라오고, 시트를 접어도 아래에 빈자리가
+ * 생기지 않는다. 접으면 가리는 만큼이 줄어드니 빼는 거리도 함께 줄인다.
+ *
+ * `fitPadding` — 검색한 곳을 맞출 때 비켜 둘 자리. `fitBounds` 는 상자 전체를
+ * 기준으로 삼는데, 위로 뺀 부분과 아래 시트·내비게이션은 눈에 보이지 않는다.
+ * 양쪽을 다 비켜 줘야 보이는 곳의 한가운데, 즉 핀 자리에 맞는다.
+ */
+const getMapLayout = (isSheetCollapsed) => {
+  const sheetVisible = isSheetCollapsed
+    ? SHEET_HEIGHT - SHEET_COLLAPSED_OFFSET
+    : SHEET_HEIGHT
+
+  const shift = NAV_HEIGHT + sheetVisible - HINT_BOTTOM
+
+  return {
+    shift,
+    fitPadding: {
+      top: shift + HINT_BOTTOM + FIT_MARGIN,
+      right: FIT_MARGIN,
+      bottom: NAV_HEIGHT + sheetVisible + FIT_MARGIN,
+      left: FIT_MARGIN,
+    },
+  }
 }
 
 /** 위치를 못 얻었을 때 시작 지점. 여기서 직접 옮겨 찍으면 된다. */
@@ -109,6 +144,7 @@ const ManualPinAdd = () => {
   const [searchedResult, setSearchedResult] = useState(null)
   const [isSearching, setIsSearching] = useState(false)
   const [searchError, setSearchError] = useState('')
+  const [isSheetCollapsed, setIsSheetCollapsed] = useState(false)
 
   useEffect(() => {
     let ignore = false
@@ -208,9 +244,11 @@ const ManualPinAdd = () => {
     })
   }
 
+  const { shift: mapShift, fitPadding } = getMapLayout(isSheetCollapsed)
+
   return (
     <Page>
-      <MapLayer>
+      <MapLayer $shift={mapShift}>
         {initialCenter && (
           /*
            * 지도를 움직여 위치를 직접 맞추는 화면이라 건물이 구분되는 단계까지
@@ -231,6 +269,7 @@ const ManualPinAdd = () => {
           >
             <PanToSearched
               result={searchedResult}
+              fitPadding={fitPadding}
               onSettled={setSelectedCenter}
             />
           </GoogleMap>
@@ -274,15 +313,16 @@ const ManualPinAdd = () => {
             : '현재 위치를 찾는 중...')}
       </Hint>
 
-      <CenterMarker aria-hidden="true">
+      <CenterMarker $shift={mapShift} aria-hidden="true">
         <MarkerIcon src={markerIcon} alt="" />
         <CrosshairIcon src={crosshairIcon} alt="" />
       </CenterMarker>
 
       <AddressSheet
         ariaLabel="선택한 위치"
-        collapsedOffset={137}
-        height={191}
+        collapsedOffset={SHEET_COLLAPSED_OFFSET}
+        height={SHEET_HEIGHT}
+        onCollapsedChange={setIsSheetCollapsed}
       >
         <LocationLabel>선택한 위치</LocationLabel>
         <LocationTitle>
@@ -322,26 +362,14 @@ const Page = styled.main`
   background: var(--Map-Base);
 `
 
-/* 위는 안내 문구(67 에서 시작해 높이 24), 아래는 주소 시트(191)와
-   하단 내비게이션(75)이 막는다. 핀을 찍을 자리는 그 사이 한가운데다. */
-const HINT_BOTTOM = 67 + 24
-const SHEET_TOP = 191 + 75
-
-/*
- * 지도를 위로 그만큼 빼서 놓는다.
- *
- * 지도의 중심은 늘 담긴 상자의 한가운데라, 상자를 화면에 딱 맞추면 중심이
- * 시트 쪽으로 내려간다. 위로 늘려 두면 중심이 두 상자 사이의 한가운데로
- * 올라오고, 시트를 접어도 아래에 빈자리가 생기지 않는다.
- */
-const MAP_SHIFT = SHEET_TOP - HINT_BOTTOM
-
 const MapLayer = styled.div`
   position: absolute;
-  top: ${-MAP_SHIFT}px;
+  top: ${({ $shift }) => `${-$shift}px`};
   right: 0;
   bottom: 0;
   left: 0;
+  /* 시트를 접고 펼 때 지도와 표시가 같이 미끄러지듯 따라간다. */
+  transition: top 240ms ease;
 `
 
 /* 지도 화면의 핀 추가 버튼과 같은 자리·크기다. */
@@ -477,7 +505,8 @@ const Hint = styled.p`
 const CenterMarker = styled.div`
   position: absolute;
   z-index: 3;
-  top: calc(50% - ${MAP_SHIFT / 2 + 65}px);
+  top: ${({ $shift }) => `calc(50% - ${$shift / 2 + 65}px)`};
+  transition: top 240ms ease;
   left: 50%;
   width: 54px;
   height: 66px;
