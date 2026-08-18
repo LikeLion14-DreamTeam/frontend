@@ -223,9 +223,26 @@ const Page = styled.main`
   background: var(--Map-Base);
 `
 
+/* 위는 안내 문구(67 에서 시작해 높이 24), 아래는 주소 시트(191)와
+   하단 내비게이션(75)이 막는다. 핀을 찍을 자리는 그 사이 한가운데다. */
+const HINT_BOTTOM = 67 + 24
+const SHEET_TOP = 191 + 75
+
+/*
+ * 지도를 위로 그만큼 빼서 놓는다.
+ *
+ * 지도의 중심은 늘 담긴 상자의 한가운데라, 상자를 화면에 딱 맞추면 중심이
+ * 시트 쪽으로 내려간다. 위로 늘려 두면 중심이 두 상자 사이의 한가운데로
+ * 올라오고, 시트를 접어도 아래에 빈자리가 생기지 않는다.
+ */
+const MAP_SHIFT = SHEET_TOP - HINT_BOTTOM
+
 const MapLayer = styled.div`
   position: absolute;
-  inset: 0;
+  top: ${-MAP_SHIFT}px;
+  right: 0;
+  bottom: 0;
+  left: 0;
 `
 
 /* 지도 화면의 핀 추가 버튼과 같은 자리·크기다. */
@@ -340,10 +357,12 @@ const Hint = styled.p`
   transform: translateX(-50%);
 `
 
+/* 십자 표시의 아래 끝이 지도의 중심에 닿아야 한다. 지도를 위로 뺀 만큼
+   같이 올린다. 65 는 그림 안에서 십자까지의 거리다. */
 const CenterMarker = styled.div`
   position: absolute;
   z-index: 3;
-  top: calc(50% - 65px);
+  top: calc(50% - ${MAP_SHIFT / 2 + 65}px);
   left: 50%;
   width: 54px;
   height: 66px;
