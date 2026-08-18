@@ -1,15 +1,39 @@
 import { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import { useNavigate } from 'react-router-dom'
+import { useMap } from '@vis.gl/react-google-maps'
 import Button from '../../components/common/Button'
 import GoogleMap from '../../components/common/GoogleMap'
 import SnapSheet from '../../components/common/SnapSheet'
 import NavBar from '../../components/layout/NavBar'
-import { reverseGeocode } from '../../features/pins/reverseGeocode'
+import {
+  geocodeAddress,
+  reverseGeocode,
+} from '../../features/pins/reverseGeocode'
 import crosshairIcon from '../../assets/map/manual-pin-crosshair.svg'
 import markerIcon from '../../assets/map/manual-pin-marker.svg'
 import searchIcon from '../../assets/map/manual-pin-search.svg'
 import recordPlusIcon from '../../assets/map/record-plus.png'
+
+/**
+ * 찾은 자리로 지도를 옮긴다.
+ *
+ * `GoogleMap` 은 중심을 `defaultCenter` 로 넘겨 처음 그릴 때만 반영한다.
+ * 나중에 옮기려면 지도를 직접 잡아야 해서 자식으로 둔다. 그리는 건 없다.
+ *
+ * 옮기면 `onCenterChanged` 가 이어져 선택 위치와 주소도 따라 바뀐다.
+ */
+const PanToSearched = ({ position }) => {
+  const map = useMap()
+
+  useEffect(() => {
+    if (!map || !position) return
+
+    map.panTo(position)
+  }, [map, position])
+
+  return null
+}
 
 /** 위치를 못 얻었을 때 시작 지점. 여기서 직접 옮겨 찍으면 된다. */
 const FALLBACK_CENTER = { lat: 37.5796, lng: 126.9849 }
@@ -47,6 +71,9 @@ const ManualPinAdd = () => {
   const [place, setPlace] = useState(null)
   const [isResolvingPlace, setIsResolvingPlace] = useState(false)
   const [address, setAddress] = useState('')
+  const [searchedCenter, setSearchedCenter] = useState(null)
+  const [isSearching, setIsSearching] = useState(false)
+  const [searchError, setSearchError] = useState('')
 
   useEffect(() => {
     let ignore = false
@@ -108,6 +135,30 @@ const ManualPinAdd = () => {
     setSelectedCenter({ lat: center.lat, lng: center.lng })
   }
 
+  /* 입력한 주소를 좌표로 바꿔 지도를 옮긴다. 핀은 늘 지도 중심이라 따라온다. */
+  const handleSearch = async (event) => {
+    event.preventDefault()
+
+    const keyword = address.trim()
+    if (!keyword || isSearching) return
+
+    setIsSearching(true)
+    setSearchError('')
+
+    const found = await geocodeAddress(keyword)
+
+    setIsSearching(false)
+
+    if (!found) {
+      setSearchError('그 주소를 찾지 못했어요')
+      return
+    }
+
+    // 매번 새 객체를 넘겨야 같은 자리를 다시 검색해도 지도가 반응한다.
+    setSearchedCenter({ lat: found.latitude, lng: found.longitude })
+    setAddress(found.address)
+  }
+
   const handleContinue = () => {
     if (!selectedCenter) return
 
@@ -142,19 +193,27 @@ const ManualPinAdd = () => {
               keyboardShortcuts: false,
               onCenterChanged: handleCenterChanged,
             }}
-          />
+          >
+            <PanToSearched position={searchedCenter} />
+          </GoogleMap>
         )}
       </MapLayer>
 
-      <SearchBar>
+      <SearchBar onSubmit={handleSearch}>
         <SearchBarInner>
-          <SearchIcon src={searchIcon} alt="" aria-hidden="true" />
+          <SearchButton type="submit" aria-label="주소 검색" disabled={isSearching}>
+            <img src={searchIcon} alt="" />
+          </SearchButton>
           <SearchInput
             type="search"
             value={address}
-            onChange={(event) => setAddress(event.target.value)}
-            aria-label="선택 위치의 주소"
-            placeholder="주소 입력 (선택)"
+            onChange={(event) => {
+              setAddress(event.target.value)
+              setSearchError('')
+            }}
+            aria-label="주소 검색"
+            placeholder="주소를 입력하고 검색하세요"
+            enterKeyHint="search"
           />
         </SearchBarInner>
       </SearchBar>
@@ -170,9 +229,11 @@ const ManualPinAdd = () => {
       </CancelButton>
 
       <Hint>
-        {selectedCenter
-          ? '지도를 움직여 위치를 맞춰주세요'
-          : '현재 위치를 찾는 중...'}
+        {searchError ||
+          (isSearching && '주소를 찾는 중...') ||
+          (selectedCenter
+            ? '지도를 움직여 위치를 맞춰주세요'
+            : '현재 위치를 찾는 중...')}
       </Hint>
 
       <CenterMarker aria-hidden="true">
@@ -252,7 +313,7 @@ const CANCEL_BUTTON_TOP = 19
 
 /* 지도 화면의 여정 선택 드롭바와 같은 자리·높이에 선다.
    두 화면을 오갈 때 같은 줄에 있어야 흔들리지 않는다. */
-const SearchBar = styled.div`
+const SearchBar = styled.form`
   position: absolute;
   z-index: 4;
   /* 지도 화면의 여정 선택 드롭바와 이어지는 이름이다. */
@@ -314,10 +375,26 @@ const SearchBarInner = styled.span`
   gap: 10px;
 `
 
-const SearchIcon = styled.img`
-  width: 18px;
-  height: 18px;
+/* 아이콘을 눌러도 검색되게 버튼으로 둔다. 모습은 그림 그대로다. */
+const SearchButton = styled.button`
   flex: 0 0 auto;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+
+  img {
+    width: 18px;
+    height: 18px;
+    display: block;
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.5;
+  }
 `
 
 const SearchInput = styled.input`

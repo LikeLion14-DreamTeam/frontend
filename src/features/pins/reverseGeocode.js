@@ -105,3 +105,40 @@ export const reverseGeocode = async ({ latitude, longitude }) => {
     return null
   }
 }
+
+/**
+ * 주소나 장소 이름을 좌표로 바꾼다(지오코딩).
+ *
+ * 수동 핀 추가 화면의 주소 검색에 쓴다. 역지오코딩과 같은 지오코더를 쓰므로
+ * 켜야 하는 API 도 같다.
+ *
+ * @returns `{ latitude, longitude, address }`. 못 찾으면 null
+ */
+export const geocodeAddress = async (query) => {
+  const keyword = query?.trim()
+  if (!keyword) return null
+
+  const geocoder = await loadGeocoder()
+  if (!geocoder) return null
+
+  try {
+    const { results } = await geocoder.geocode({
+      address: keyword,
+      language: 'ko',
+    })
+
+    const [best] = results
+    if (!best) return null
+
+    const { location } = best.geometry
+
+    return {
+      latitude: location.lat(),
+      longitude: location.lng(),
+      address: toReadableAddress(best.formatted_address),
+    }
+  } catch {
+    // 결과가 없거나(ZERO_RESULTS) 요청이 거절된 경우
+    return null
+  }
+}
