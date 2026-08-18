@@ -539,39 +539,43 @@ const MyPage = () => {
     void logoutRequest.catch(() => {})
   }
 
-  const handlePermissionSettingClick = async (permissionType) => {
+  const handlePermissionSettingClick = (permissionType) => {
     if (
       permissionStatuses[permissionType] === DEVICE_PERMISSION_STATUS.CHECKING
     ) {
       return
     }
 
+    // Safari는 권한 API가 버튼 클릭의 사용자 제스처 안에서 바로 호출돼야 한다.
+    // 따라서 상태 갱신이나 다른 비동기 작업보다 먼저 요청을 시작한다.
+    const permissionRequest = requestDevicePermission(permissionType)
+
     setPermissionStatuses((currentStatuses) => ({
       ...currentStatuses,
       [permissionType]: DEVICE_PERMISSION_STATUS.CHECKING,
     }))
 
-    const status = await requestDevicePermission(permissionType)
+    void permissionRequest.then((status) => {
+      if (
+        permissionType === 'location' &&
+        status === DEVICE_PERMISSION_STATUS.GRANTED
+      ) {
+        rememberLocationGranted()
+      }
 
-    if (
-      permissionType === 'location' &&
-      status === DEVICE_PERMISSION_STATUS.GRANTED
-    ) {
-      rememberLocationGranted()
-    }
+      setPermissionStatuses((currentStatuses) => ({
+        ...currentStatuses,
+        [permissionType]: status,
+      }))
 
-    setPermissionStatuses((currentStatuses) => ({
-      ...currentStatuses,
-      [permissionType]: status,
-    }))
-
-    if (mobileOS) {
-      void recordPermissionEvent({
-        permission_type: permissionType,
-        status,
-        os: mobileOS,
-      }).catch(() => {})
-    }
+      if (mobileOS) {
+        void recordPermissionEvent({
+          permission_type: permissionType,
+          status,
+          os: mobileOS,
+        }).catch(() => {})
+      }
+    })
   }
 
   const tasteProfileUpdatedDate = formatIsoDate(
