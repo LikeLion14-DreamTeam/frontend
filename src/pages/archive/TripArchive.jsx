@@ -14,6 +14,7 @@ import {
   getPhotobook,
   updatePhotobookName,
 } from '../../features/photobooks/photobookApi'
+import { getCachedRepresentativePhotos } from '../../features/pins/pinApi'
 
 const INITIAL_PLAYER = {
   pinId: null,
@@ -21,6 +22,8 @@ const INITIAL_PLAYER = {
   progress: 0,
   duration: 0,
 }
+
+const MAX_REPRESENTATIVE_PHOTOS = 3
 
 const pad2 = (value) => String(value).padStart(2, '0')
 
@@ -81,12 +84,18 @@ const normalizePhotos = (photos, placeName) =>
     .sort(
       (a, b) => a.order - b.order || a.sourceIndex - b.sourceIndex,
     )
-    .slice(0, 4)
+    .slice(0, MAX_REPRESENTATIVE_PHOTOS)
     .map(({ sourceIndex: _sourceIndex, ...photo }) => photo)
 
 const normalizePin = (pin, cityName, index) => {
   const placeName = pin.place_name?.trim() || '이름 없는 장소'
   const voiceMemo = pin.voice_memo
+  const refreshedRepresentativePhotos = getCachedRepresentativePhotos(pin.pin_id)
+  const representativePhotos = refreshedRepresentativePhotos.length
+    ? refreshedRepresentativePhotos
+    : Array.isArray(pin.representative_photos)
+      ? pin.representative_photos
+      : []
 
   return {
     id: pin.pin_id,
@@ -97,7 +106,10 @@ const normalizePin = (pin, cityName, index) => {
     latitude: getCoordinate(pin.latitude),
     longitude: getCoordinate(pin.longitude),
     note: pin.text_note?.trim() || undefined,
-    photos: normalizePhotos(pin.photos, placeName),
+    photos: normalizePhotos(
+      representativePhotos.length ? representativePhotos : pin.photos,
+      placeName,
+    ),
     voiceMemo: voiceMemo
       ? {
           audioUrl: voiceMemo.audio_url ?? voiceMemo.audio_file ?? '',

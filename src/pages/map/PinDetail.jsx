@@ -15,6 +15,7 @@ import refreshIcon from '../../assets/map/refresh.svg'
 import photoAddIcon from '../../assets/map/photo-add-round.svg'
 import noteEditIcon from '../../assets/map/note-edit.svg'
 import {
+  cacheRepresentativePhotos,
   deletePin,
   getPin,
   getPinPhotos,
@@ -398,6 +399,7 @@ const PinDetail = () => {
 
     try {
       const result = await refreshRepresentativePhotos(pinID)
+      cacheRepresentativePhotos(pinID, result.representative_photos)
       setPin((prev) => ({
         ...prev,
         representative_photos: result.representative_photos,
@@ -433,7 +435,15 @@ const PinDetail = () => {
     ? { lat: latitude, lng: longitude }
     : null
   const title = pin.place_name || pin.address || '이름 없는 장소'
-  const representativePhotos = pin.representative_photos ?? []
+  const apiRepresentativePhotos = (pin.representative_photos ?? [])
+    .filter((photo) => photo?.url)
+    .slice(0, 3)
+  const representativePhotos = apiRepresentativePhotos.length
+    ? apiRepresentativePhotos
+    : photos
+        .filter((photo) => photo.is_pin_cover && photo.file_path)
+        .slice(0, 3)
+        .map((photo) => ({ photo_id: photo.photo_id, url: photo.file_path }))
   const previewPhotos = photos.slice(0, 3)
   // 미리보기 세 칸에 안 들어간 나머지 장수
   const hiddenPhotoCount = Math.max(photos.length - previewPhotos.length, 0)
