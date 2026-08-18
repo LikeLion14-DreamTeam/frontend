@@ -66,6 +66,11 @@ const DKM_PIN_COORDINATES = {
   5: { latitude: 37.5050375, longitude: 126.954171875 },
 }
 
+const DKM_ALL_ABOUT_PIN_NO = 5
+const DKM_ALL_ABOUT_NOTE =
+  '곽효석 [PM]\n- 안녕하세요. 고기만두 싫어하는 대왕김치만두파 곽효석입니다.\n\n오채린 [DE]\n- 저랑 느좋카페 가실분\n\n나희경 [FE]\n- 몬스터의 악마 (특이사항: 피 뽑으면 몬스터 나옴)\n\n이준원 [FE]\n- 내 최애 팬텀\n\n김희선 [BE]\n- 나 ♡ ☕️\n\n서유진 [BE]\n- 저의 말랑볼은 코딩주머니입니다'
+const DKM_ALL_ABOUT_PHOTO_ORDER = [1, 5, 2, 4, 6, 3]
+
 const DEMO_JOURNEYS = [
   {
     segmentId: MCM_DEMO_SEGMENT_ID,
@@ -395,12 +400,38 @@ const createDkmPins = () => ({
     country_name: '대한민국',
     place_name: 'All about DKM',
     tagged_at: '2026-08-12T18:05:00.000',
-    text_note:
-      '곽효석 [PM]\n- 안녕하세요. 고기만두 싫어하는 대왕김치만두파 곽효석입니다.\n김희선 [BE]\n- 나 ♡ ☕️\n나희경 [FE]\n- 몬스터의 악마 (특이사항: 피 뽑으면 몬스터 나옴)\n서유진 [BE]\n- 저의 말랑볼은 코딩주머니입니다\n이준원 [FE]\n- 내 최애 팬텀\n오채린 [DE]\n- 저랑 느좋카페 가실분',
+    text_note: DKM_ALL_ABOUT_NOTE,
     product_name: '대왕김치만두',
     source_pin_no: 5,
   },
 })
+
+const applyDkmAllAboutUpdates = (state) => {
+  const pinId = DKM_PIN_IDS[DKM_ALL_ABOUT_PIN_NO]
+  const pin = state.pins?.[pinId]
+
+  if (pin) pin.text_note = DKM_ALL_ABOUT_NOTE
+
+  const photos = state.photos?.[pinId]
+  if (!photos) return state
+
+  const orderBySlot = new Map(
+    DKM_ALL_ABOUT_PHOTO_ORDER.map((slot, index) => [slot, index]),
+  )
+  const getSlot = (photo) => {
+    const sourceKey = photo.source_asset_key ?? photo.source_file_name ?? ''
+    const match = sourceKey.match(/dkm\/pin-05-(\d+)\.webp$/)
+    return match ? Number(match[1]) : null
+  }
+
+  state.photos[pinId] = [...photos].sort((left, right) => {
+    const leftOrder = orderBySlot.get(getSlot(left)) ?? Number.MAX_SAFE_INTEGER
+    const rightOrder = orderBySlot.get(getSlot(right)) ?? Number.MAX_SAFE_INTEGER
+    return leftOrder - rightOrder
+  })
+
+  return state
+}
 
 const createInitialState = () => {
   const pinGroups = {
@@ -469,7 +500,7 @@ const createInitialState = () => {
     voiceMemoId: -9502,
   })
 
-  return state
+  return applyDkmAllAboutUpdates(state)
 }
 
 const applySeededDkmCoordinates = (state) => {
@@ -558,7 +589,9 @@ const loadInitialState = () => {
   try {
     const saved = JSON.parse(storage.getItem(DEMO_JOURNEY_STORAGE_KEY))
     if (saved?.state && saved.version === 2) {
-      return reviveAssetUrls(applySeededDkmCoordinates(saved.state))
+      return reviveAssetUrls(
+        applyDkmAllAboutUpdates(applySeededDkmCoordinates(saved.state)),
+      )
     }
 
     const legacyMcm = JSON.parse(storage.getItem(LEGACY_STORAGE_KEYS[0]))
@@ -579,13 +612,19 @@ const loadInitialState = () => {
           Object.assign(state[key], legacyMcm.state[key] ?? {})
         },
       )
-      return reviveAssetUrls(applySeededDkmCoordinates(state))
+      return reviveAssetUrls(
+        applyDkmAllAboutUpdates(applySeededDkmCoordinates(state)),
+      )
     }
 
-    return applySeededDkmCoordinates(createInitialState())
+    return applyDkmAllAboutUpdates(
+      applySeededDkmCoordinates(createInitialState()),
+    )
   } catch {
     storage.removeItem(DEMO_JOURNEY_STORAGE_KEY)
-    return applySeededDkmCoordinates(createInitialState())
+    return applyDkmAllAboutUpdates(
+      applySeededDkmCoordinates(createInitialState()),
+    )
   }
 }
 
