@@ -6,6 +6,7 @@ import Button from '../../components/common/Button'
 import ConfirmationModal from '../../components/common/ConfirmationModal'
 import GoogleMap from '../../components/common/GoogleMap'
 import SnapSheet from '../../components/common/SnapSheet'
+import PhotoPreviewOverlay from '../../components/common/PhotoPreviewOverlay'
 import VoiceMemoBar from '../../components/common/VoiceMemoBar'
 import activePinIcon from '../../assets/map/map-pin-active.svg'
 import deleteWarningIcon from '../../assets/icons/delete-warning.svg'
@@ -149,6 +150,9 @@ const PinDetail = () => {
   const [noteDraft, setNoteDraft] = useState('')
   const [isSavingNote, setIsSavingNote] = useState(false)
   const [noteError, setNoteError] = useState('')
+
+  /** 크게 보고 있는 추천 사진의 자리. 없으면 -1 */
+  const [suggestedIndex, setSuggestedIndex] = useState(-1)
 
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -714,6 +718,9 @@ const PinDetail = () => {
               {representativePhotos.map((photo, index) => (
                 <SuggestedPhoto
                   key={photo.photo_id}
+                  type="button"
+                  aria-label={`추천 사진 ${index + 1} 크게 보기`}
+                  onClick={() => setSuggestedIndex(index)}
                   $tone={['soft', 'warm', 'main'][index] ?? 'main'}
                 >
                   <PhotoImage src={photo.url} alt="" crossOrigin="anonymous" />
@@ -768,6 +775,18 @@ const PinDetail = () => {
           </PinDeleteWarning>
         </PinDeleteModalContent>
       </ConfirmationModal>
+
+      {suggestedIndex >= 0 && (
+        <PhotoPreviewOverlay
+          photos={representativePhotos.map((photo) => ({
+            id: photo.photo_id,
+            url: photo.url,
+          }))}
+          index={suggestedIndex}
+          onIndexChange={setSuggestedIndex}
+          onClose={() => setSuggestedIndex(-1)}
+        />
+      )}
     </Page>
   )
 }
@@ -1372,11 +1391,15 @@ const SuggestedGrid = styled.div`
   gap: 6px;
 `
 
-const SuggestedPhoto = styled.div`
+const SuggestedPhoto = styled.button`
   position: relative;
+  width: 100%;
   aspect-ratio: 1;
+  padding: 0;
   overflow: hidden;
+  border: 0;
   border-radius: 12px;
   background: ${({ $tone }) => toneBackgrounds[$tone]};
+  cursor: pointer;
 `
 
