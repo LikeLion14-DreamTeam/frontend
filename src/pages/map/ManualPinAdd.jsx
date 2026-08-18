@@ -9,7 +9,7 @@ import { reverseGeocode } from '../../features/pins/reverseGeocode'
 import crosshairIcon from '../../assets/map/manual-pin-crosshair.svg'
 import markerIcon from '../../assets/map/manual-pin-marker.svg'
 import searchIcon from '../../assets/map/manual-pin-search.svg'
-import closeIcon from '../../assets/map/popover-close.svg'
+import recordPlusIcon from '../../assets/map/record-plus.png'
 
 /** 위치를 못 얻었을 때 시작 지점. 여기서 직접 옮겨 찍으면 된다. */
 const FALLBACK_CENTER = { lat: 37.5796, lng: 126.9849 }
@@ -162,7 +162,7 @@ const ManualPinAdd = () => {
         aria-label="핀 추가 취소"
         onClick={() => navigate('/map', { replace: true })}
       >
-        <img src={closeIcon} alt="" />
+        <img src={recordPlusIcon} alt="" />
       </CancelButton>
 
       <Hint>
@@ -249,7 +249,7 @@ const SearchBar = styled.div`
   box-shadow: var(--Effect-Card);
 `
 
-/* 옆에 선 주소 입력칸과 같은 바탕이라 지도 위에서 한 벌로 보인다. */
+/* 지도 화면의 핀 추가 버튼과 같은 모습이다. 가운데 표시만 + 대신 X 다. */
 const CancelButton = styled.button`
   position: absolute;
   z-index: 4;
@@ -263,14 +263,17 @@ const CancelButton = styled.button`
   justify-content: center;
   border: 0;
   border-radius: 50%;
-  background: var(--Surface-Base);
-  box-shadow: var(--Effect-Card);
+  background: var(--Primary-Cognac);
+  box-shadow: var(--Effect-CTA);
   cursor: pointer;
 
+  /* 핀 추가 버튼의 + 를 그대로 돌려 쓴다. 굵기와 끝 모양이 저절로 같다. */
   img {
-    width: 12px;
-    height: 12px;
+    width: 30px;
+    height: 30px;
     display: block;
+    object-fit: contain;
+    transform: rotate(45deg);
   }
 `
 
