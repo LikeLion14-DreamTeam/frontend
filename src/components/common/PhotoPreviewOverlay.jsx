@@ -1,5 +1,6 @@
 import styled from 'styled-components'
 import closeIcon from '../../assets/icons/capture-close.svg'
+import trashIcon from '../../assets/icons/capture-trash.svg'
 
 /**
  * 사진을 크게 보는 오버레이. 촬영 화면과 전체 사진 보기가 같은 모습을 쓴다.
@@ -66,6 +67,40 @@ const PhotoPreviewOverlay = ({
 }
 
 export default PhotoPreviewOverlay
+
+/**
+ * 크게 보고 있는 사진을 지우는 버튼.
+ *
+ * 오버레이의 `children` 으로 넣어 쓴다. 지우는 방식은 화면마다 달라 동작만
+ * 받는다. 어두운 바탕 위에 놓이는 모습이라 여기 함께 둔다.
+ */
+export const PreviewDeleteButton = ({ onClick }) => (
+  <DeleteButton type="button" onClick={onClick}>
+    <img src={trashIcon} alt="" aria-hidden="true" />
+    삭제
+  </DeleteButton>
+)
+
+const DeleteButton = styled.button`
+  padding: 13px 22px 13px 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgb(242 233 220 / 35%);
+  border-radius: 24px;
+  background: none;
+  color: rgb(242 233 220 / 85%);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+
+  img {
+    width: 16px;
+    height: 15px;
+    display: block;
+  }
+`
 
 /*
  * 화면 전체를 덮어야 해서 `fixed` 로 둔다. `absolute` 로 두면 기준이 되는

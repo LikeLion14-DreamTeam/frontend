@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import styled, { createGlobalStyle } from 'styled-components'
-import trashIcon from '../../assets/icons/capture-trash.svg'
 import ConfirmationModal from '../../components/common/ConfirmationModal'
-import PhotoPreviewOverlay from '../../components/common/PhotoPreviewOverlay'
+import PhotoPreviewOverlay, {
+  PreviewDeleteButton,
+} from '../../components/common/PhotoPreviewOverlay'
 import cameraFlipIcon from '../../assets/icons/camera-flip.svg'
 import { linkProduct } from '../../features/products/productApi'
 import useRecordDraftStore from '../../features/pins/useRecordDraftStore'
@@ -531,10 +532,7 @@ const MultiCapture = () => {
           onIndexChange={(nextIndex) => setPreviewId(shots[nextIndex].id)}
           onClose={() => setPreviewId(null)}
         >
-          <PreviewDeleteButton type="button" onClick={handleRemovePreview}>
-            <img src={trashIcon} alt="" aria-hidden="true" />
-            삭제
-          </PreviewDeleteButton>
+          <PreviewDeleteButton onClick={handleRemovePreview} />
         </PhotoPreviewOverlay>
       )}
       <ConfirmationModal
@@ -840,23 +838,3 @@ const Shutter = styled.button`
   }
 `
 
-const PreviewDeleteButton = styled.button`
-  padding: 13px 22px 13px 20px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid rgb(242 233 220 / 35%);
-  border-radius: 24px;
-  background: none;
-  color: rgb(242 233 220 / 85%);
-  font-size: 14px;
-  font-weight: 500;
-  white-space: nowrap;
-  cursor: pointer;
-
-  img {
-    width: 16px;
-    height: 15px;
-    display: block;
-  }
-`
