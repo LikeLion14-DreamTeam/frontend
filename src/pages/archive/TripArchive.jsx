@@ -23,7 +23,7 @@ const INITIAL_PLAYER = {
   duration: 0,
 }
 
-const MAX_REPRESENTATIVE_PHOTOS = 3
+const MAX_PIN_THUMBNAIL_PHOTOS = 4
 
 const pad2 = (value) => String(value).padStart(2, '0')
 
@@ -84,8 +84,40 @@ const normalizePhotos = (photos, placeName) =>
     .sort(
       (a, b) => a.order - b.order || a.sourceIndex - b.sourceIndex,
     )
-    .slice(0, MAX_REPRESENTATIVE_PHOTOS)
+    .slice(0, MAX_PIN_THUMBNAIL_PHOTOS)
     .map(({ sourceIndex: _sourceIndex, ...photo }) => photo)
+
+const getPhotoIdentity = (photo) => {
+  if (typeof photo === 'string') return `url:${photo}`
+  if (!photo) return null
+
+  if (photo.photo_id !== undefined && photo.photo_id !== null) {
+    return `id:${photo.photo_id}`
+  }
+  if (photo.id !== undefined && photo.id !== null) return `id:${photo.id}`
+
+  const url = photo.url ?? photo.photo_url ?? photo.file_path
+  return url ? `url:${url}` : null
+}
+
+const composePinThumbnailPhotos = (representativePhotos, photos) => {
+  if (!representativePhotos.length) return photos
+
+  const suggestedPhotos = representativePhotos.slice(0, 3)
+  const suggestedPhotoIds = new Set(
+    suggestedPhotos.map(getPhotoIdentity).filter(Boolean),
+  )
+  const additionalPhoto = (Array.isArray(photos) ? photos : []).find(
+    (photo) => !suggestedPhotoIds.has(getPhotoIdentity(photo)),
+  )
+
+  return [...suggestedPhotos, ...(additionalPhoto ? [additionalPhoto] : [])].map(
+    (photo, index) =>
+      typeof photo === 'string'
+        ? { url: photo, order: index + 1 }
+        : { ...photo, order: index + 1 },
+  )
+}
 
 const normalizePin = (pin, cityName, index) => {
   const placeName = pin.place_name?.trim() || '이름 없는 장소'
@@ -107,7 +139,7 @@ const normalizePin = (pin, cityName, index) => {
     longitude: getCoordinate(pin.longitude),
     note: pin.text_note?.trim() || undefined,
     photos: normalizePhotos(
-      representativePhotos.length ? representativePhotos : pin.photos,
+      composePinThumbnailPhotos(representativePhotos, pin.photos),
       placeName,
     ),
     voiceMemo: voiceMemo

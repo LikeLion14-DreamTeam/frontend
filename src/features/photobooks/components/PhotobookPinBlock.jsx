@@ -3,7 +3,7 @@ import detailChevron from '../../../assets/photobooks/detail-chevron.svg'
 import shareIcon from '../../../assets/photobooks/share.svg'
 import VoiceMemoBar from '../../../components/common/VoiceMemoBar'
 
-const MAX_REPRESENTATIVE_PHOTOS = 3
+const MAX_PIN_THUMBNAIL_PHOTOS = 4
 
 const normalizePhoto = (photo, index, placeName) =>
   typeof photo === 'string'
@@ -30,7 +30,7 @@ const PhotobookPinBlock = ({
   detailLabel = '자세히',
 }) => {
   const normalizedPhotos = photos
-    .slice(0, MAX_REPRESENTATIVE_PHOTOS)
+    .slice(0, MAX_PIN_THUMBNAIL_PHOTOS)
     .map((photo, index) => normalizePhoto(photo, index, placeName))
   const photoCount = Math.max(1, normalizedPhotos.length)
   const hasRecord = Boolean(note || voiceMemo)
