@@ -323,7 +323,12 @@ const ManualPinDetails = () => {
             <PhotoViewport>
               <PhotoStrip aria-label="추가된 사진">
                 {photos.map((photo, index) => (
-                  <PhotoTile key={photo.id}>
+                  <PhotoTile
+                    key={photo.id}
+                    type="button"
+                    aria-label={`추가된 사진 ${index + 1} 크게 보기`}
+                    onClick={() => setPreviewIndex(index)}
+                  >
                     <PhotoPreview
                       src={photo.url}
                       alt={`추가된 사진 ${index + 1}`}
@@ -712,10 +717,21 @@ const AddPhotoIcon = styled.img`
   display: block;
 `
 
+/* 넘치는 사진을 가로로 넘겨 본다. 촬영 화면의 썸네일 줄과 같은 방식이다.
+   본문 여백(24)을 음수 마진으로 상쇄해 넘기는 동안 화면 끝까지 흘러간다. */
 const PhotoViewport = styled.div`
   width: calc(100vw - 24px);
   max-width: 378px;
-  overflow: hidden;
+  margin: 0 -24px;
+  padding: 0 24px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  touch-action: pan-x;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 `
 
 const PhotoStrip = styled.div`
@@ -724,13 +740,16 @@ const PhotoStrip = styled.div`
   gap: 10px;
 `
 
-const PhotoTile = styled.div`
+const PhotoTile = styled.button`
   width: 111.333px;
   height: 124px;
   flex: 0 0 111.333px;
+  padding: 0;
   overflow: hidden;
+  border: 0;
   border-radius: 12px;
   background: var(--Map-Land);
+  cursor: pointer;
 `
 
 const PhotoPreview = styled.img`
