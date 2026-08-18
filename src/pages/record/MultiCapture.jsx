@@ -29,6 +29,9 @@ const FRONT_CAMERA = 'user'
 
 const JPEG_QUALITY = 0.92
 
+/* 배율 버튼에 올릴 값. 기기가 지원하는 범위 안의 것만 쓴다. */
+const ZOOM_STEPS = [1, 2, 3]
+
 // 저장 비율 3:4 고정. 뷰파인더도 같은 비율이라 보이는 그대로 찍힌다.
 const CAPTURE_RATIO = 3 / 4
 
@@ -73,6 +76,9 @@ const MultiCapture = () => {
   const [status, setStatus] = useState('starting')
   const [errorMessage, setErrorMessage] = useState('')
   const [facingMode, setFacingMode] = useState(BACK_CAMERA)
+  /* 기기가 배율을 지원할 때만 채워진다. 못 하면 버튼을 아예 그리지 않는다. */
+  const [zoomSteps, setZoomSteps] = useState([])
+  const [zoom, setZoom] = useState(1)
   /** 빠르게 여러 번 전환했을 때 늦게 도착한 스트림을 버리기 위한 표식 */
   const streamRequestRef = useRef(0)
 
@@ -114,6 +120,22 @@ const MultiCapture = () => {
       }
 
       streamRef.current = stream
+
+      /*
+       * 배율은 기기가 처리한다. 잘라 쓰는 게 아니라 렌즈를 바꾸거나 센서 단계에서
+       * 당기므로 화질이 그대로다. 카메라마다 지원 범위가 달라 열 때마다 다시 본다.
+       */
+      const [videoTrack] = stream.getVideoTracks()
+      const zoomRange = videoTrack?.getCapabilities?.().zoom
+
+      setZoom(1)
+      setZoomSteps(
+        zoomRange
+          ? ZOOM_STEPS.filter(
+              (step) => step >= zoomRange.min && step <= zoomRange.max,
+            )
+          : [],
+      )
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream
@@ -189,6 +211,18 @@ const MultiCapture = () => {
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
     )
   }, [clearCoordinates, hasResolvedLocation, setCoordinates])
+
+  const handleZoom = async (nextZoom) => {
+    const [track] = streamRef.current?.getVideoTracks() ?? []
+    if (!track) return
+
+    try {
+      await track.applyConstraints({ advanced: [{ zoom: nextZoom }] })
+      setZoom(nextZoom)
+    } catch {
+      // 못 바꿔도 촬영은 그대로 할 수 있다.
+    }
+  }
 
   const handleFlipCamera = () => {
     setFacingMode((current) =>
@@ -309,6 +343,22 @@ const MultiCapture = () => {
           <GridLine $vertical style={{ left: '66.666%' }} aria-hidden="true" />
           <GridLine style={{ top: '33.333%' }} aria-hidden="true" />
           <GridLine style={{ top: '66.666%' }} aria-hidden="true" />
+
+          {zoomSteps.length > 1 && (
+            <ZoomBar role="group" aria-label="배율">
+              {zoomSteps.map((step) => (
+                <ZoomButton
+                  key={step}
+                  type="button"
+                  $active={step === zoom}
+                  aria-pressed={step === zoom}
+                  onClick={() => handleZoom(step)}
+                >
+                  {step}x
+                </ZoomButton>
+              ))}
+            </ZoomBar>
+          )}
 
           <FlipButton
             type="button"
@@ -462,6 +512,34 @@ const ViewfinderTint = styled.div`
   position: absolute;
   inset: 0;
   background: rgb(20 17 16 / 12%);
+`
+
+/* 뷰파인더 아래 가운데. 전환 버튼은 오른쪽 아래라 겹치지 않는다. */
+const ZoomBar = styled.div`
+  position: absolute;
+  z-index: 4;
+  bottom: 12px;
+  left: 50%;
+  padding: 4px;
+  display: flex;
+  gap: 4px;
+  border-radius: 18px;
+  background: rgb(0 0 0 / 40%);
+  transform: translateX(-50%);
+`
+
+const ZoomButton = styled.button`
+  width: 34px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  background: ${({ $active }) => ($active ? 'rgb(255 255 255 / 92%)' : 'transparent')};
+  color: ${({ $active }) => ($active ? 'var(--Text-Primary)' : '#fff')};
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
 `
 
 const GridLine = styled.span`
