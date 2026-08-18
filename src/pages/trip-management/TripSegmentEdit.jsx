@@ -685,9 +685,16 @@ const TextInput = styled.input`
    테두리·높이는 여정 이름 입력과 맞춘다. */
 const DateInput = styled(TextInput)`
   padding: 0 12px;
+  /* 기본 모양을 끄지 않으면 아래 폭 지정이 먹지 않는다. */
+  appearance: none;
 
-  /* iOS 사파리는 date 입력에 제멋대로 높이를 준다. */
+  /*
+   * iOS 사파리는 값을 이 안쪽 요소에 그리는데, 칸 크기와 무관하게 자기 고유
+   * 폭을 가진다. 칸보다 넓게 잡히면 값이 오른쪽으로 밀리며 앞부터 잘려
+   * 2026. 08. 17. 이 26. 08. 17. 로 보인다. 칸에 맞춰 눌러 준다.
+   */
   &::-webkit-date-and-time-value {
+    width: 100%;
     text-align: left;
   }
 `
