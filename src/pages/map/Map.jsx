@@ -267,6 +267,12 @@ const formatTaggedAt = (taggedAt) =>
         .replace(/\.(오전|오후)/, ' $1')
     : ''
 
+/* 위치 권한은 허용했지만 기기가 좌표를 못 잡았을 때. */
+const LOCATE_FAILED_MESSAGE = '지금 위치를 확인하지 못했어요. 잠시 후 다시 시도해주세요.'
+
+/** 알림이 스스로 사라지기까지 */
+const LOCATE_TOAST_MS = 4000
+
 const MapPage = () => {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -354,6 +360,7 @@ const MapPage = () => {
   const hasRestoredPinRef = useRef(false)
   const [tripPins, setTripPins] = useState([])
   const [tripError, setTripError] = useState('')
+  const [locateError, setLocateError] = useState('')
 
   /**
    * 현재 위치 마커. 걸어 다니며 쓰는 화면이라 한 번만 받지 않고 계속 따라간다.
@@ -699,28 +706,47 @@ const MapPage = () => {
   const handleLocate = () => {
     requestCompass()
     setSelectedPinId(null)
+    setLocateError('')
 
-    if (currentPosition) {
+    const moveTo = (position) => {
       // 내 위치로 갈 때는 영역이 아니라 그 점을 가운데 두고 더 당겨 본다.
-      setMapBounds(null)
-      setMapCenter(currentPosition)
-      setMapZoom(CURRENT_POSITION_ZOOM)
-      setMapKey((current) => current + 1)
-      return
-    }
-
-    if (!navigator.geolocation) return
-
-    navigator.geolocation.getCurrentPosition(({ coords }) => {
-      const position = { lat: coords.latitude, lng: coords.longitude }
-
-      setCurrentPosition(position)
       setMapBounds(null)
       setMapCenter(position)
       setMapZoom(CURRENT_POSITION_ZOOM)
       setMapKey((current) => current + 1)
-    })
+    }
+
+    if (currentPosition) {
+      moveTo(currentPosition)
+      return
+    }
+
+    if (!navigator.geolocation) {
+      setLocateError(LOCATE_FAILED_MESSAGE)
+      return
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const position = { lat: coords.latitude, lng: coords.longitude }
+
+        setCurrentPosition(position)
+        moveTo(position)
+      },
+      /* 못 받았다는 걸 알려야 한다. 알리지 않으면 버튼이 고장 난 것처럼 보인다. */
+      () => setLocateError(LOCATE_FAILED_MESSAGE),
+      /* 기본값은 기다리는 시간이 없어, 못 잡으면 영영 안 돌아올 수 있다. */
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+    )
   }
+
+  useEffect(() => {
+    if (!locateError) return undefined
+
+    const timer = setTimeout(() => setLocateError(''), LOCATE_TOAST_MS)
+
+    return () => clearTimeout(timer)
+  }, [locateError])
 
   const selectTrip = (segmentId) => {
     setSelectedTripId(segmentId)
@@ -878,6 +904,8 @@ const MapPage = () => {
           <img src={recordPlusIcon} alt="" />
         </RecordButton>
       )}
+
+      {locateError && <LocateToast role="alert">{locateError}</LocateToast>}
 
       <NavBar activeOverride="map" />
 
@@ -1059,6 +1087,24 @@ const LocationButton = styled.button`
 /* 여정 선택 버튼과 같은 줄이다. 높이가 서로 달라, 윗자리를 맞추는 대신
    가운데를 맞춘다. 오른쪽 여백은 아래 내 위치 버튼과 같은 값으로 둔다. */
 const RECORD_BUTTON_SIZE = 40
+
+/* 하단 내비게이션 바로 위, 가운데에 잠깐 떴다 사라진다.
+   내 위치 버튼은 오른쪽에 있어 겹치지 않는다. */
+const LocateToast = styled.p`
+  position: absolute;
+  z-index: 9;
+  bottom: 95px;
+  left: 50%;
+  max-width: calc(100% - 100px);
+  padding: 8px 14px;
+  border-radius: 16px;
+  background: rgb(36 28 22 / 82%);
+  color: var(--Text-Inverse);
+  font: var(--text-ui-caption);
+  text-align: center;
+  word-break: keep-all;
+  transform: translateX(-50%);
+`
 
 const RecordButton = styled.button`
   position: absolute;
