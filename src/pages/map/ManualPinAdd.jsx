@@ -15,22 +15,50 @@ import markerIcon from '../../assets/map/manual-pin-marker.svg'
 import searchIcon from '../../assets/map/manual-pin-search.svg'
 import recordPlusIcon from '../../assets/map/record-plus.png'
 
+/* 건물 하나를 찾았을 때 이보다 더 파고들지 않는다. 처음 배율과 같은 값이라
+   검색 전후로 보이는 정도가 크게 달라지지 않는다. */
+const SEARCH_MAX_ZOOM = 18
+
 /**
  * 찾은 자리로 지도를 옮긴다.
  *
  * `GoogleMap` 은 중심을 `defaultCenter` 로 넘겨 처음 그릴 때만 반영한다.
  * 나중에 옮기려면 지도를 직접 잡아야 해서 자식으로 둔다. 그리는 건 없다.
  *
+ * 구글이 준 표시 영역(`viewport`)에 맞추면 나라를 찾으면 나라가, 도시를 찾으면
+ * 도시가 화면에 들어온다. 지도 상자는 위로 빼 두었으므로 그만큼 위쪽에 여백을
+ * 줘야 찾은 곳이 가려지지 않는다.
+ *
  * 옮기면 `onCenterChanged` 가 이어져 선택 위치와 주소도 따라 바뀐다.
  */
-const PanToSearched = ({ position }) => {
+const PanToSearched = ({ result }) => {
   const map = useMap()
 
   useEffect(() => {
-    if (!map || !position) return
+    if (!map || !result) return undefined
 
-    map.panTo(position)
-  }, [map, position])
+    const center = { lat: result.latitude, lng: result.longitude }
+
+    if (!result.viewport) {
+      map.panTo(center)
+      return undefined
+    }
+
+    map.fitBounds(result.viewport, {
+      top: MAP_SHIFT + 24,
+      right: 24,
+      bottom: 24,
+      left: 24,
+    })
+
+    /* `fitBounds` 에는 상한이 없다. 자리를 잡은 뒤 한 번만 눌러 준다. */
+    const listener = map.addListener('idle', () => {
+      if ((map.getZoom() ?? 0) > SEARCH_MAX_ZOOM) map.setZoom(SEARCH_MAX_ZOOM)
+      listener.remove()
+    })
+
+    return () => listener.remove()
+  }, [map, result])
 
   return null
 }
@@ -71,7 +99,7 @@ const ManualPinAdd = () => {
   const [place, setPlace] = useState(null)
   const [isResolvingPlace, setIsResolvingPlace] = useState(false)
   const [address, setAddress] = useState('')
-  const [searchedCenter, setSearchedCenter] = useState(null)
+  const [searchedResult, setSearchedResult] = useState(null)
   const [isSearching, setIsSearching] = useState(false)
   const [searchError, setSearchError] = useState('')
 
@@ -155,7 +183,7 @@ const ManualPinAdd = () => {
     }
 
     // 매번 새 객체를 넘겨야 같은 자리를 다시 검색해도 지도가 반응한다.
-    setSearchedCenter({ lat: found.latitude, lng: found.longitude })
+    setSearchedResult({ ...found })
     setAddress(found.address)
   }
 
@@ -194,7 +222,7 @@ const ManualPinAdd = () => {
               onCenterChanged: handleCenterChanged,
             }}
           >
-            <PanToSearched position={searchedCenter} />
+            <PanToSearched result={searchedResult} />
           </GoogleMap>
         )}
       </MapLayer>
