@@ -1041,6 +1041,7 @@ const MemoBody = styled.div`
 const MemoText = styled.p`
   color: var(--Text-Primary);
   font: var(--text-ui-body-m);
+  white-space: pre-line;
 `
 
 /* 기록이 없을 때 자리를 지키는 문구. 실제 기록과 구분되게 흐린 색을 쓴다. */
