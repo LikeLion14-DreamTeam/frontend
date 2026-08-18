@@ -66,6 +66,89 @@ const getMockStampImageId = (countryCode) => {
   return code ? `stamp-${code}` : 'stamp-default'
 }
 
+const getStampPinCount = (stamp) => {
+  const pinCount = Number(stamp?.pin_count)
+  if (Number.isFinite(pinCount)) return pinCount
+
+  return (stamp?.city_counts ?? []).reduce(
+    (total, { pin_count }) => total + (Number(pin_count) || 0),
+    0,
+  )
+}
+
+const addStampCityCounts = (counts, stamp) => {
+  if (Array.isArray(stamp?.city_counts) && stamp.city_counts.length > 0) {
+    stamp.city_counts.forEach(({ city, pin_count }) => {
+      if (!city) return
+      counts.set(city, (counts.get(city) ?? 0) + (Number(pin_count) || 0))
+    })
+    return
+  }
+
+  ;(stamp?.cities ?? []).forEach((city) => {
+    if (!city || counts.has(city)) return
+    counts.set(city, 0)
+  })
+}
+
+const buildMergedCountryStamp = (countryCode, stamps) => {
+  const cityCounts = new Map()
+  stamps.forEach((stamp) => addStampCityCounts(cityCounts, stamp))
+
+  const rankedCities = [...cityCounts.entries()].sort(
+    ([cityA, countA], [cityB, countB]) =>
+      countB - countA || cityA.localeCompare(cityB, 'ko'),
+  )
+
+  const createdAt = stamps.reduce((earliest, stamp) => {
+    const timestamp = stamp?.created_at
+    const time = timestamp ? new Date(timestamp).getTime() : Number.NaN
+    const earliestTime = earliest ? new Date(earliest).getTime() : Number.NaN
+
+    if (Number.isNaN(time)) return earliest
+    if (Number.isNaN(earliestTime)) return timestamp
+    return time < earliestTime ? timestamp : earliest
+  }, null)
+
+  return {
+    ...stamps[0],
+    country_code: countryCode,
+    country_name:
+      stamps.find((stamp) => stamp?.country_name)?.country_name ?? countryCode,
+    stamp_image_id:
+      stamps.find((stamp) => stamp?.stamp_image_id)?.stamp_image_id ??
+      getMockStampImageId(countryCode),
+    created_at: createdAt,
+    is_new: stamps.some((stamp) => stamp?.is_new),
+    pin_count: stamps.reduce(
+      (total, stamp) => total + getStampPinCount(stamp),
+      0,
+    ),
+    cities: rankedCities.slice(0, 3).map(([city]) => city),
+    city_counts: rankedCities.map(([city, pin_count]) => ({ city, pin_count })),
+    extra_city_count: Math.max(0, rankedCities.length - 3),
+    is_demo: stamps.some((stamp) => stamp?.is_demo),
+  }
+}
+
+const mergeCountryStamps = (items, demoItems) => {
+  const groupedStamps = new Map()
+
+  ;[...(items ?? []), ...(demoItems ?? [])].forEach((stamp) => {
+    const countryCode = stamp?.country_code?.toUpperCase()
+    if (!countryCode) return
+
+    groupedStamps.set(countryCode, [
+      ...(groupedStamps.get(countryCode) ?? []),
+      stamp,
+    ])
+  })
+
+  return [...groupedStamps.entries()].map(([countryCode, stamps]) =>
+    buildMergedCountryStamp(countryCode, stamps),
+  )
+}
+
 const getMockStampSummary = (stamp) => {
   const cityCounts = new Map()
   let pinCount = 0
@@ -351,7 +434,7 @@ export const getCountryStamps = async () => {
       cities: [...(stamp.cities ?? [])],
     }))
     const stamps = sortCountryStamps(
-      prependDemoItems(mockStamps, getDemoCountryStamps(), 'country_code'),
+      mergeCountryStamps(mockStamps, getDemoCountryStamps()),
     )
 
     // 새 도장 연출은 생성 직후의 첫 여권 조회에서만 쓴다.
@@ -371,7 +454,7 @@ export const getCountryStamps = async () => {
   return {
     ...response,
     stamps: sortCountryStamps(
-      prependDemoItems(response.stamps, getDemoCountryStamps(), 'country_code'),
+      mergeCountryStamps(response.stamps, getDemoCountryStamps()),
     ),
   }
 }

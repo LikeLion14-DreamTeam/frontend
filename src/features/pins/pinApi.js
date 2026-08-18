@@ -11,10 +11,9 @@ import {
   deleteDemoPhoto,
   getDemoPin,
   getDemoPinPhotos,
-  getDemoPinsByStamp,
+  getDemoPinsByCountry,
   getDemoPinVoiceMemos,
   isDemoPinId,
-  isDemoStampCode,
   refreshDemoRepresentativePhotos,
   updateDemoPin,
 } from '../demo/demoJourneyData'
@@ -31,6 +30,15 @@ const mockNotFound = () =>
     code: 'NOT_FOUND',
     message: '핀을 찾을 수 없습니다.',
   })
+
+const mergeCountryPins = (pins, demoPins) => {
+  const demoPinIds = new Set(demoPins.map((pin) => String(pin.pin_id)))
+
+  return [
+    ...demoPins,
+    ...(pins ?? []).filter((pin) => !demoPinIds.has(String(pin?.pin_id))),
+  ].sort((left, right) => new Date(left.tagged_at) - new Date(right.tagged_at))
+}
 
 const endedTripPinDeleteError = () =>
   new ApiError({
@@ -179,16 +187,10 @@ export const getPinsByCountry = async ({ countryCode, limit = 20 } = {}) => {
     })
   }
 
-  const demoPins = getDemoPinsByStamp(normalizedCountryCode)
-  if (demoPins || isDemoStampCode(normalizedCountryCode)) {
-    return {
-      pins: (demoPins ?? []).slice(0, limit),
-      next_cursor: null,
-    }
-  }
+  const demoPins = getDemoPinsByCountry(normalizedCountryCode)
 
   if (USE_MOCK) {
-    const pins = Object.values(mockPinStore.pins)
+    const mockPins = Object.values(mockPinStore.pins)
       .filter((pin) => {
         const location = getMockPinLocation(pin.pin_id)
         return (
@@ -209,12 +211,12 @@ export const getPinsByCountry = async ({ countryCode, limit = 20 } = {}) => {
       }))
 
     return {
-      pins: pins.slice(0, limit),
+      pins: mergeCountryPins(mockPins, demoPins).slice(0, limit),
       next_cursor: null,
     }
   }
 
-  return fetchAllPages(
+  const response = await fetchAllPages(
     (pageCursor) =>
       apiClient.get('/pins', {
         params: {
@@ -225,6 +227,11 @@ export const getPinsByCountry = async ({ countryCode, limit = 20 } = {}) => {
       }),
     'pins',
   )
+
+  return {
+    ...response,
+    pins: mergeCountryPins(response.pins, demoPins),
+  }
 }
 
 /**

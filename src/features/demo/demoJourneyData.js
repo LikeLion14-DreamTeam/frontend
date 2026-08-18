@@ -106,17 +106,11 @@ const DEMO_JOURNEYS = [
 
 const DEMO_SEGMENT_IDS = DEMO_JOURNEYS.map((journey) => journey.segmentId)
 const DEMO_PHOTOBOOK_IDS = DEMO_JOURNEYS.map((journey) => journey.photobookId)
-const DEMO_STAMP_CODE_SET = new Set(
-  DEMO_JOURNEYS.map((journey) => journey.stampCode),
-)
 const JOURNEY_BY_SEGMENT_ID = new Map(
   DEMO_JOURNEYS.map((journey) => [journey.segmentId, journey]),
 )
 const SEGMENT_ID_BY_PHOTOBOOK_ID = new Map(
   DEMO_JOURNEYS.map((journey) => [journey.photobookId, journey.segmentId]),
-)
-const SEGMENT_ID_BY_STAMP_CODE = new Map(
-  DEMO_JOURNEYS.map((journey) => [journey.stampCode, journey.segmentId]),
 )
 const SEGMENT_ID_BY_PIN_ID = new Map(
   DEMO_JOURNEYS.flatMap((journey) =>
@@ -124,7 +118,7 @@ const SEGMENT_ID_BY_PIN_ID = new Map(
   ),
 )
 
-export const DEMO_STAMP_CODES = new Set(DEMO_STAMP_CODE_SET)
+export const DEMO_STAMP_CODES = new Set()
 
 const expectedPhotoAssetKeys = DEMO_JOURNEYS.flatMap((journey) =>
   Object.entries(journey.photoCounts).flatMap(([pinNo, count]) =>
@@ -674,6 +668,75 @@ const getIncludedTripPins = (segmentId) =>
 
 const getPinPhotoCount = (pinId) => demoJourneyState.photos[pinId]?.length ?? 0
 
+const getStoredDemoPinsForSegment = (segmentId) =>
+  getAllTripPins(segmentId)
+    .map((tripPin) => demoJourneyState.pins[tripPin.pin_id])
+    .filter(Boolean)
+
+const getAllStoredDemoPins = () =>
+  DEMO_SEGMENT_IDS.flatMap((segmentId) => getStoredDemoPinsForSegment(segmentId))
+
+const buildDemoCountryStampSummaries = (pins) => {
+  const groupedPins = new Map()
+
+  pins.forEach((pin) => {
+    const countryCode = pin.country_code?.toUpperCase()
+    if (!countryCode) return
+
+    if (!groupedPins.has(countryCode)) {
+      groupedPins.set(countryCode, {
+        countryCode,
+        countryName: pin.country_name || countryCode,
+        pins: [],
+      })
+    }
+
+    const group = groupedPins.get(countryCode)
+    if (!group.countryName && pin.country_name) group.countryName = pin.country_name
+    group.pins.push(pin)
+  })
+
+  return [...groupedPins.values()]
+    .map(({ countryCode, countryName, pins: countryPins }) => {
+      const sortedPins = [...countryPins].sort((left, right) =>
+        left.tagged_at.localeCompare(right.tagged_at),
+      )
+      const cityCounts = sortedPins.reduce((counts, pin) => {
+        if (!pin.city) return counts
+
+        counts.set(pin.city, (counts.get(pin.city) ?? 0) + 1)
+        return counts
+      }, new Map())
+
+      const rankedCities = [...cityCounts.entries()].sort(
+        ([cityA, countA], [cityB, countB]) =>
+          countB - countA || cityA.localeCompare(cityB, 'ko'),
+      )
+
+      return {
+        user_id: null,
+        country_code: countryCode,
+        country_name: countryName || countryCode,
+        stamp_image_id: `stamp-${countryCode}`,
+        created_at: sortedPins[0]?.tagged_at ?? null,
+        is_new: false,
+        pin_count: sortedPins.length,
+        cities: rankedCities.slice(0, 3).map(([city]) => city),
+        city_counts: rankedCities.map(([city, pin_count]) => ({
+          city,
+          pin_count,
+        })),
+        extra_city_count: Math.max(0, rankedCities.length - 3),
+        is_demo: true,
+      }
+    })
+    .sort((left, right) => {
+      if (!left.created_at) return 1
+      if (!right.created_at) return -1
+      return left.created_at.localeCompare(right.created_at)
+    })
+}
+
 const getIncludedPhotos = (segmentId) =>
   getIncludedTripPins(segmentId).flatMap(
     (pin) => demoJourneyState.photos[pin.pin_id] ?? [],
@@ -721,8 +784,7 @@ export const isDemoSegmentId = (segmentId) => resolveSegmentId(segmentId) != nul
 export const isDemoPhotobookId = (photobookId) =>
   resolvePhotobookId(photobookId) != null
 export const isDemoPinId = (pinId) => getSegmentIdForPin(pinId) != null
-export const isDemoStampCode = (stampCode) =>
-  DEMO_STAMP_CODE_SET.has(stampCode?.toUpperCase())
+export const isDemoStampCode = () => false
 
 export const isDemoPhotoId = (photoId) =>
   Object.values(demoJourneyState.photos)
@@ -737,46 +799,11 @@ export const isMcmDemoPinId = (pinId) =>
   Object.values(MCM_PIN_IDS).includes(Number(pinId))
 
 export const getDemoCountryStamps = () =>
-  DEMO_JOURNEYS.flatMap((journey) => {
-    const trip = demoJourneyState.trips[journey.segmentId]
-    if (!trip) return []
-
-    const cityCounts = getAllTripPins(journey.segmentId).reduce((counts, tripPin) => {
-      const pin = demoJourneyState.pins[tripPin.pin_id]
-      if (!pin?.city) return counts
-
-      counts.set(pin.city, (counts.get(pin.city) ?? 0) + 1)
-      return counts
-    }, new Map())
-
-    const rankedCities = [...cityCounts.entries()].sort(
-      ([cityA, countA], [cityB, countB]) =>
-        countB - countA || cityA.localeCompare(cityB, 'ko'),
-    )
-
-    return [
-      {
-        user_id: null,
-        country_code: journey.stampCode,
-        country_name: journey.stampName,
-        stamp_image_id: journey.stampImageId,
-        created_at: trip.start_at,
-        is_new: false,
-        pin_count: getAllTripPins(journey.segmentId).length,
-        cities: rankedCities.slice(0, 3).map(([city]) => city),
-        city_counts: rankedCities.map(([city, pin_count]) => ({
-          city,
-          pin_count,
-        })),
-        extra_city_count: Math.max(0, rankedCities.length - 3),
-        is_demo: true,
-      },
-    ]
-  })
+  buildDemoCountryStampSummaries(getAllStoredDemoPins())
 
 export const getMcmDemoCountryStamps = () =>
-  getDemoCountryStamps().filter(
-    (stamp) => stamp.country_code === MCM_DEMO_STAMP_CODE,
+  buildDemoCountryStampSummaries(
+    getStoredDemoPinsForSegment(MCM_DEMO_SEGMENT_ID),
   )
 
 export const getDemoTripList = () =>
@@ -889,16 +916,13 @@ export const deleteDemoTrip = (segmentId) => {
 export const deleteMcmDemoTrip = (segmentId) =>
   isMcmDemoSegmentId(segmentId) ? deleteDemoTrip(segmentId) : false
 
-export const getDemoPinsByStamp = (countryCode) => {
+export const getDemoPinsByCountry = (countryCode) => {
   const normalizedCode = countryCode?.toUpperCase()
-  const segmentId = SEGMENT_ID_BY_STAMP_CODE.get(normalizedCode)
-  if (!segmentId) return null
-  if (!demoJourneyState.trips[segmentId]) return null
+  if (!normalizedCode) return []
 
   return clone(
-    getAllTripPins(segmentId)
-      .map((tripPin) => demoJourneyState.pins[tripPin.pin_id])
-      .filter(Boolean)
+    getAllStoredDemoPins()
+      .filter((pin) => pin.country_code?.toUpperCase() === normalizedCode)
       .sort((left, right) => left.tagged_at.localeCompare(right.tagged_at))
       .map((pin) => ({
         pin_id: pin.pin_id,
@@ -911,9 +935,15 @@ export const getDemoPinsByStamp = (countryCode) => {
   )
 }
 
+export const getDemoPinsByStamp = getDemoPinsByCountry
+
 export const getMcmDemoPinsByStamp = (countryCode) =>
-  countryCode?.toUpperCase() === MCM_DEMO_STAMP_CODE
-    ? getDemoPinsByStamp(countryCode)
+  getStoredDemoPinsForSegment(MCM_DEMO_SEGMENT_ID).some(
+    (pin) => pin.country_code?.toUpperCase() === countryCode?.toUpperCase(),
+  )
+    ? getDemoPinsByCountry(countryCode).filter((pin) =>
+        Object.values(MCM_PIN_IDS).includes(pin.pin_id),
+      )
     : null
 
 export const getDemoPin = (pinId) => {
