@@ -4,6 +4,9 @@ import styled from 'styled-components'
 import { uploadAudio } from '../../api/uploads'
 import Button from '../../components/common/Button'
 import { createPin } from '../../features/pins/pinApi'
+import PhotoPreviewOverlay, {
+  PreviewDeleteButton,
+} from '../../components/common/PhotoPreviewOverlay'
 import {
   addCapturedPhotos,
   attachUploadedPhotos,
@@ -59,6 +62,8 @@ const ManualPinDetails = () => {
   const [placeName, setPlaceName] = useState('')
   const [memo, setMemo] = useState('')
   const [photos, setPhotos] = useState([])
+  /** 크게 보고 있는 사진의 자리. 없으면 -1 */
+  const [previewIndex, setPreviewIndex] = useState(-1)
   const [isVoiceSheetOpen, setIsVoiceSheetOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
@@ -148,6 +153,19 @@ const ManualPinDetails = () => {
     }
 
     event.target.value = ''
+  }
+
+  /* 지운 자리의 다음 사진으로 넘어가고, 마지막 한 장이었으면 크게 보기를 닫는다. */
+  const handleRemovePhoto = () => {
+    const removed = photos[previewIndex]
+    if (!removed) return
+
+    URL.revokeObjectURL(removed.url)
+
+    const remaining = photos.filter((photo) => photo.id !== removed.id)
+
+    setPhotos(remaining)
+    setPreviewIndex(previewIndex < remaining.length ? previewIndex : -1)
   }
 
   const handleOpenVoiceMemo = () => {
@@ -473,6 +491,16 @@ const ManualPinDetails = () => {
             </DeleteRecordingButton>
           </VoiceSheet>
         </ModalLayer>
+      )}
+      {previewIndex >= 0 && (
+        <PhotoPreviewOverlay
+          photos={photos}
+          index={previewIndex}
+          onIndexChange={setPreviewIndex}
+          onClose={() => setPreviewIndex(-1)}
+        >
+          <PreviewDeleteButton onClick={handleRemovePhoto} />
+        </PhotoPreviewOverlay>
       )}
     </Page>
   )
