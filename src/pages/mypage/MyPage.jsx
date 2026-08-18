@@ -20,6 +20,7 @@ import {
   getProducts,
   unlinkProduct,
 } from '../../features/products/productApi'
+import { DEMO_JOURNEY_CHANGED_EVENT } from '../../features/demo/demoJourneyData'
 import {
   DEVICE_PERMISSION_STATUS,
   detectMobileOS,
@@ -243,6 +244,19 @@ const MyPage = () => {
       ignore = true
     }
   }, [accountRequestKey, clearUser, navigate, setUser])
+
+  useEffect(() => {
+    const handleDemoJourneyChanged = () => {
+      setAccountRequestKey((key) => key + 1)
+    }
+
+    window.addEventListener(DEMO_JOURNEY_CHANGED_EVENT, handleDemoJourneyChanged)
+    return () =>
+      window.removeEventListener(
+        DEMO_JOURNEY_CHANGED_EVENT,
+        handleDemoJourneyChanged,
+      )
+  }, [])
 
   useEffect(() => {
     let ignore = false

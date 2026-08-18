@@ -4,6 +4,7 @@ import {
   MOCK_GOOGLE_LOGIN_RESPONSE,
   updateMockAccount,
 } from './authMock'
+import { getDemoAccountStats } from '../demo/demoJourneyData'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK_API === 'true'
 
@@ -38,10 +39,26 @@ export const logout = async (sessionToken) => {
 
 export const getMyAccount = async () => {
   if (USE_MOCK) {
-    return { ...MOCK_CURRENT_USER_RESPONSE }
+    return {
+      ...MOCK_CURRENT_USER_RESPONSE,
+      ...addDemoAccountStats(MOCK_CURRENT_USER_RESPONSE),
+    }
   }
 
-  return apiClient.get('/users/me')
+  const account = await apiClient.get('/users/me')
+  return { ...account, ...addDemoAccountStats(account) }
+}
+
+const addDemoAccountStats = (account) => {
+  const demoStats = getDemoAccountStats()
+
+  return {
+    pin_count: Number(account?.pin_count ?? 0) + demoStats.pin_count,
+    completed_trip_count:
+      Number(account?.completed_trip_count ?? 0) + demoStats.completed_trip_count,
+    visited_city_count:
+      Number(account?.visited_city_count ?? 0) + demoStats.visited_city_count,
+  }
 }
 
 /** API 명세 1.4: 온보딩 및 권한 안내 완료 상태를 수정한다. */
