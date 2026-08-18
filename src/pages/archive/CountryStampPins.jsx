@@ -150,7 +150,7 @@ const CountryStampPins = () => {
           height="100%"
           borderRadius="0"
           bordered={false}
-          mapOptions={{ clickableIcons: false, keyboardShortcuts: false, minZoom: 3 }}
+          mapOptions={{ clickableIcons: false, keyboardShortcuts: false }}
         >
           {mapPins.map((pin) => {
             const isSelected = pin.pin_id === selectedPinId
