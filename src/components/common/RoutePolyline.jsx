@@ -3,20 +3,21 @@ import { Polyline } from '@vis.gl/react-google-maps'
 const ROUTE_COLOR = '#c99a45'
 
 /*
- * 화살표 모양. 위(-y)가 진행 방향이고, 선의 기울기에 맞춰 저절로 돌아간다.
+ * 꺾쇠 모양. 위(-y)가 진행 방향이고, 선의 기울기에 맞춰 저절로 돌아간다.
  *
  * 구글이 주는 기본 화살표(`SymbolPath.FORWARD_CLOSED_ARROW`)는 뾰족한 끝이
  * 기준점이라 `offset: '50%'` 을 줘도 끝만 가운데에 닿고 몸통은 뒤로 처진다.
- * 기준점이 한가운데인 삼각형을 직접 그려 화살표 중앙이 선 가운데에 오게 한다.
+ * 기준점이 한가운데가 되도록 직접 그려, 꺾쇠 중앙이 선 가운데에 오게 한다.
  * 좌표는 그대로 픽셀이다.
+ *
+ * 삼각형과 달리 닫지(`Z`) 않는다. 두 획만 남아 선의 일부처럼 읽힌다.
  */
-const ARROW_LENGTH = 8
-const ARROW_WIDTH = 7
+const ARROW_LENGTH = 6
+const ARROW_WIDTH = 6
 const ARROW_PATH = [
-  `M 0 ${-ARROW_LENGTH / 2}`,
+  `M ${-ARROW_WIDTH / 2} ${ARROW_LENGTH / 2}`,
+  `L 0 ${-ARROW_LENGTH / 2}`,
   `L ${ARROW_WIDTH / 2} ${ARROW_LENGTH / 2}`,
-  `L ${-ARROW_WIDTH / 2} ${ARROW_LENGTH / 2}`,
-  'Z',
 ].join(' ')
 
 /* 핀에서 핀으로 가는 구간들. 화살표를 구간마다 하나씩 놓는다. */
@@ -49,11 +50,13 @@ const buildDirectionArrow = (leg) => [
   {
     icon: {
       path: ARROW_PATH,
-      /* 끝이 뾰족해서 선을 두르면 이음매가 뾰족한 끝 너머로 길게 삐져나온다.
-         한쪽으로 쏠려 보이므로 채우기만 쓴다. */
-      strokeWeight: 0,
-      fillColor: ROUTE_COLOR,
-      fillOpacity: 1,
+      /* 열린 모양이라 채우면 두 획 사이가 메워진다. 선으로만 그린다.
+         굵기는 동선과 같게 둔다. 구글의 심볼은 끝 모양·이음매를 고를 수 없어
+         기본값(각진 끝, 뾰족한 이음매)으로 그려진다. */
+      strokeColor: ROUTE_COLOR,
+      strokeOpacity: 1,
+      strokeWeight: 3,
+      fillOpacity: 0,
       rotation: getBearing(leg),
     },
     fixedRotation: true,
