@@ -14,7 +14,6 @@ import useVoiceRecorder, {
 } from '../../features/pins/useVoiceRecorder'
 import backIcon from '../../assets/icons/trip-edit-back.svg'
 import closeIcon from '../../assets/pin-save/close.svg'
-import backgroundTexture from '../../assets/pin-save/manual-pin-form-bg.png'
 import photoAddIcon from '../../assets/pin-save/manual-pin-photo-add.svg'
 import locationIcon from '../../assets/pin-save/location.svg'
 import microphoneIcon from '../../assets/pin-save/microphone.svg'
@@ -249,7 +248,6 @@ const ManualPinDetails = () => {
 
   return (
     <Page>
-      <Background src={backgroundTexture} alt="" aria-hidden="true" />
 
       <Header>
         <BackButton
@@ -488,17 +486,6 @@ const Page = styled.main`
   overflow: hidden;
   background: var(--Background-Base);
   color: var(--Text-Primary);
-`
-
-const Background = styled.img`
-  position: absolute;
-  z-index: 0;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-  object-fit: cover;
-  pointer-events: none;
 `
 
 const Header = styled.header`
