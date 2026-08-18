@@ -25,8 +25,19 @@ const useRecordDraftStore = create((set, get) => ({
 
   setTagId: (tagId) => set({ tagId: tagId || null }),
   setPhotos: (photos) => set({ photos }),
+  /*
+   * 좌표를 받았을 때만 쓴다.
+   *
+   * `hasResolvedLocation` 은 "더 물어볼 필요 없다"는 표시라, 실패했을 때
+   * 세우면 촬영 화면에 다시 들어와도 위치를 다시 잡지 않는다. 실내에서
+   * 실패한 뒤 밖에 나가 이어 찍어도 계속 위치가 없는 상태로 남는다.
+   */
   setCoordinates: ({ latitude, longitude }) =>
     set({ latitude, longitude, hasResolvedLocation: true }),
+
+  /** 위치를 못 받았을 때. 다음에 다시 물어볼 수 있게 표시를 세우지 않는다. */
+  clearCoordinates: () =>
+    set({ latitude: null, longitude: null, hasResolvedLocation: false }),
   setLocationDetails: ({ address, city, countryCode, countryName }) =>
     set({ address, city, countryCode, countryName }),
   setContext: ({ placeName, textNote }) => set({ placeName, textNote }),
