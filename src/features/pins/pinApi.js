@@ -21,8 +21,44 @@ import { getMockPinLocation } from '../trips/tripMock'
 import { mockPinStore } from './pinMock'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK_API === 'true'
+const REPRESENTATIVE_PHOTO_CACHE_KEY = 'orte:representative-photos:v1'
 
 /** 핀 API (명세서 5번) */
+
+const getRepresentativePhotoCache = () => {
+  try {
+    const stored = window.sessionStorage.getItem(REPRESENTATIVE_PHOTO_CACHE_KEY)
+    const cache = stored ? JSON.parse(stored) : {}
+
+    return cache && typeof cache === 'object' ? cache : {}
+  } catch {
+    return {}
+  }
+}
+
+const saveRepresentativePhotoCache = (cache) => {
+  try {
+    window.sessionStorage.setItem(
+      REPRESENTATIVE_PHOTO_CACHE_KEY,
+      JSON.stringify(cache),
+    )
+  } catch {
+    // 저장 공간을 쓸 수 없는 환경에서는 현재 화면의 상태만 갱신한다.
+  }
+}
+
+export const cacheRepresentativePhotos = (pinId, photos) => {
+  if (pinId === null || pinId === undefined || !Array.isArray(photos)) return
+
+  const cache = getRepresentativePhotoCache()
+  cache[String(pinId)] = photos.map((photo) => ({ ...photo }))
+  saveRepresentativePhotoCache(cache)
+}
+
+export const getCachedRepresentativePhotos = (pinId) => {
+  const photos = getRepresentativePhotoCache()[String(pinId)]
+  return Array.isArray(photos) ? photos : []
+}
 
 const mockNotFound = () =>
   new ApiError({

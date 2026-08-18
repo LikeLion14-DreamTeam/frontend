@@ -15,6 +15,7 @@ import refreshIcon from '../../assets/map/refresh.svg'
 import photoAddIcon from '../../assets/map/photo-add-round.svg'
 import noteEditIcon from '../../assets/map/note-edit.svg'
 import {
+  cacheRepresentativePhotos,
   deletePin,
   getPin,
   getPinPhotos,
@@ -398,6 +399,7 @@ const PinDetail = () => {
 
     try {
       const result = await refreshRepresentativePhotos(pinID)
+      cacheRepresentativePhotos(pinID, result.representative_photos)
       setPin((prev) => ({
         ...prev,
         representative_photos: result.representative_photos,

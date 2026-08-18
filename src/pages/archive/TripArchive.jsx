@@ -14,6 +14,7 @@ import {
   getPhotobook,
   updatePhotobookName,
 } from '../../features/photobooks/photobookApi'
+import { getCachedRepresentativePhotos } from '../../features/pins/pinApi'
 
 const INITIAL_PLAYER = {
   pinId: null,
@@ -89,9 +90,12 @@ const normalizePhotos = (photos, placeName) =>
 const normalizePin = (pin, cityName, index) => {
   const placeName = pin.place_name?.trim() || '이름 없는 장소'
   const voiceMemo = pin.voice_memo
-  const representativePhotos = Array.isArray(pin.representative_photos)
-    ? pin.representative_photos
-    : []
+  const refreshedRepresentativePhotos = getCachedRepresentativePhotos(pin.pin_id)
+  const representativePhotos = refreshedRepresentativePhotos.length
+    ? refreshedRepresentativePhotos
+    : Array.isArray(pin.representative_photos)
+      ? pin.representative_photos
+      : []
 
   return {
     id: pin.pin_id,
