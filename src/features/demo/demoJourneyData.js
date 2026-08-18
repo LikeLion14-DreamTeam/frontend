@@ -217,8 +217,39 @@ const createPhotoId = (journey, pinNo, slot) => {
   )
 }
 
-const createPhotos = ({ journey, pinNo, taggedAt }) =>
-  Array.from({ length: journey.photoCounts[pinNo] ?? 0 }, (_, index) => {
+const setRandomRepresentativePhotos = (photos) => {
+  const shuffled = [...photos]
+
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1))
+    ;[shuffled[index], shuffled[randomIndex]] = [
+      shuffled[randomIndex],
+      shuffled[index],
+    ]
+  }
+
+  const representativeCount = Math.min(3, photos.length)
+  const selected = shuffled.slice(0, representativeCount)
+  const firstPhotos = new Set(photos.slice(0, representativeCount))
+
+  // 사진이 충분할 때는 단순히 첫 세 장을 다시 고르는 경우를 피해 추천처럼 보이게 한다.
+  if (
+    photos.length > representativeCount &&
+    selected.every((photo) => firstPhotos.has(photo))
+  ) {
+    selected[representativeCount - 1] = shuffled.find(
+      (photo) => !firstPhotos.has(photo),
+    )
+  }
+
+  const selectedIds = new Set(selected.map((photo) => photo.photo_id))
+  photos.forEach((photo) => {
+    photo.is_pin_cover = selectedIds.has(photo.photo_id)
+  })
+}
+
+const createPhotos = ({ journey, pinNo, taggedAt }) => {
+  const photos = Array.from({ length: journey.photoCounts[pinNo] ?? 0 }, (_, index) => {
     const slot = index + 1
     const fileName = `pin-${String(pinNo).padStart(2, '0')}-${String(
       slot,
@@ -231,9 +262,13 @@ const createPhotos = ({ journey, pinNo, taggedAt }) =>
       photo_id: createPhotoId(journey, pinNo, slot),
       captured_at: taggedAt,
       file_path: photoUrl(sourceAssetKey),
-      is_pin_cover: slot <= 3,
+      is_pin_cover: false,
     }
   })
+
+  setRandomRepresentativePhotos(photos)
+  return photos
+}
 
 const createVoiceMemo = ({ journey, pinNo, taggedAt, voiceMemoId }) => {
   const sourceAudioKey = `${journey.slug}/audio/pin-${String(pinNo).padStart(
@@ -583,6 +618,28 @@ const reviveAssetUrls = (state) => {
   return state
 }
 
+const seedPersistedRepresentativePhotos = (state) => {
+  if (state.representative_photos_initialized) return false
+
+  Object.values(state.photos ?? {}).forEach((photos) => {
+    if (!Array.isArray(photos) || photos.length <= 3) return
+
+    const startsWithDefaultRepresentatives = photos
+      .slice(0, 3)
+      .every((photo) => photo.is_pin_cover)
+    const hasOnlyDefaultRepresentatives = photos
+      .slice(3)
+      .every((photo) => !photo.is_pin_cover)
+
+    if (startsWithDefaultRepresentatives && hasOnlyDefaultRepresentatives) {
+      setRandomRepresentativePhotos(photos)
+    }
+  })
+
+  state.representative_photos_initialized = true
+  return true
+}
+
 const loadInitialState = () => {
   const storage = getBrowserStorage()
   if (!storage) return createInitialState()
@@ -590,9 +647,20 @@ const loadInitialState = () => {
   try {
     const saved = JSON.parse(storage.getItem(DEMO_JOURNEY_STORAGE_KEY))
     if (saved?.state && saved.version === 2) {
-      return reviveAssetUrls(
+      const state = reviveAssetUrls(
         applyDkmAllAboutUpdates(applySeededDkmCoordinates(saved.state)),
       )
+      if (seedPersistedRepresentativePhotos(state)) {
+        storage.setItem(
+          DEMO_JOURNEY_STORAGE_KEY,
+          JSON.stringify({
+            version: 2,
+            saved_at: new Date().toISOString(),
+            state,
+          }),
+        )
+      }
+      return state
     }
 
     const legacyMcm = JSON.parse(storage.getItem(LEGACY_STORAGE_KEYS[0]))
@@ -1258,6 +1326,12 @@ export const getDemoPhotobook = (photobookId) => {
       latitude: pin.latitude,
       longitude: pin.longitude,
       text_note: pin.text_note,
+      representative_photos: (demoJourneyState.photos[pin.pin_id] ?? [])
+        .filter((photo) => photo.is_pin_cover)
+        .map((photo) => ({
+          photo_id: photo.photo_id,
+          url: photo.file_path,
+        })),
       photos: (demoJourneyState.photos[pin.pin_id] ?? []).map(
         (photo, photoIndex) => ({
           photo_id: photo.photo_id,
