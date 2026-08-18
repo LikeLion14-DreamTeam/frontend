@@ -465,12 +465,25 @@ const MapPage = () => {
           setSelectedTripId((current) => {
             if (current) return current
 
-            // 주소에 적힌 여정이 아직 있으면 그걸 고른다. 없으면 목록 첫 번째.
+            // 주소에 적힌 여정이 아직 있으면 그걸 고른다.
             const fromUrl = options.find(
               ({ segment_id }) => String(segment_id) === initialParams.trip,
             )
 
-            return fromUrl?.segment_id ?? options[0]?.segment_id ?? null
+            if (fromUrl) return fromUrl.segment_id
+
+            /*
+             * 진행 중인 여정이 있을 때만 자동으로 고른다.
+             *
+             * 없을 때 끝난 여정을 아무거나 띄우면, 목록 순서에 따라 지난달
+             * 여정이 뜨기도 하고 작년 것이 뜨기도 한다. 지금 어디에 있는지가
+             * 먼저이므로 아무것도 고르지 않고 내 위치를 보여준다.
+             */
+            const ongoingOption = options.find(
+              ({ segment_id }) => segment_id === ONGOING_TRIP_ID,
+            )
+
+            return ongoingOption?.segment_id ?? null
           })
         }
       } catch (error) {
