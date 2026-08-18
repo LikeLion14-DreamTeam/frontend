@@ -25,7 +25,7 @@ import {
   DEVICE_PERMISSION_STATUS,
   detectMobileOS,
   getCurrentPermissionStatus,
-  rememberLocationGranted,
+  hasRememberedPermissionGrant,
   requestDevicePermission,
 } from '../../features/permissions/devicePermissions'
 import { recordPermissionEvent } from '../../features/permissions/permissionApi'
@@ -319,10 +319,19 @@ const MyPage = () => {
 
     const loadPermissionStatuses = async () => {
       const permissionEntries = await Promise.all(
-        ['location', 'camera', 'microphone'].map(async (permissionType) => [
-          permissionType,
-          await getCurrentPermissionStatus(permissionType),
-        ]),
+        ['location', 'camera', 'microphone'].map(async (permissionType) => {
+          const status = await getCurrentPermissionStatus(permissionType)
+
+          // Safari는 이미 허용된 카메라·마이크 상태도 조회하지 못할 수 있다.
+          // 실제 권한 요청이 성공했던 기록으로만 이 경우를 보완한다.
+          return [
+            permissionType,
+            status === DEVICE_PERMISSION_STATUS.IDLE &&
+            hasRememberedPermissionGrant(permissionType)
+              ? DEVICE_PERMISSION_STATUS.GRANTED
+              : status,
+          ]
+        }),
       )
 
       if (!ignore) {
@@ -541,7 +550,8 @@ const MyPage = () => {
 
   const handlePermissionSettingClick = (permissionType) => {
     if (
-      permissionStatuses[permissionType] === DEVICE_PERMISSION_STATUS.CHECKING
+      permissionStatuses[permissionType] === DEVICE_PERMISSION_STATUS.CHECKING ||
+      permissionStatuses[permissionType] === DEVICE_PERMISSION_STATUS.GRANTED
     ) {
       return
     }
@@ -556,13 +566,6 @@ const MyPage = () => {
     }))
 
     void permissionRequest.then((status) => {
-      if (
-        permissionType === 'location' &&
-        status === DEVICE_PERMISSION_STATUS.GRANTED
-      ) {
-        rememberLocationGranted()
-      }
-
       setPermissionStatuses((currentStatuses) => ({
         ...currentStatuses,
         [permissionType]: status,

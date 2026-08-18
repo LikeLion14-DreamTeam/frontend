@@ -7,6 +7,10 @@ import PhotoPreviewOverlay from '../../components/common/PhotoPreviewOverlay'
 import cameraFlipIcon from '../../assets/icons/camera-flip.svg'
 import { linkProduct } from '../../features/products/productApi'
 import useRecordDraftStore from '../../features/pins/useRecordDraftStore'
+import {
+  forgetRememberedPermissionGrant,
+  rememberPermissionGranted,
+} from '../../features/permissions/devicePermissions'
 
 /**
  * 연속 촬영 화면 (피그마 `8 사진 촬영 화면`, `8.1 사진 촬영 세부`)
@@ -115,6 +119,8 @@ const MultiCapture = () => {
         audio: false,
       })
 
+      rememberPermissionGranted('camera')
+
       // 여는 사이에 카메라를 또 바꿨으면 방금 연 것은 버린다.
       if (requestId !== streamRequestRef.current) {
         stream.getTracks().forEach((track) => track.stop())
@@ -151,6 +157,7 @@ const MultiCapture = () => {
       setStatus('error')
 
       if (error.name === 'NotAllowedError') {
+        forgetRememberedPermissionGrant('camera')
         setErrorMessage(
           '카메라 권한이 거부되었습니다. 설정에서 허용한 뒤 다시 시도해주세요.',
         )
