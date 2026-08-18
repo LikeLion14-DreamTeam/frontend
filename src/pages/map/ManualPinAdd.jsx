@@ -9,6 +9,7 @@ import { reverseGeocode } from '../../features/pins/reverseGeocode'
 import crosshairIcon from '../../assets/map/manual-pin-crosshair.svg'
 import markerIcon from '../../assets/map/manual-pin-marker.svg'
 import searchIcon from '../../assets/map/manual-pin-search.svg'
+import recordPlusIcon from '../../assets/map/record-plus.png'
 
 /** 위치를 못 얻었을 때 시작 지점. 여기서 직접 옮겨 찍으면 된다. */
 const FALLBACK_CENTER = { lat: 37.5796, lng: 126.9849 }
@@ -146,15 +147,27 @@ const ManualPinAdd = () => {
       </MapLayer>
 
       <SearchBar>
-        <SearchIcon src={searchIcon} alt="" aria-hidden="true" />
-        <SearchInput
-          type="search"
-          value={address}
-          onChange={(event) => setAddress(event.target.value)}
-          aria-label="선택 위치의 주소"
-          placeholder="주소 입력 (선택)"
-        />
+        <SearchBarInner>
+          <SearchIcon src={searchIcon} alt="" aria-hidden="true" />
+          <SearchInput
+            type="search"
+            value={address}
+            onChange={(event) => setAddress(event.target.value)}
+            aria-label="선택 위치의 주소"
+            placeholder="주소 입력 (선택)"
+          />
+        </SearchBarInner>
       </SearchBar>
+
+      <CancelButton
+        type="button"
+        aria-label="핀 추가 취소"
+        onClick={() =>
+          navigate('/map', { replace: true, viewTransition: true })
+        }
+      >
+        <img src={recordPlusIcon} alt="" />
+      </CancelButton>
 
       <Hint>
         {selectedCenter
@@ -192,7 +205,7 @@ const ManualPinAdd = () => {
         </ContinueButton>
       </AddressSheet>
 
-      <NavBar activeOverride="home" />
+      <NavBar activeOverride="map" />
     </Page>
   )
 }
@@ -210,26 +223,95 @@ const Page = styled.main`
   background: var(--Map-Base);
 `
 
+/* 위는 안내 문구(67 에서 시작해 높이 24), 아래는 주소 시트(191)와
+   하단 내비게이션(75)이 막는다. 핀을 찍을 자리는 그 사이 한가운데다. */
+const HINT_BOTTOM = 67 + 24
+const SHEET_TOP = 191 + 75
+
+/*
+ * 지도를 위로 그만큼 빼서 놓는다.
+ *
+ * 지도의 중심은 늘 담긴 상자의 한가운데라, 상자를 화면에 딱 맞추면 중심이
+ * 시트 쪽으로 내려간다. 위로 늘려 두면 중심이 두 상자 사이의 한가운데로
+ * 올라오고, 시트를 접어도 아래에 빈자리가 생기지 않는다.
+ */
+const MAP_SHIFT = SHEET_TOP - HINT_BOTTOM
+
 const MapLayer = styled.div`
   position: absolute;
-  inset: 0;
+  top: ${-MAP_SHIFT}px;
+  right: 0;
+  bottom: 0;
+  left: 0;
 `
 
+/* 지도 화면의 핀 추가 버튼과 같은 자리·크기다. */
+const CANCEL_BUTTON_SIZE = 40
+const CANCEL_BUTTON_INSET = 13
+const CANCEL_BUTTON_TOP = 19
+
+/* 지도 화면의 여정 선택 드롭바와 같은 자리·높이에 선다.
+   두 화면을 오갈 때 같은 줄에 있어야 흔들리지 않는다. */
 const SearchBar = styled.div`
   position: absolute;
   z-index: 4;
-  top: 50px;
-  right: 24px;
-  left: 24px;
-  height: 44px;
-  padding: 11px 14px;
+  /* 지도 화면의 여정 선택 드롭바와 이어지는 이름이다. */
+  view-transition-name: map-top-bar;
+  top: ${CANCEL_BUTTON_TOP}px;
+  /* 오른쪽은 취소 버튼 자리를 비우고, 버튼과의 사이도 바깥 여백만큼 띄운다. */
+  right: ${CANCEL_BUTTON_INSET * 2 + CANCEL_BUTTON_SIZE}px;
+  left: ${CANCEL_BUTTON_INSET}px;
+  height: 40px;
+  padding: 6px 14px;
   display: flex;
   align-items: center;
   gap: 10px;
   overflow: hidden;
-  border-radius: 22px;
+  border-radius: 20px;
   background: var(--Surface-Base);
   box-shadow: var(--Effect-Card);
+`
+
+/* 지도 화면의 핀 추가 버튼과 같은 모습이다. 가운데 표시만 + 대신 X 다. */
+const CancelButton = styled.button`
+  position: absolute;
+  z-index: 4;
+  /* 지도 화면의 핀 추가 버튼과 이어지는 이름이다. */
+  view-transition-name: map-top-action;
+  top: ${CANCEL_BUTTON_TOP}px;
+  right: ${CANCEL_BUTTON_INSET}px;
+  width: ${CANCEL_BUTTON_SIZE}px;
+  height: ${CANCEL_BUTTON_SIZE}px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--Primary-Cognac);
+  box-shadow: var(--Effect-CTA);
+  cursor: pointer;
+
+  /* 핀 추가 버튼의 + 를 그대로 돌려 쓴다. 굵기와 끝 모양이 저절로 같다. */
+  img {
+    view-transition-name: map-top-action-icon;
+    width: 30px;
+    height: 30px;
+    display: block;
+    object-fit: contain;
+    transform: rotate(45deg);
+  }
+`
+
+/* 알약은 폭이 줄고 늘지만 안의 내용은 그대로여야 한다. 지도 화면의 드롭바
+   내용과 다른 이름을 붙여, 겹쳐 늘어나지 않고 흐려지며 바뀌게 한다. */
+const SearchBarInner = styled.span`
+  view-transition-name: map-top-bar-search;
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 `
 
 const SearchIcon = styled.img`
@@ -257,24 +339,30 @@ const SearchInput = styled.input`
   }
 `
 
+/* 주소 입력칸(19 + 40) 아래 8px 에 붙는다. 칸이 줄어든 만큼 글자도 줄인다. */
 const Hint = styled.p`
   position: absolute;
   z-index: 4;
-  top: 110px;
+  top: 67px;
   left: 50%;
-  padding: 7px 12px;
-  border-radius: 14px;
+  padding: 5px 10px;
+  border-radius: 12px;
   background: rgb(36 28 22 / 68%);
   color: var(--Text-Inverse);
-  font: var(--text-ui-nav);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 14px;
   white-space: nowrap;
   transform: translateX(-50%);
 `
 
+/* 십자 표시의 아래 끝이 지도의 중심에 닿아야 한다. 지도를 위로 뺀 만큼
+   같이 올린다. 65 는 그림 안에서 십자까지의 거리다. */
 const CenterMarker = styled.div`
   position: absolute;
   z-index: 3;
-  top: calc(50% - 65px);
+  top: calc(50% - ${MAP_SHIFT / 2 + 65}px);
   left: 50%;
   width: 54px;
   height: 66px;

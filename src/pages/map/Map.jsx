@@ -852,13 +852,15 @@ const MapPage = () => {
           setDropdownOpen((open) => !open)
         }}
       >
-        <TripAvatar src={tripAvatar} alt="" />
-        <TripName>
-          {isCountryFilterMode
-            ? countryName || countryCode
-            : selectedTrip?.name ?? '여정 선택'}
-        </TripName>
-        <Chevron src={tripSelectChevron} alt="" />
+        <TripSelectorInner>
+          <TripAvatar src={tripAvatar} alt="" />
+          <TripName>
+            {isCountryFilterMode
+              ? countryName || countryCode
+              : selectedTrip?.name ?? '여정 선택'}
+          </TripName>
+          <Chevron src={tripSelectChevron} alt="" />
+        </TripSelectorInner>
       </TripSelector>
 
       <LocationButton
@@ -873,7 +875,8 @@ const MapPage = () => {
         <RecordButton
           type="button"
           aria-label="현재 위치에 기록 추가"
-          onClick={() => navigate('/map/pin/new')}
+          /* 수동 핀 추가 화면의 주소 입력칸·취소 버튼으로 이어진다. */
+          onClick={() => navigate('/map/pin/new', { viewTransition: true })}
         >
           <img src={recordPlusIcon} alt="" />
         </RecordButton>
@@ -988,6 +991,8 @@ const TRIP_SELECTOR_HEIGHT = 40
 const TripSelector = styled.button`
   position: absolute;
   z-index: 34;
+  /* 수동 핀 추가 화면의 주소 입력칸과 이어지는 이름이다. */
+  view-transition-name: map-top-bar;
   top: ${TRIP_SELECTOR_TOP}px;
   /* 왼쪽 여백은 버튼들의 오른쪽 여백과 같은 값이다. */
   left: ${MAP_BUTTON_INSET}px;
@@ -1004,6 +1009,18 @@ const TripSelector = styled.button`
   box-shadow: var(--Effect-Card);
   color: var(--Text-Primary);
   cursor: pointer;
+`
+
+/* 알약은 폭이 늘어나지만 안의 내용은 늘어나면 안 된다. 따로 이름을 붙여
+   상자 밖으로 빼내면, 수동 핀 추가 화면의 내용과 겹치지 않고 흐려지며 바뀐다.
+   두 화면의 이름을 다르게 둔 것이 그래서다. */
+const TripSelectorInner = styled.span`
+  view-transition-name: map-top-bar-trip;
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 `
 
 const TripAvatar = styled.img`
@@ -1062,6 +1079,8 @@ const RECORD_BUTTON_SIZE = 40
 
 const RecordButton = styled.button`
   position: absolute;
+  /* 수동 핀 추가 화면의 취소 버튼과 이어지는 이름이다. */
+  view-transition-name: map-top-action;
   top: ${TRIP_SELECTOR_TOP + (TRIP_SELECTOR_HEIGHT - RECORD_BUTTON_SIZE) / 2}px;
   right: ${MAP_BUTTON_INSET}px;
   z-index: 9;
@@ -1078,6 +1097,7 @@ const RecordButton = styled.button`
   cursor: pointer;
 
   img {
+    view-transition-name: map-top-action-icon;
     width: 30px;
     height: 30px;
     display: block;
