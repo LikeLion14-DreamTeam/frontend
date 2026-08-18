@@ -785,7 +785,6 @@ const MapPage = () => {
             mapOptions={{
               clickableIcons: false,
               keyboardShortcuts: false,
-              minZoom: 3,
               onClick: () => setSelectedPinId(null),
             }}
           >
