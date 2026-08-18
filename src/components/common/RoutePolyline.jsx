@@ -19,37 +19,9 @@ const ARROW_PATH = [
   'Z',
 ].join(' ')
 
-/*
- * 화살표를 놓을 구간을 고른다.
- *
- * 선 전체의 한가운데에 놓으면 그 자리가 꺾이는 지점일 때 화살표가 한쪽 구간만
- * 따라가 선과 어긋나 보인다. 곧게 뻗은 구간의 한가운데면 그럴 일이 없다.
- * 가장 긴 구간이 눈에도 제일 잘 띈다.
- *
- * 길이는 화면에 보이는 대로 재야 해서 경도를 위도만큼 좁혀 계산한다.
- * 어느 구간이 긴지만 가리면 되므로 이 정도 어림으로 충분하다.
- */
-const getLongestLeg = (path) => {
-  let longest = [path[0], path[1]]
-  let longestLength = -1
-
-  for (let index = 0; index < path.length - 1; index += 1) {
-    const from = path[index]
-    const to = path[index + 1]
-
-    const meanLat = ((from.lat + to.lat) / 2) * (Math.PI / 180)
-    const dx = (to.lng - from.lng) * Math.cos(meanLat)
-    const dy = to.lat - from.lat
-    const length = dx * dx + dy * dy
-
-    if (length > longestLength) {
-      longestLength = length
-      longest = [from, to]
-    }
-  }
-
-  return longest
-}
+/* 핀에서 핀으로 가는 구간들. 화살표를 구간마다 하나씩 놓는다. */
+const getLegs = (path) =>
+  path.slice(0, -1).map((from, index) => [from, path[index + 1]])
 
 const toRadian = (degree) => (degree * Math.PI) / 180
 
@@ -93,16 +65,17 @@ const buildDirectionArrow = (leg) => [
 /**
  * 여정 동선.
  *
- * 선만 그으면 어느 쪽에서 어느 쪽으로 갔는지 알 수 없어, 가운데에 이동 방향
- * 화살표를 하나 얹는다.
+ * 선만 그으면 어느 쪽에서 어느 쪽으로 갔는지 알 수 없어, 핀과 핀 사이 구간마다
+ * 한가운데에 이동 방향 화살표를 하나씩 얹는다.
+ *
+ * 화살표는 구간별로 따로 그린다. 선 하나에 몰아 얹으면 꺾이는 지점에 걸린
+ * 화살표가 한쪽 구간 기울기만 따라가 선과 어긋나 보인다.
  *
  * `path` 는 방문한 순서대로 와야 한다. 화살표는 그 순서를 따른다.
  * 점이 둘 미만이면 이을 것이 없어 아무것도 그리지 않는다.
  */
 const RoutePolyline = ({ path }) => {
   if (path.length < 2) return null
-
-  const arrowLeg = getLongestLeg(path)
 
   return (
     <>
@@ -113,12 +86,15 @@ const RoutePolyline = ({ path }) => {
         strokeWeight={3}
       />
 
-      {/* 화살표만 얹는 선이다. 동선은 위에서 이미 그렸으므로 보이지 않게 둔다. */}
-      <Polyline
-        path={arrowLeg}
-        strokeOpacity={0}
-        icons={buildDirectionArrow(arrowLeg)}
-      />
+      {/* 화살표만 얹는 선들이다. 동선은 위에서 이미 그렸으므로 보이지 않게 둔다. */}
+      {getLegs(path).map((leg, index) => (
+        <Polyline
+          key={`${leg[0].lat},${leg[0].lng}-${index}`}
+          path={leg}
+          strokeOpacity={0}
+          icons={buildDirectionArrow(leg)}
+        />
+      ))}
     </>
   )
 }
