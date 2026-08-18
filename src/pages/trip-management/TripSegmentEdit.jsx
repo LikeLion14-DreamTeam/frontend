@@ -731,6 +731,14 @@ const RangeValue = styled.p`
   white-space: nowrap;
 `
 
+/*
+ * 보이는 글자는 위에서 직접 그리고, 이 요소는 목록을 띄우는 역할만 한다.
+ * 닫혀 있을 때는 `opacity` 로 감춘다.
+ *
+ * 색과 글꼴은 감춰진 상태와 무관하게 필요하다. 목록에 뜨는 `option` 이 이
+ * 값을 물려받기 때문이다. 투명하게 두면 데스크톱에서 항목 글자가 안 보이고,
+ * 글꼴이 없으면 목록 줄 높이가 상속값을 따라 지나치게 높아진다.
+ */
 const RangeSelect = styled.select`
   position: absolute;
   inset: 0;
@@ -738,12 +746,18 @@ const RangeSelect = styled.select`
   width: 100%;
   height: 100%;
   border: 0;
-  background: transparent;
-  color: transparent;
+  background: var(--Surface-Base);
+  color: var(--Text-Primary);
+  font: var(--text-ui-label);
   opacity: 0;
   appearance: none;
   cursor: pointer;
   outline: none;
+
+  option {
+    background: var(--Surface-Base);
+    color: var(--Text-Primary);
+  }
 `
 
 const ChevronIcon = styled.img`
