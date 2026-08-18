@@ -772,7 +772,8 @@ const LastTaggedCard = styled.section`
   margin: 15px 6px 0;
   aspect-ratio: 350 / 228;
   overflow: hidden;
-  border-radius: ${lastTaggedScale(16)};
+  /* 데스크톱에서 카드 폭이 커져도 모바일 시안의 16px보다 둥글어지지 않게 한다. */
+  border-radius: min(${lastTaggedScale(16)}, 16px);
   background: linear-gradient(
     145.79deg,
     rgb(69 50 36) 0%,
