@@ -1,4 +1,8 @@
-import { Routes, Route } from "react-router-dom"
+import {
+  createBrowserRouter,
+  createRoutesFromElements,
+  Route,
+} from "react-router-dom"
 import Home from "./pages/home/Home"
 import Map from "./pages/map/Map"
 import ManualPinAdd from "./pages/map/ManualPinAdd"
@@ -25,9 +29,16 @@ import PinSaveComplete from "./pages/record/PinSaveComplete"
 import { GuestOnly, RequireAuth } from "./features/auth/AuthRoute"
 
 
-function App() {
-  return (
-    <Routes>
+/*
+ * 데이터 라우터로 만든다.
+ *
+ * 화면을 오갈 때 앞뒤 모습을 이어 붙이려면(`viewTransition`) 라우터가 갱신이
+ * 끝나는 시점을 알아야 하는데, `<BrowserRouter>` 는 그 정보를 주지 않는다.
+ * 라우트 목록 자체는 그대로다.
+ */
+const router = createBrowserRouter(
+  createRoutesFromElements(
+    <Route>
       <Route element={<GuestOnly />}>
         <Route path="/login" element={<LogIn />} />
       </Route>
@@ -63,8 +74,8 @@ function App() {
           />
         </Route>
       </Route>
-    </Routes>
-  )
-}
+    </Route>,
+  ),
+)
 
-export default App
+export default router

@@ -147,20 +147,24 @@ const ManualPinAdd = () => {
       </MapLayer>
 
       <SearchBar>
-        <SearchIcon src={searchIcon} alt="" aria-hidden="true" />
-        <SearchInput
-          type="search"
-          value={address}
-          onChange={(event) => setAddress(event.target.value)}
-          aria-label="선택 위치의 주소"
-          placeholder="주소 입력 (선택)"
-        />
+        <SearchBarInner>
+          <SearchIcon src={searchIcon} alt="" aria-hidden="true" />
+          <SearchInput
+            type="search"
+            value={address}
+            onChange={(event) => setAddress(event.target.value)}
+            aria-label="선택 위치의 주소"
+            placeholder="주소 입력 (선택)"
+          />
+        </SearchBarInner>
       </SearchBar>
 
       <CancelButton
         type="button"
         aria-label="핀 추가 취소"
-        onClick={() => navigate('/map', { replace: true })}
+        onClick={() =>
+          navigate('/map', { replace: true, viewTransition: true })
+        }
       >
         <img src={recordPlusIcon} alt="" />
       </CancelButton>
@@ -234,6 +238,8 @@ const CANCEL_BUTTON_TOP = 19
 const SearchBar = styled.div`
   position: absolute;
   z-index: 4;
+  /* 지도 화면의 여정 선택 드롭바와 이어지는 이름이다. */
+  view-transition-name: map-top-bar;
   top: ${CANCEL_BUTTON_TOP}px;
   /* 오른쪽은 취소 버튼 자리를 비우고, 버튼과의 사이도 바깥 여백만큼 띄운다. */
   right: ${CANCEL_BUTTON_INSET * 2 + CANCEL_BUTTON_SIZE}px;
@@ -253,6 +259,8 @@ const SearchBar = styled.div`
 const CancelButton = styled.button`
   position: absolute;
   z-index: 4;
+  /* 지도 화면의 핀 추가 버튼과 이어지는 이름이다. */
+  view-transition-name: map-top-action;
   top: ${CANCEL_BUTTON_TOP}px;
   right: ${CANCEL_BUTTON_INSET}px;
   width: ${CANCEL_BUTTON_SIZE}px;
@@ -269,12 +277,24 @@ const CancelButton = styled.button`
 
   /* 핀 추가 버튼의 + 를 그대로 돌려 쓴다. 굵기와 끝 모양이 저절로 같다. */
   img {
+    view-transition-name: map-top-action-icon;
     width: 30px;
     height: 30px;
     display: block;
     object-fit: contain;
     transform: rotate(45deg);
   }
+`
+
+/* 알약은 폭이 줄고 늘지만 안의 내용은 그대로여야 한다. 지도 화면의 드롭바
+   내용과 다른 이름을 붙여, 겹쳐 늘어나지 않고 흐려지며 바뀌게 한다. */
+const SearchBarInner = styled.span`
+  view-transition-name: map-top-bar-search;
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 `
 
 const SearchIcon = styled.img`
