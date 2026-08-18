@@ -32,6 +32,11 @@ import { getTrip, getTripPins } from '../../features/trips/tripApi'
 const FALLBACK_PIN_ID = 101
 const DETAIL_MAP_ZOOM = 15.5
 
+/* 기록 시트가 서는 세 자리. 값은 모두 화면 위에서부터 잰 거리다. */
+const SHEET_TOP_INSET = 44
+const SHEET_DEFAULT_TOP = 317
+const SHEET_PEEK = 54
+
 const detailDateFormatter = new Intl.DateTimeFormat('ko-KR', {
   year: 'numeric',
   month: '2-digit',
@@ -434,9 +439,21 @@ const PinDetail = () => {
   const hiddenPhotoCount = Math.max(photos.length - previewPhotos.length, 0)
   // 5.3: 여정에 배정되기 전(진행 중)인 핀만 삭제할 수 있다.
   const isDeletable = pin.segment_id === null
-  // 시트가 열렸을 때 시작 위치(상단에서 317px)를 유지하되,
-  // 지도는 화면 전체를 채워 접힌 상태에서도 빈 배경이 보이지 않게 한다.
-  const detailSheetHeight = Math.max(403, viewportHeight - 317)
+  /*
+   * 시트는 세 자리를 오간다.
+   *
+   * 끝까지 올리면 위 44px 만 남기고 지도를 덮고, 처음에는 예전처럼 상단에서
+   * 317px 자리에 서며, 끝까지 내리면 54px 만 남기고 지도를 보여준다.
+   * 뒤로 가기 버튼은 시트보다 위에 있어 어느 자리에서든 누를 수 있다.
+   */
+  const detailSheetHeight = Math.max(403, viewportHeight - SHEET_TOP_INSET)
+  const sheetDefaultOffset = Math.max(
+    0,
+    Math.min(SHEET_DEFAULT_TOP - SHEET_TOP_INSET, detailSheetHeight - SHEET_PEEK),
+  )
+  const sheetCollapsedOffset = detailSheetHeight - SHEET_PEEK
+  // 지도 핀을 띄울 기준은 처음 자리에서 시트가 가리는 높이다.
+  const defaultVisibleSheet = detailSheetHeight - sheetDefaultOffset
 
   return (
     <Page>
@@ -454,7 +471,7 @@ const PinDetail = () => {
             <CenterPinForSheet
               latitude={position.lat}
               longitude={position.lng}
-              offsetPx={detailSheetHeight / 2}
+              offsetPx={defaultVisibleSheet / 2}
             />
           </GoogleMap>
         ) : (
@@ -475,7 +492,10 @@ const PinDetail = () => {
 
       <DetailSheet
         ariaLabel="핀 기록"
-        collapsedOffset={detailSheetHeight - 54}
+        collapsedOffset={sheetCollapsedOffset}
+        snapOffsets={[sheetDefaultOffset]}
+        expandOnScroll
+        initialOffset={sheetDefaultOffset}
         height={detailSheetHeight}
         onOffsetChange={setSheetOffset}
       >
@@ -932,10 +952,17 @@ const BackButton = styled.button`
   }
 `
 
-const JourneyChip = styled.span`
+/* 시트를 끄는 동안 자리가 프레임마다 바뀐다. 그 값을 CSS 에 넣으면
+   styled-components 가 프레임마다 클래스를 새로 만든다. 바뀌는 두 값만
+   인라인 스타일로 빼서 클래스는 하나로 둔다. */
+const JourneyChip = styled.span.attrs(({ $sheetHeight, $sheetOffset }) => ({
+  style: {
+    bottom: `${$sheetHeight + 28}px`,
+    transform: `translateY(${$sheetOffset}px)`,
+  },
+}))`
   position: absolute;
   z-index: 3;
-  bottom: ${({ $sheetHeight }) => `${$sheetHeight + 28}px`};
   left: 20px;
   max-width: calc(100% - 40px);
   padding: 7px 12px;
@@ -947,7 +974,6 @@ const JourneyChip = styled.span`
   font: var(--text-ui-caption);
   text-overflow: ellipsis;
   white-space: nowrap;
-  transform: ${({ $sheetOffset }) => `translateY(${$sheetOffset}px)`};
 `
 
 const DetailSheet = styled(SnapSheet)`
@@ -956,18 +982,14 @@ const DetailSheet = styled(SnapSheet)`
   background: var(--Background-Base);
 `
 
+/* 스크롤은 시트가 맡는다(`expandOnScroll`). 여기서는 여백과 배치만 잡는다. */
 const DetailContent = styled.div`
-  height: 100%;
+  min-height: 100%;
   padding: 30px 24px 48px;
   display: flex;
   flex-direction: column;
   gap: 38px;
   overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: none;
-
-  &::-webkit-scrollbar { display: none; }
 `
 
 /* PHOTOS·SUGGESTED 와 같이 본문 폭을 꽉 채운다. 여기만 354 로 묶어두면
