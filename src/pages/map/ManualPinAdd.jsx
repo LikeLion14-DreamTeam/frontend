@@ -9,6 +9,7 @@ import { reverseGeocode } from '../../features/pins/reverseGeocode'
 import crosshairIcon from '../../assets/map/manual-pin-crosshair.svg'
 import markerIcon from '../../assets/map/manual-pin-marker.svg'
 import searchIcon from '../../assets/map/manual-pin-search.svg'
+import closeIcon from '../../assets/map/popover-close.svg'
 
 /** 위치를 못 얻었을 때 시작 지점. 여기서 직접 옮겨 찍으면 된다. */
 const FALLBACK_CENTER = { lat: 37.5796, lng: 126.9849 }
@@ -156,6 +157,14 @@ const ManualPinAdd = () => {
         />
       </SearchBar>
 
+      <CancelButton
+        type="button"
+        aria-label="핀 추가 취소"
+        onClick={() => navigate('/map', { replace: true })}
+      >
+        <img src={closeIcon} alt="" />
+      </CancelButton>
+
       <Hint>
         {selectedCenter
           ? '지도를 움직여 위치를 맞춰주세요'
@@ -215,14 +224,20 @@ const MapLayer = styled.div`
   inset: 0;
 `
 
+/* 지도 화면의 핀 추가 버튼과 같은 자리·크기다. */
+const CANCEL_BUTTON_SIZE = 40
+const CANCEL_BUTTON_INSET = 13
+const CANCEL_BUTTON_TOP = 19
+
 /* 지도 화면의 여정 선택 드롭바와 같은 자리·높이에 선다.
    두 화면을 오갈 때 같은 줄에 있어야 흔들리지 않는다. */
 const SearchBar = styled.div`
   position: absolute;
   z-index: 4;
-  top: 19px;
-  right: 13px;
-  left: 13px;
+  top: ${CANCEL_BUTTON_TOP}px;
+  /* 오른쪽은 취소 버튼 자리를 비우고, 버튼과의 사이도 바깥 여백만큼 띄운다. */
+  right: ${CANCEL_BUTTON_INSET * 2 + CANCEL_BUTTON_SIZE}px;
+  left: ${CANCEL_BUTTON_INSET}px;
   height: 40px;
   padding: 6px 14px;
   display: flex;
@@ -232,6 +247,31 @@ const SearchBar = styled.div`
   border-radius: 20px;
   background: var(--Surface-Base);
   box-shadow: var(--Effect-Card);
+`
+
+/* 옆에 선 주소 입력칸과 같은 바탕이라 지도 위에서 한 벌로 보인다. */
+const CancelButton = styled.button`
+  position: absolute;
+  z-index: 4;
+  top: ${CANCEL_BUTTON_TOP}px;
+  right: ${CANCEL_BUTTON_INSET}px;
+  width: ${CANCEL_BUTTON_SIZE}px;
+  height: ${CANCEL_BUTTON_SIZE}px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--Surface-Base);
+  box-shadow: var(--Effect-Card);
+  cursor: pointer;
+
+  img {
+    width: 12px;
+    height: 12px;
+    display: block;
+  }
 `
 
 const SearchIcon = styled.img`
