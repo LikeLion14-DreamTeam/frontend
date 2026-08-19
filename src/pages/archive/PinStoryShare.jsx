@@ -12,6 +12,12 @@ const STORY_WIDTH = 1080
 const STORY_HEIGHT = 1920
 const SHEET_COLLAPSED_OFFSET = 236
 
+/* 도시·국가는 한글로 오는데 Cormorant Garamond 에는 한글 글자가 없어,
+   지금까지는 기기 기본 글꼴로 떨어져 그려졌다. 뒤에 서비스 한글 글꼴을
+   붙여 두면 글자마다 알아서 갈라져 한글만 이쪽으로 그려진다. */
+const SERIF = '"Cormorant Garamond", "Noto Sans KR"'
+const SANS = '"Noto Sans KR"'
+
 const templates = [
   { id: 'story2', name: '프린트', count: 3 },
   { id: 'story1', name: '폴라로이드', count: 4 },
@@ -121,6 +127,15 @@ const fillRoundedRect = (ctx, x, y, width, height, radius, color) => {
   ctx.fill()
 }
 
+/* 목록 화면에서 이름이 빈 핀을 이 문구로 채워 보여준다. 화면에서는 자리를
+   메우는 값이지만 내보내기 제목으로 크게 박히면 이름처럼 읽혀 걸러낸다. */
+const PLACEHOLDER_NAMES = ['이름 없는 장소', '이름 없는 도시']
+
+const withoutPlaceholder = (name) => {
+  const trimmed = (name ?? '').trim()
+  return PLACEHOLDER_NAMES.includes(trimmed) ? '' : trimmed
+}
+
 const setText = (ctx, { color, font, align = 'left', spacing = 0 }) => {
   ctx.fillStyle = color
   ctx.font = font
@@ -133,7 +148,15 @@ const drawTemplate = (canvas, templateId, images, pin) => {
   const ctx = canvas.getContext('2d')
   canvas.width = STORY_WIDTH
   canvas.height = STORY_HEIGHT
-  const title = (pin.cityName || pin.placeName || 'PARIS').toUpperCase()
+  /* 도시명이 없으면 장소명으로 대신한다. 둘 다 없으면 제목 줄을 그리지
+     않는다. 없는 지명을 지어내면 다른 곳 이야기가 되어 버린다. */
+  const title = (
+    withoutPlaceholder(pin.cityName) ||
+    withoutPlaceholder(pin.placeName) ||
+    ''
+  ).toUpperCase()
+  /* 6.2 가 도시 묶음에 실어 주는 값. 없으면 국가 줄도 그리지 않는다. */
+  const country = (pin.countryName ?? '').trim().toUpperCase()
   const date = formatEditorialDate(pin.recordedAt)
 
   if (templateId === 'story0') {
@@ -147,13 +170,13 @@ const drawTemplate = (canvas, templateId, images, pin) => {
     ctx.strokeStyle = 'rgba(233, 217, 188, 0.72)'
     ctx.lineWidth = 2
     ctx.strokeRect(56, 278, 968, 1364)
-    setText(ctx, { color: '#e9d9bc', font: '600 30px "Cormorant Garamond"', align: 'center', spacing: 8 })
-    ctx.fillText('FRANCE', 540, 1154)
-    setText(ctx, { color: '#f7f1e8', font: '600 192px "Cormorant Garamond"', align: 'center', spacing: 8 })
-    ctx.fillText(title, 540, 1200)
+    setText(ctx, { color: '#e9d9bc', font: `600 30px ${SERIF}`, align: 'center', spacing: 8 })
+    if (country) ctx.fillText(country, 540, 1154)
+    setText(ctx, { color: '#f7f1e8', font: `600 192px ${SERIF}`, align: 'center', spacing: 8 })
+    if (title) ctx.fillText(title, 540, 1200)
     ctx.fillStyle = '#c5a15b'
     ctx.fillRect(500, 1452, 80, 2)
-    setText(ctx, { color: 'rgba(247,241,232,.72)', font: '400 34px "Noto Sans KR"', align: 'center' })
+    setText(ctx, { color: 'rgba(247,241,232,.72)', font: `400 34px ${SANS}`, align: 'center' })
     ctx.fillText(formatDate(pin.recordedAt), 540, 1494)
     return
   }
@@ -165,9 +188,9 @@ const drawTemplate = (canvas, templateId, images, pin) => {
     drawPolaroid(ctx, images[1], 560, 120)
     drawPolaroid(ctx, images[2], 48, 1132)
     drawPolaroid(ctx, images[3], 560, 824)
-    setText(ctx, { color: '#f7f1e8', font: '600 120px "Cormorant Garamond"', spacing: 2 })
-    ctx.fillText(title, 48, 166)
-    setText(ctx, { color: '#f2eee2', font: '600 40px "Cormorant Garamond"', spacing: 8 })
+    setText(ctx, { color: '#f7f1e8', font: `600 120px ${SERIF}`, spacing: 2 })
+    if (title) ctx.fillText(title, 48, 166)
+    setText(ctx, { color: '#f2eee2', font: `600 40px ${SERIF}`, spacing: 8 })
     ctx.fillText(date, 48, 290)
     return
   }
@@ -175,14 +198,14 @@ const drawTemplate = (canvas, templateId, images, pin) => {
   if (templateId === 'story2') {
     ctx.fillStyle = '#2e3a2e'
     ctx.fillRect(0, 0, 1080, 1920)
-    setText(ctx, { color: '#f2eee2', font: '600 124px "Cormorant Garamond"', spacing: 2.5 })
+    setText(ctx, { color: '#f2eee2', font: `600 124px ${SERIF}`, spacing: 2.5 })
     ctx.fillText('This Journey', 222, 168)
     drawPrint(ctx, images[0], 116, 468, 2.28)
     drawPrint(ctx, images[1], 260, 782, -2.41)
     drawPrint(ctx, images[2], 124, 1142, 1.5)
     ctx.fillStyle = '#151c15'
     ctx.fillRect(0, 1758, 1080, 162)
-    setText(ctx, { color: '#f2eee2', font: '600 40px "Cormorant Garamond"', align: 'center', spacing: 8 })
+    setText(ctx, { color: '#f2eee2', font: `600 40px ${SERIF}`, align: 'center', spacing: 8 })
     ctx.fillText(date, 540, 1812)
     return
   }
@@ -195,10 +218,10 @@ const drawTemplate = (canvas, templateId, images, pin) => {
     withShadow(ctx, () => drawCoverImage(ctx, images[0], 516, 428, 400, 534))
     withShadow(ctx, () => drawCoverImage(ctx, images[1], 124, 640, 380, 506))
     withShadow(ctx, () => drawCoverImage(ctx, images[2], 336, 940, 432, 576))
-    setText(ctx, { color: '#f7f1e8', font: '600 124px "Cormorant Garamond"', spacing: 2.5 })
+    setText(ctx, { color: '#f7f1e8', font: `600 124px ${SERIF}`, spacing: 2.5 })
     ctx.fillText('Travel', 108, 292)
     ctx.fillText('journey', 176, 412)
-    setText(ctx, { color: '#f7f1e8', font: '600 30px "Cormorant Garamond"', align: 'center', spacing: 6.6 })
+    setText(ctx, { color: '#f7f1e8', font: `600 30px ${SERIF}`, align: 'center', spacing: 6.6 })
     ctx.fillText(date, 540, 1564)
     return
   }
@@ -209,10 +232,10 @@ const drawTemplate = (canvas, templateId, images, pin) => {
     ;[[86, 434], [550, 434], [86, 1046], [550, 1046]].forEach(([x, y], index) =>
       drawCoverImage(ctx, images[index], x, y, 444, 592),
     )
-    setText(ctx, { color: '#b5763b', font: '600 28px "Cormorant Garamond"', align: 'center', spacing: 6.7 })
-    ctx.fillText(`FRANCE · ${date}`, 540, 216)
-    setText(ctx, { color: '#241c16', font: '600 88px "Cormorant Garamond"', align: 'center', spacing: 8.8 })
-    ctx.fillText(title, 540, 250)
+    setText(ctx, { color: '#b5763b', font: `600 28px ${SERIF}`, align: 'center', spacing: 6.7 })
+    ctx.fillText(country ? `${country} · ${date}` : date, 540, 216)
+    setText(ctx, { color: '#241c16', font: `600 88px ${SERIF}`, align: 'center', spacing: 8.8 })
+    if (title) ctx.fillText(title, 540, 250)
     return
   }
 
@@ -243,7 +266,7 @@ const drawTemplate = (canvas, templateId, images, pin) => {
       drawCoverImage(ctx, images[index], x, y, width, height)
       ctx.restore()
     })
-    setText(ctx, { color: '#b5763b', font: '600 34px "Cormorant Garamond"', align: 'right' })
+    setText(ctx, { color: '#b5763b', font: `600 34px ${SERIF}`, align: 'right' })
     ctx.fillText('✦', 1000, 1610)
     return
   }
@@ -264,6 +287,7 @@ const normalizeLoadedPin = (rawPin) => ({
   id: rawPin.pin_id,
   placeName: rawPin.place_name?.trim() || '이름 없는 장소',
   cityName: rawPin.__cityName?.trim() || '',
+  countryName: rawPin.__countryName?.trim() || '',
   recordedAt: rawPin.tagged_at,
   photos: (rawPin.photos ?? [])
     .map((photo) => ({ url: typeof photo === 'string' ? photo : photo.url ?? photo.photo_url ?? photo.file_path }))
@@ -302,6 +326,7 @@ const PinStoryShare = () => {
             (city.pins ?? []).map((item) => ({
               ...item,
               __cityName: city.city,
+              __countryName: city.country_name,
             })),
           )
           .find((item) => String(item.pin_id) === String(pinID))
@@ -590,8 +615,10 @@ const ArrowButton = styled.button`
   &:disabled { opacity: 0.2; cursor: default; }
 `
 
+/* 402 로 묶어 두면 그보다 넓은 기기에서 좌우가 뜬다. 시트는 화면 아래에
+   붙는 것이라 가장자리까지 닿아야 해서 앱 공통 상한(450)까지 늘린다. */
 const TemplateSheet = styled(SnapSheet)`
-  width: min(100%, 402px);
+  width: min(100%, 450px);
   left: 50%;
   z-index: 4;
   padding: 0 0 20px;

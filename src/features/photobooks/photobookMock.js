@@ -58,6 +58,7 @@ const MOCK_PHOTOBOOK_DETAILS = {
     cities: [
       {
         city: '파리',
+        country_name: '프랑스',
         start_at: '2024-09-12T09:10:00.000000Z',
         end_at: '2024-09-18T17:20:00.000000Z',
         pin_count: 3,
@@ -112,6 +113,7 @@ const MOCK_PHOTOBOOK_DETAILS = {
       },
       {
         city: '암스테르담',
+        country_name: '네덜란드',
         start_at: '2024-09-22T10:00:00.000000Z',
         end_at: '2024-09-27T10:00:00.000000Z',
         pin_count: 2,
@@ -157,6 +159,7 @@ const MOCK_PHOTOBOOK_DETAILS = {
     cities: [
       {
         city: '도쿄',
+        country_name: '일본',
         start_at: '2024-05-03T08:00:00.000000Z',
         end_at: '2024-05-07T09:20:00.000000Z',
         pin_count: 1,
@@ -180,6 +183,7 @@ const MOCK_PHOTOBOOK_DETAILS = {
       },
       {
         city: '요코하마',
+        country_name: '일본',
         start_at: '2024-05-11T10:00:00.000000Z',
         end_at: '2024-05-11T10:00:00.000000Z',
         pin_count: 1,
@@ -209,6 +213,7 @@ const MOCK_PHOTOBOOK_DETAILS = {
     cities: [
       {
         city: '바르셀로나',
+        country_name: '스페인',
         start_at: '2023-11-08T09:00:00.000000Z',
         end_at: '2023-11-19T10:00:00.000000Z',
         pin_count: 2,

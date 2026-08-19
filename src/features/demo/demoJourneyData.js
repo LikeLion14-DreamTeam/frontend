@@ -1357,6 +1357,7 @@ export const getDemoPhotobook = (photobookId) => {
     if (!city) {
       city = {
         city: pin.city,
+        country_name: pin.country_name || pin.country_code || '',
         start_at: pin.tagged_at,
         end_at: pin.tagged_at,
         pin_count: 0,
