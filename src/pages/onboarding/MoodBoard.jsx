@@ -45,6 +45,7 @@ const MoodBoard = () => {
   const navigate = useNavigate()
   const isRelearning = isRelearningFlow(location.search)
   const initialRound = location.state?.initialRound ?? 1
+  const restorePreviousStage = location.state?.restorePreviousStage ?? false
   const user = useAuthStore((state) => state.user)
   const setUser = useAuthStore((state) => state.setUser)
   const [photoRounds, setPhotoRounds] = useState(() =>
@@ -65,6 +66,7 @@ const MoodBoard = () => {
     stage: MOODBOARD_STAGE,
     isRelearning,
     initialRound,
+    restorePreviousStage,
     normalizeRound: normalizeMoodboardRound,
     onProgressLoaded: (progress) => {
       const selectionPhotos = progress.selection_photos ?? []
@@ -186,7 +188,10 @@ const MoodBoard = () => {
         {
           state: {
             initialRound: PREVIOUS_STAGE_LAST_ROUND,
-            abAnswers: readRelearningDraft().abAnswers,
+            restorePreviousStage: true,
+            basicAnswers: location.state?.basicAnswers,
+            abAnswers:
+              location.state?.abAnswers ?? readRelearningDraft().abAnswers,
           },
         },
       )
@@ -208,7 +213,10 @@ const MoodBoard = () => {
         )}
         state={{
           initialRound: PREVIOUS_STAGE_LAST_ROUND,
-          abAnswers: readRelearningDraft().abAnswers,
+          restorePreviousStage: true,
+          basicAnswers: location.state?.basicAnswers,
+          abAnswers:
+            location.state?.abAnswers ?? readRelearningDraft().abAnswers,
         }}
       />
 

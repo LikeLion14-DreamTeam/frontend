@@ -35,6 +35,7 @@ const AbPreference = () => {
   const navigate = useNavigate()
   const isRelearning = isRelearningFlow(location.search)
   const initialRound = location.state?.initialRound ?? 1
+  const restorePreviousStage = location.state?.restorePreviousStage ?? false
   const [photoRounds] = useState(() =>
     selectRandomPhotoSets(AB_PHOTO_ROUNDS, {
       storageKey: PHOTO_SET_STORAGE_KEY,
@@ -53,6 +54,7 @@ const AbPreference = () => {
     stage: AB_SELECTION_STAGE,
     isRelearning,
     initialRound,
+    restorePreviousStage,
     onProgressLoaded: (progress) => {
       setAnswers((currentAnswers) => {
         const nextAnswers = [...currentAnswers]
@@ -99,6 +101,18 @@ const AbPreference = () => {
   const handleNext = async () => {
     if (!selectedPhotoId || isSubmitting) return
 
+    // 무드보드에서 되돌아온 A/B 마지막 라운드는 이미 저장돼 있다. 서버 진행
+    // 상태도 무드보드이므로 다시 저장하지 않고 다음 단계로 돌아간다.
+    if (isLastRound && restorePreviousStage && !isRelearning) {
+      navigate(getOnboardingFlowPath('/onboarding/moodboard', isRelearning), {
+        state: {
+          basicAnswers: location.state?.basicAnswers,
+          abAnswers: answers,
+        },
+      })
+      return
+    }
+
     setIsSubmitting(true)
     setErrorMessage('')
 
@@ -119,7 +133,12 @@ const AbPreference = () => {
 
       navigate(
         getOnboardingFlowPath('/onboarding/moodboard', isRelearning),
-        isRelearning ? { state: { abAnswers: answers } } : undefined,
+        {
+          state: {
+            basicAnswers: location.state?.basicAnswers,
+            abAnswers: answers,
+          },
+        },
       )
     } catch (error) {
       setErrorMessage(
@@ -138,7 +157,9 @@ const AbPreference = () => {
         {
           state: {
             initialRound: PREVIOUS_STAGE_LAST_ROUND,
-            basicAnswers: readRelearningDraft().basicAnswers,
+            restorePreviousStage: true,
+            basicAnswers:
+              location.state?.basicAnswers ?? readRelearningDraft().basicAnswers,
           },
         },
       )
@@ -160,7 +181,9 @@ const AbPreference = () => {
         )}
         state={{
           initialRound: PREVIOUS_STAGE_LAST_ROUND,
-          basicAnswers: readRelearningDraft().basicAnswers,
+          restorePreviousStage: true,
+          basicAnswers:
+            location.state?.basicAnswers ?? readRelearningDraft().basicAnswers,
         }}
       />
 
