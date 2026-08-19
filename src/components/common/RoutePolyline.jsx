@@ -1,4 +1,5 @@
-import { Polyline } from '@vis.gl/react-google-maps'
+import { useEffect, useState } from 'react'
+import { Polyline, useMap } from '@vis.gl/react-google-maps'
 
 const ROUTE_COLOR = '#c99a45'
 
@@ -19,6 +20,42 @@ const ARROW_PATH = [
   `L 0 ${-ARROW_LENGTH / 2}`,
   `L ${ARROW_WIDTH / 2} ${ARROW_LENGTH / 2}`,
 ].join(' ')
+
+/* 지도의 기본 여정 배율에서 화살표가 지금의 6px 크기로 보이게 둔다.
+   한 단계 확대·축소할 때마다 크기를 10%씩 바꾸되, 너무 멀리/가깝게 봐도
+   읽기 어려워지지 않도록 범위를 둔다. */
+const ARROW_REFERENCE_ZOOM = 13
+const ARROW_SCALE_PER_ZOOM = 0.1
+const MIN_ARROW_SCALE = 0.55
+const MAX_ARROW_SCALE = 1.45
+
+const getArrowScale = (zoom) =>
+  Math.min(
+    MAX_ARROW_SCALE,
+    Math.max(
+      MIN_ARROW_SCALE,
+      1 + (zoom - ARROW_REFERENCE_ZOOM) * ARROW_SCALE_PER_ZOOM,
+    ),
+  )
+
+/* 지도 배율은 사용자의 제스처로만 바뀌므로 Map props만으로는 다시 렌더되지
+   않는다. Google Maps의 zoom_changed를 구독해 심볼 크기를 즉시 맞춘다. */
+const useMapZoom = () => {
+  const map = useMap()
+  const [zoom, setZoom] = useState(ARROW_REFERENCE_ZOOM)
+
+  useEffect(() => {
+    if (!map) return undefined
+
+    const syncZoom = () => setZoom(map.getZoom() ?? ARROW_REFERENCE_ZOOM)
+    syncZoom()
+
+    const listener = map.addListener('zoom_changed', syncZoom)
+    return () => listener.remove()
+  }, [map])
+
+  return zoom
+}
 
 /* 핀에서 핀으로 가는 구간들. 화살표를 구간마다 하나씩 놓는다. */
 const getLegs = (path) =>
@@ -56,7 +93,7 @@ const getBearing = ([from, to]) =>
   Math.PI
 
 /* 구글이 알아서 돌려 주는 각도에 맡기지 않고(`fixedRotation`) 직접 계산해 넣는다. */
-const buildDirectionArrow = (leg) => [
+const buildDirectionArrow = (leg, scale) => [
   {
     icon: {
       path: ARROW_PATH,
@@ -65,9 +102,11 @@ const buildDirectionArrow = (leg) => [
          기본값(각진 끝, 뾰족한 이음매)으로 그려진다. */
       strokeColor: ROUTE_COLOR,
       strokeOpacity: 1,
-      strokeWeight: 3,
       fillOpacity: 0,
       rotation: getBearing(leg),
+      scale,
+      // 심볼 경로만 줄이면 선이 상대적으로 너무 굵어 보인다.
+      strokeWeight: 3 * scale,
     },
     fixedRotation: true,
     // `repeat` 을 주지 않으면 이 자리에 하나만 놓인다.
@@ -88,7 +127,11 @@ const buildDirectionArrow = (leg) => [
  * 점이 둘 미만이면 이을 것이 없어 아무것도 그리지 않는다.
  */
 const RoutePolyline = ({ path }) => {
+  const zoom = useMapZoom()
+
   if (path.length < 2) return null
+
+  const arrowScale = getArrowScale(zoom)
 
   return (
     <>
@@ -105,7 +148,7 @@ const RoutePolyline = ({ path }) => {
           key={`${leg[0].lat},${leg[0].lng}-${index}`}
           path={leg}
           strokeOpacity={0}
-          icons={buildDirectionArrow(leg)}
+          icons={buildDirectionArrow(leg, arrowScale)}
         />
       ))}
     </>
