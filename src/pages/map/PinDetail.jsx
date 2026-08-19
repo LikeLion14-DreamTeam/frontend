@@ -142,7 +142,7 @@ const PinDetail = () => {
   const [audioSrc, setAudioSrc] = useState(null)
   const [playedRatio, setPlayedRatio] = useState(0)
   const [playedSec, setPlayedSec] = useState(0)
-  /* 5.1 이 길이를 안 줄 때를 대비해 오디오 파일에서 읽은 값을 따로 둔다. */
+  /* 파일 메타데이터가 서버의 계산값보다 정확하므로 화면 표시에 우선한다. */
   const [audioDuration, setAudioDuration] = useState(0)
   const [voiceError, setVoiceError] = useState('')
   const [pin, setPin] = useState(null)
@@ -230,6 +230,10 @@ const PinDetail = () => {
     let ignore = false
 
     const loadVoiceMemo = async () => {
+      setAudioDuration(0)
+      setPlayedSec(0)
+      setPlayedRatio(0)
+
       try {
         const { voice_memo: memo } = await getPinVoiceMemos(pinID)
 
@@ -636,7 +640,11 @@ const PinDetail = () => {
                 {pin.voice_memo && (
                   <>
                     <VoiceMemoBar
-                      duration={pin.voice_memo.duration_sec || audioDuration}
+                      duration={
+                        audioDuration > 0
+                          ? audioDuration
+                          : pin.voice_memo.duration_sec
+                      }
                       position={playedSec}
                       isPlaying={isPlaying}
                       progress={playedRatio}
@@ -644,8 +652,7 @@ const PinDetail = () => {
                       disabled={!audioSrc}
                     />
 
-                    {/* 길이를 보내기 전에 만든 핀은 5.1 이 0 을 주므로, 그때만
-                        파일 머리말에서 읽어 채운다. 재생에도 이 요소를 쓴다. */}
+                    {/* 파일 메타데이터를 읽어 서버 계산값과 실제 재생 길이를 맞춘다. */}
                     <audio
                       ref={audioRef}
                       src={audioSrc ?? undefined}
