@@ -3,6 +3,7 @@ import styled from 'styled-components'
 import { Map, Marker, useMap, useMapsLibrary } from '@vis.gl/react-google-maps'
 import mapPinIcon from '../../assets/map/map-pin.svg'
 import { MAP_STYLES } from './mapStyles'
+import { normalizeLongitude } from '../../utils/coordinates'
 
 // 클라우드 스타일을 쓸 때만 필요하다. 콘솔에서 발급받기 전까진 구글 제공 데모 ID 사용.
 const MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID || 'DEMO_MAP_ID'
@@ -91,7 +92,7 @@ const getPinIcon = (core) => {
  */
 const getBounds = (markers) => {
   const lats = markers.map(({ lat }) => lat)
-  const lngs = markers.map(({ lng }) => lng)
+  const lngs = markers.map(({ lng }) => normalizeLongitude(lng))
 
   const north = Math.max(...lats)
   const south = Math.min(...lats)
@@ -159,14 +160,23 @@ const GoogleMap = ({
    * 영역을 직접 받으면 그대로 쓰고, 없으면 마커로 계산한다.
    * 둘 다 없을 때만 중심과 배율로 잡는다.
    */
-  const [firstMarker] = markers
+  // 기존 서버 데이터에도 한 바퀴를 넘는 경도가 남아 있을 수 있다.
+  const normalizedMarkers = markers.map((marker) => ({
+    ...marker,
+    lng: normalizeLongitude(marker.lng),
+  }))
+  const normalizedCenter = center
+    ? { ...center, lng: normalizeLongitude(center.lng) }
+    : undefined
+  const [firstMarker] = normalizedMarkers
   const fitBounds =
-    bounds ?? (!center && firstMarker ? getBounds(markers) : null)
+    bounds ??
+    (!normalizedCenter && firstMarker ? getBounds(normalizedMarkers) : null)
 
   /* 마커가 하나뿐이면 영역을 못 잡는다. 그 마커를 가운데 두고 `zoom` 을 쓴다.
      기본 좌표로 두면 엉뚱하게 서울이 뜬다. */
   const fallbackCenter =
-    center ??
+    normalizedCenter ??
     (firstMarker
       ? { lat: firstMarker.lat, lng: firstMarker.lng }
       : DEFAULT_CENTER)
@@ -201,7 +211,7 @@ const GoogleMap = ({
         {fitBounds && <FitZoomLimit maxZoom={maxFitZoom} />}
 
         {/* AdvancedMarker 는 Map ID 를 요구해 테마와 같이 못 쓴다. */}
-        {markers.map(({ id, name, lat, lng }, index) => (
+        {normalizedMarkers.map(({ id, name, lat, lng }, index) => (
           <Marker
             key={id ?? `${name}-${lat}-${lng}-${index}`}
             position={{ lat, lng }}

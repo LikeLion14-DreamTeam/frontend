@@ -6,6 +6,7 @@ import GoogleMap from '../../components/common/GoogleMap'
 import pinIcon from '../../assets/map/map-pin.svg'
 import activePinIcon from '../../assets/map/map-pin-active.svg'
 import { getPinsByCountry } from '../../features/pins/pinApi'
+import { normalizeLongitude } from '../../utils/coordinates'
 
 const DEFAULT_CENTER = { lat: 37.5665, lng: 126.978 }
 const DEFAULT_ZOOM = 5
@@ -116,7 +117,11 @@ const CountryStampPins = () => {
     () =>
       pins
         .filter(({ latitude, longitude }) => latitude != null && longitude != null)
-        .sort((a, b) => a.tagged_at.localeCompare(b.tagged_at)),
+        .sort((a, b) => a.tagged_at.localeCompare(b.tagged_at))
+        .map((pin) => ({
+          ...pin,
+          longitude: normalizeLongitude(pin.longitude),
+        })),
     [pins],
   )
 

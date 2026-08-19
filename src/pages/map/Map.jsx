@@ -31,6 +31,7 @@ import {
   getTripPins,
   getTrips,
 } from '../../features/trips/tripApi'
+import { normalizeLongitude } from '../../utils/coordinates'
 
 // 위치 권한을 받을 수 없을 때만 쓰는 마지막 fallback.
 const FALLBACK_CENTER = { lat: 37.5665, lng: 126.978 }
@@ -44,6 +45,10 @@ const CURRENT_POSITION_ZOOM = 17
 /* 진행 중인 여행은 TRAVEL_SEGMENT 가 없어 segment_id 로 못 고른다.
    목록에서 구분하려고 쓰는 프론트 전용 값이다. */
 const ONGOING_TRIP_ID = 'ongoing'
+
+/* false면 핀 안에 방문 순서를, true면 핀 사이에 진행 방향 화살표를 표시한다.
+   동선 표기를 다시 화살표로 바꿀 때는 이 값만 true로 바꾸면 된다. */
+const SHOW_ROUTE_ARROWS = false
 
 // 종료 여정은 최근에 끝난 순으로 보여 준다. 예시 데이터는 실제 여정 뒤에 둔다.
 const sortEndedTrips = (trips) =>
@@ -592,7 +597,11 @@ const MapPage = () => {
             latitude != null &&
             longitude != null,
         )
-        .sort((a, b) => a.tagged_at.localeCompare(b.tagged_at)),
+        .sort((a, b) => a.tagged_at.localeCompare(b.tagged_at))
+        .map((pin) => ({
+          ...pin,
+          longitude: normalizeLongitude(pin.longitude),
+        })),
     [isCountryFilterMode, tripPins],
   )
 
@@ -817,26 +826,52 @@ const MapPage = () => {
               onClick: () => setSelectedPinId(null),
             }}
           >
-            <RoutePolyline path={routePath} />
+            <RoutePolyline path={routePath} showArrows={SHOW_ROUTE_ARROWS} />
 
-            {mapPins.map((pin) => {
-              const isSelected = pin.pin_id === selectedPinId
+            {SHOW_ROUTE_ARROWS
+              ? mapPins.map((pin) => {
+                  const isSelected = pin.pin_id === selectedPinId
 
-              return (
-                <Marker
-                  key={pin.pin_id}
-                  position={{ lat: pin.latitude, lng: pin.longitude }}
-                  icon={
-                    isSelected
-                      ? centeredIcon(activePinIcon, ACTIVE_PIN_SIZE)
-                      : centeredIcon(pinIcon, PIN_SIZE)
-                  }
-                  title={pin.place_name || '이름 없는 장소'}
-                  zIndex={isSelected ? 3 : 2}
-                  onClick={() => setSelectedPinId(pin.pin_id)}
-                />
-              )
-            })}
+                  return (
+                    <Marker
+                      key={pin.pin_id}
+                      position={{ lat: pin.latitude, lng: pin.longitude }}
+                      icon={
+                        isSelected
+                          ? centeredIcon(activePinIcon, ACTIVE_PIN_SIZE)
+                          : centeredIcon(pinIcon, PIN_SIZE)
+                      }
+                      title={pin.place_name || '이름 없는 장소'}
+                      zIndex={isSelected ? 3 : 2}
+                      onClick={() => setSelectedPinId(pin.pin_id)}
+                    />
+                  )
+                })
+              : mapPins.map((pin, index) => {
+                  const isSelected = pin.pin_id === selectedPinId
+
+                  return (
+                    <MapOverlay
+                      key={pin.pin_id}
+                      latitude={pin.latitude}
+                      longitude={pin.longitude}
+                      // 숫자 핀 위에서도 휠·트랙패드 제스처는 지도에 전달한다.
+                      blockMapGestures={false}
+                      // 같은 자리에 겹치면 나중에 방문한 핀이 위에 보인다.
+                      zIndex={isSelected ? 1000 : 100 + index}
+                    >
+                      <SequencePin
+                        type="button"
+                        $selected={isSelected}
+                        title={pin.place_name || '이름 없는 장소'}
+                        aria-label={`${index + 1}번 핀: ${pin.place_name || '이름 없는 장소'}`}
+                        onClick={() => setSelectedPinId(pin.pin_id)}
+                      >
+                        {index + 1}
+                      </SequencePin>
+                    </MapOverlay>
+                  )
+                })}
 
             {currentPosition && (
               <Marker
@@ -861,6 +896,7 @@ const MapPage = () => {
                 <MapOverlay
                   latitude={selectedPin.latitude}
                   longitude={selectedPin.longitude}
+                  zIndex={2000}
                 >
                   <PopoverAnchor>
                     <PinPopover
@@ -1188,6 +1224,31 @@ const PopoverAnchor = styled.div`
   bottom: 31px;
   left: 0;
   transform: translateX(-50%);
+`
+
+/* 기본 마커의 label은 SVG 내부 원과 기준점이 달라 어긋난다. 숫자 핀을 직접
+   원으로 그려 좌표를 정확히 중심에 두고, 마커끼리 겹쳐도 z-index를 제어한다. */
+const SequencePin = styled.button`
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: ${({ $selected }) => ($selected ? '48px' : '38px')};
+  height: ${({ $selected }) => ($selected ? '48px' : '38px')};
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 3px solid var(--Surface-Base);
+  border-radius: 50%;
+  background: ${({ $selected }) =>
+    $selected ? 'var(--Primary-Cognac)' : 'var(--Map-Pin-Inactive)'};
+  box-shadow: var(--Effect-Marker);
+  color: var(--Text-Inverse);
+  font-family: var(--font-sans);
+  font-size: ${({ $selected }) => ($selected ? '16px' : '13px')};
+  font-weight: 700;
+  line-height: 1;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
 `
 
 const Scrim = styled.button`

@@ -23,6 +23,7 @@ import {
   MAX_PIN_PHOTOS,
   PHOTO_UPLOAD_BATCH_SIZE,
 } from './photoUploadQueue'
+import { normalizeLongitude } from '../../utils/coordinates'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK_API === 'true'
 const REPRESENTATIVE_PHOTO_CACHE_KEY = 'orte:representative-photos:v1'
@@ -206,7 +207,8 @@ export const createPin = async ({
   const pinPayload = {
     nfc_tag_id: nfcTagId ?? null,
     latitude,
-    longitude,
+    // 지도를 여러 바퀴 돌린 뒤 고른 좌표도 서버에는 실제 경도로 저장한다.
+    longitude: normalizeLongitude(longitude),
     address,
     city,
     country_code: countryCode,

@@ -1,4 +1,5 @@
-import { Polyline } from '@vis.gl/react-google-maps'
+import { useEffect, useState } from 'react'
+import { Polyline, useMap } from '@vis.gl/react-google-maps'
 
 const ROUTE_COLOR = '#c99a45'
 
@@ -12,6 +13,7 @@ const ROUTE_COLOR = '#c99a45'
  *
  * 삼각형과 달리 닫지(`Z`) 않는다. 두 획만 남아 선의 일부처럼 읽힌다.
  */
+// 일반 구간은 기존 크기를 유지하고, 가까운 핀 사이에서만 아래 scale을 적용한다.
 const ARROW_LENGTH = 6
 const ARROW_WIDTH = 6
 const ARROW_PATH = [
@@ -19,6 +21,59 @@ const ARROW_PATH = [
   `L 0 ${-ARROW_LENGTH / 2}`,
   `L ${ARROW_WIDTH / 2} ${ARROW_LENGTH / 2}`,
 ].join(' ')
+
+/* 핀 중심 사이가 이보다 좁게 보일 때만 화살표를 함께 줄인다. */
+const SHORT_LEG_MAX_PX = 72
+const MIN_SHORT_LEG_ARROW_SCALE = 0.4
+
+/* `fromLatLngToPoint` 는 확대 전 세계 좌표(256px 기준)를 돌려준다. */
+const getLegScreenDistance = ([from, to], view) => {
+  if (!view?.projection || view.zoom == null) return Infinity
+
+  const fromPoint = view.projection.fromLatLngToPoint(from)
+  const toPoint = view.projection.fromLatLngToPoint(to)
+  if (!fromPoint || !toPoint) return Infinity
+
+  // 점 좌표 자체가 확대 전 256px 기준이므로, 줌에 따른 배율만 곱한다.
+  const worldSize = 2 ** view.zoom
+  // 날짜 변경선 양쪽도 실제로 가까운 거리로 재야 한다.
+  const xDistance = Math.min(
+    Math.abs(toPoint.x - fromPoint.x),
+    1 - Math.abs(toPoint.x - fromPoint.x),
+  ) * worldSize
+  const yDistance = Math.abs(toPoint.y - fromPoint.y) * worldSize
+
+  return Math.hypot(xDistance, yDistance)
+}
+
+const getShortLegArrowScale = (screenDistance) =>
+  screenDistance >= SHORT_LEG_MAX_PX
+    ? 1
+    : Math.max(MIN_SHORT_LEG_ARROW_SCALE, screenDistance / SHORT_LEG_MAX_PX)
+
+/* 충분히 먼 구간은 고정 크기다. 현재 화면에서 가까워 보이는 구간만 골라
+   축소하려고 확대·축소가 끝날 때 화면 거리만 다시 잰다. */
+const useMapView = () => {
+  const map = useMap()
+  const [view, setView] = useState(null)
+
+  useEffect(() => {
+    if (!map) return undefined
+
+    const syncView = () => {
+      const projection = map.getProjection()
+      const zoom = map.getZoom()
+      if (projection && zoom != null) setView({ projection, zoom })
+    }
+
+    syncView()
+    const idleListener = map.addListener('idle', syncView)
+
+    return () => idleListener.remove()
+  }, [map])
+
+  return view
+}
 
 /* 핀에서 핀으로 가는 구간들. 화살표를 구간마다 하나씩 놓는다. */
 const getLegs = (path) =>
@@ -56,7 +111,7 @@ const getBearing = ([from, to]) =>
   Math.PI
 
 /* 구글이 알아서 돌려 주는 각도에 맡기지 않고(`fixedRotation`) 직접 계산해 넣는다. */
-const buildDirectionArrow = (leg) => [
+const buildDirectionArrow = (leg, scale) => [
   {
     icon: {
       path: ARROW_PATH,
@@ -65,9 +120,10 @@ const buildDirectionArrow = (leg) => [
          기본값(각진 끝, 뾰족한 이음매)으로 그려진다. */
       strokeColor: ROUTE_COLOR,
       strokeOpacity: 1,
-      strokeWeight: 3,
+      strokeWeight: 3 * scale,
       fillOpacity: 0,
       rotation: getBearing(leg),
+      scale,
     },
     fixedRotation: true,
     // `repeat` 을 주지 않으면 이 자리에 하나만 놓인다.
@@ -87,7 +143,9 @@ const buildDirectionArrow = (leg) => [
  * `path` 는 방문한 순서대로 와야 한다. 화살표는 그 순서를 따른다.
  * 점이 둘 미만이면 이을 것이 없어 아무것도 그리지 않는다.
  */
-const RoutePolyline = ({ path }) => {
+const RoutePolyline = ({ path, showArrows = true }) => {
+  const view = useMapView()
+
   if (path.length < 2) return null
 
   return (
@@ -100,14 +158,19 @@ const RoutePolyline = ({ path }) => {
       />
 
       {/* 화살표만 얹는 선들이다. 동선은 위에서 이미 그렸으므로 보이지 않게 둔다. */}
-      {getLegs(path).map((leg, index) => (
-        <Polyline
-          key={`${leg[0].lat},${leg[0].lng}-${index}`}
-          path={leg}
-          strokeOpacity={0}
-          icons={buildDirectionArrow(leg)}
-        />
-      ))}
+      {showArrows &&
+        getLegs(path).map((leg, index) => {
+          const scale = getShortLegArrowScale(getLegScreenDistance(leg, view))
+
+          return (
+            <Polyline
+              key={`${leg[0].lat},${leg[0].lng}-${index}`}
+              path={leg}
+              strokeOpacity={0}
+              icons={buildDirectionArrow(leg, scale)}
+            />
+          )
+        })}
     </>
   )
 }
