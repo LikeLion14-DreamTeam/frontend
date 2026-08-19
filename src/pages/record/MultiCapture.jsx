@@ -423,6 +423,8 @@ const MultiCapture = () => {
       <DarkSafeArea />
 
       <ViewfinderArea>
+        <ViewfinderSpacer aria-hidden="true" />
+
         <Viewfinder
           onTouchStart={handlePinchStart}
           onTouchMove={handlePinchMove}
@@ -477,6 +479,15 @@ const MultiCapture = () => {
           </FlipButton>
         </Viewfinder>
 
+        <PhotoLimitSlot>
+          <PhotoLimitStatus role="status">
+            사진 {shots.length}/{MAX_PIN_PHOTOS}장
+            {shots.length < MAX_PIN_PHOTOS
+              ? ` · ${MAX_PIN_PHOTOS - shots.length}장 더 촬영할 수 있어요`
+              : ' · 최대 사진 수에 도달했어요'}
+          </PhotoLimitStatus>
+        </PhotoLimitSlot>
+
         {status !== 'ready' && (
           <StatusOverlay>
             {status === 'starting' ? (
@@ -494,12 +505,6 @@ const MultiCapture = () => {
       </ViewfinderArea>
 
       <BottomPanel>
-        <PhotoLimitStatus role="status">
-          사진 {shots.length}/{MAX_PIN_PHOTOS}장
-          {shots.length < MAX_PIN_PHOTOS
-            ? ` · ${MAX_PIN_PHOTOS - shots.length}장 더 촬영할 수 있어요`
-            : ' · 최대 사진 수에 도달했어요'}
-        </PhotoLimitStatus>
         <ThumbnailStrip aria-label="촬영한 사진">
           {shots.map((shot, index) => (
             <ThumbnailButton
@@ -570,7 +575,7 @@ const BOTTOM_PANEL_HEIGHT = '173px'
 
 /* 뷰파인더와 썸네일 사이의 최소 간격. 남는 높이가 있으면 위아래로 나뉘어
    이보다 벌어지고, 화면이 짧으면 뷰파인더가 줄어 이 간격을 지킨다.
-   시안은 39. */
+   장수 문구가 이 사이 공간의 한가운데에 놓인다. 시안은 39. */
 const VIEWFINDER_GAP = '15px'
 
 const CaptureShell = styled.main`
@@ -589,9 +594,24 @@ const ViewfinderArea = styled.section`
   position: relative;
   flex: 1;
   min-height: 0;
-  padding-bottom: ${VIEWFINDER_GAP};
   display: flex;
-  /* 남는 높이를 위아래로 나눠 뷰파인더를 가운데 둔다. */
+  flex-direction: column;
+  align-items: center;
+`
+
+/* 뷰파인더 위쪽 몫. 아래 문구 자리와 같은 비율로 늘어나 뷰파인더가 가운데 온다. */
+const ViewfinderSpacer = styled.div`
+  flex: 1 1 0;
+  min-height: 0;
+`
+
+/* 뷰파인더와 썸네일 사이를 통째로 차지해, 그 한가운데에 문구를 둔다.
+   위쪽 몫과 같은 비율로 늘어나되 최소 간격만큼을 더 갖는다. 그래서 남는
+   높이가 얼마든 문구는 늘 두 영역 사이 정중앙에 온다. */
+const PhotoLimitSlot = styled.div`
+  flex: 1 0 ${VIEWFINDER_GAP};
+  align-self: stretch;
+  display: flex;
   align-items: center;
   justify-content: center;
 `
