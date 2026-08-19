@@ -828,34 +828,48 @@ const MapPage = () => {
           >
             {SHOW_ROUTE_ARROWS && <RoutePolyline path={routePath} />}
 
-            {mapPins.map((pin, index) => {
-              const isSelected = pin.pin_id === selectedPinId
+            {SHOW_ROUTE_ARROWS
+              ? mapPins.map((pin) => {
+                  const isSelected = pin.pin_id === selectedPinId
 
-              return (
-                <Marker
-                  key={pin.pin_id}
-                  position={{ lat: pin.latitude, lng: pin.longitude }}
-                  icon={
-                    isSelected
-                      ? centeredIcon(activePinIcon, ACTIVE_PIN_SIZE)
-                      : centeredIcon(pinIcon, PIN_SIZE)
-                  }
-                  title={pin.place_name || '이름 없는 장소'}
-                  label={
-                    SHOW_ROUTE_ARROWS
-                      ? undefined
-                      : {
-                          text: String(index + 1),
-                          color: isSelected ? '#ffffff' : '#6e5a4a',
-                          fontSize: '13px',
-                          fontWeight: '700',
-                        }
-                  }
-                  zIndex={isSelected ? 3 : 2}
-                  onClick={() => setSelectedPinId(pin.pin_id)}
-                />
-              )
-            })}
+                  return (
+                    <Marker
+                      key={pin.pin_id}
+                      position={{ lat: pin.latitude, lng: pin.longitude }}
+                      icon={
+                        isSelected
+                          ? centeredIcon(activePinIcon, ACTIVE_PIN_SIZE)
+                          : centeredIcon(pinIcon, PIN_SIZE)
+                      }
+                      title={pin.place_name || '이름 없는 장소'}
+                      zIndex={isSelected ? 3 : 2}
+                      onClick={() => setSelectedPinId(pin.pin_id)}
+                    />
+                  )
+                })
+              : mapPins.map((pin, index) => {
+                  const isSelected = pin.pin_id === selectedPinId
+
+                  return (
+                    <MapOverlay
+                      key={pin.pin_id}
+                      latitude={pin.latitude}
+                      longitude={pin.longitude}
+                      // 같은 자리에 겹치면 나중에 방문한 핀이 위에 보인다.
+                      zIndex={isSelected ? 1000 : 100 + index}
+                    >
+                      <SequencePin
+                        type="button"
+                        $selected={isSelected}
+                        title={pin.place_name || '이름 없는 장소'}
+                        aria-label={`${index + 1}번 핀: ${pin.place_name || '이름 없는 장소'}`}
+                        onClick={() => setSelectedPinId(pin.pin_id)}
+                      >
+                        {index + 1}
+                      </SequencePin>
+                    </MapOverlay>
+                  )
+                })}
 
             {currentPosition && (
               <Marker
@@ -880,6 +894,7 @@ const MapPage = () => {
                 <MapOverlay
                   latitude={selectedPin.latitude}
                   longitude={selectedPin.longitude}
+                  zIndex={2000}
                 >
                   <PopoverAnchor>
                     <PinPopover
@@ -1207,6 +1222,31 @@ const PopoverAnchor = styled.div`
   bottom: 31px;
   left: 0;
   transform: translateX(-50%);
+`
+
+/* 기본 마커의 label은 SVG 내부 원과 기준점이 달라 어긋난다. 숫자 핀을 직접
+   원으로 그려 좌표를 정확히 중심에 두고, 마커끼리 겹쳐도 z-index를 제어한다. */
+const SequencePin = styled.button`
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: ${({ $selected }) => ($selected ? '48px' : '38px')};
+  height: ${({ $selected }) => ($selected ? '48px' : '38px')};
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 3px solid var(--Surface-Base);
+  border-radius: 50%;
+  background: ${({ $selected }) =>
+    $selected ? 'var(--Primary-Cognac)' : 'var(--Map-Pin-Inactive)'};
+  box-shadow: var(--Effect-Marker);
+  color: var(--Text-Inverse);
+  font-family: var(--font-sans);
+  font-size: ${({ $selected }) => ($selected ? '16px' : '13px')};
+  font-weight: 700;
+  line-height: 1;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
 `
 
 const Scrim = styled.button`

@@ -11,7 +11,13 @@ import { useMap, useMapsLibrary } from '@vis.gl/react-google-maps'
  *
  * `<Map>` 안에서만 쓸 수 있다.
  */
-const MapOverlay = ({ latitude, longitude, children }) => {
+const MapOverlay = ({
+  latitude,
+  longitude,
+  zIndex,
+  interactive = true,
+  children,
+}) => {
   const map = useMap()
   const maps = useMapsLibrary('maps')
 
@@ -20,6 +26,11 @@ const MapOverlay = ({ latitude, longitude, children }) => {
     element.style.position = 'absolute'
     return element
   })
+
+  useEffect(() => {
+    container.style.zIndex = zIndex == null ? '' : String(zIndex)
+    container.style.pointerEvents = interactive ? 'auto' : 'none'
+  }, [container, interactive, zIndex])
 
   useEffect(() => {
     if (!map || !maps) return undefined
@@ -35,7 +46,7 @@ const MapOverlay = ({ latitude, longitude, children }) => {
      */
     overlay.onAdd = () => {
       overlay.getPanes()?.floatPane.appendChild(container)
-      maps.OverlayView.preventMapHitsAndGesturesFrom(container)
+      if (interactive) maps.OverlayView.preventMapHitsAndGesturesFrom(container)
     }
     overlay.onRemove = () => container.remove()
 
@@ -53,7 +64,7 @@ const MapOverlay = ({ latitude, longitude, children }) => {
     overlay.setMap(map)
 
     return () => overlay.setMap(null)
-  }, [container, latitude, longitude, map, maps])
+  }, [container, interactive, latitude, longitude, map, maps])
 
   return createPortal(children, container)
 }
