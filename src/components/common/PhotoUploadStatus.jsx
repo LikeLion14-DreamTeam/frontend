@@ -1,11 +1,25 @@
+import { useEffect, useState } from 'react'
 import styled from 'styled-components'
 
 const PhotoUploadStatus = ({ progress, className }) => {
+  const [dotCount, setDotCount] = useState(1)
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setDotCount((current) => (current % 3) + 1)
+    }, 500)
+
+    return () => window.clearInterval(timer)
+  }, [])
+
   if (!progress) return null
+
+  const label = progress.phase === 'attach' ? '핀에 사진 등록 중' : '사진 업로드 중'
 
   return (
     <Status className={className} role="status" aria-live="polite">
-      {progress.phase === 'attach' ? '핀에 사진 등록 중' : '사진 업로드 중'}…{' '}
+      {label}
+      <LoadingDots aria-hidden="true">{'.'.repeat(dotCount)}</LoadingDots>{' '}
       {progress.completed}/{progress.total}장 (
       {progress.batchIndex}/{progress.totalBatches})
     </Status>
@@ -20,4 +34,10 @@ const Status = styled.p`
   font: var(--text-ui-caption);
   text-align: center;
   word-break: keep-all;
+`
+
+const LoadingDots = styled.span`
+  display: inline-block;
+  width: 3ch;
+  text-align: left;
 `

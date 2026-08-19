@@ -214,6 +214,8 @@ const TripSegmentEdit = () => {
     return Boolean(date) && (date < startDate || date > endDate)
   }
 
+  const hasSelectablePin = pins.some((pin) => !isOutOfRange(pin))
+
   /** 선택이 바뀌면 기간을 첫 핀 · 마지막 핀 날짜로 맞춘다.
       기간을 직접 정한 뒤에는 그쪽이 기준이라 건드리지 않는다. */
   const selectPins = (ids) => {
@@ -253,10 +255,29 @@ const TripSegmentEdit = () => {
 
   /** 범위를 바꾸면 그 사이 핀만 선택 상태로 다시 맞춘다. */
   const applyRange = (startIndex, endIndex) => {
+    // 날짜를 직접 지정해 포함 핀이 없어진 경우 first/last index 는 -1 이다.
+    // 이 값을 slice 에 넘기면 -1 이 마지막 핀으로 해석되어 범위 밖 핀이
+    // 다시 선택되는 문제가 생긴다. 범위의 양 끝은 반드시 선택 가능한 핀이어야 한다.
+    if (
+      startIndex < 0 ||
+      endIndex < 0 ||
+      !pins[startIndex] ||
+      !pins[endIndex] ||
+      isOutOfRange(pins[startIndex]) ||
+      isOutOfRange(pins[endIndex])
+    ) {
+      return
+    }
+
     const [from, to] =
       startIndex <= endIndex ? [startIndex, endIndex] : [endIndex, startIndex]
 
-    selectPins(pins.slice(from, to + 1).map((pin) => pin.pin_id))
+    selectPins(
+      pins
+        .slice(from, to + 1)
+        .filter((pin) => !isOutOfRange(pin))
+        .map((pin) => pin.pin_id),
+    )
   }
 
   const togglePin = (pinId) => {
@@ -274,6 +295,13 @@ const TripSegmentEdit = () => {
     // 명세 4.3: 핀을 하나도 남기지 않고 전부 제외하면 VALIDATION_ERROR
     if (includedIds.length === 0) {
       setErrorMessage('핀을 최소 한 개는 남겨야 저장할 수 있습니다.')
+      return
+    }
+
+    // UI 이벤트 외의 경로로 상태가 바뀌더라도, 직접 지정한 기간 밖 핀을
+    // 저장 요청에 포함하지 않는다.
+    if (pins.some((pin) => includedSet.has(pin.pin_id) && isOutOfRange(pin))) {
+      setErrorMessage('선택한 기간 밖의 핀은 저장할 수 없습니다.')
       return
     }
 
@@ -403,6 +431,7 @@ const TripSegmentEdit = () => {
                     id="firstPin"
                     aria-label="첫 번째 핀"
                     value={pinOptions[firstIncludedIndex]?.value ?? ''}
+                    disabled={!hasIncludedPin || !hasSelectablePin}
                     onChange={(event) =>
                       applyRange(
                         pinOptions.findIndex(
@@ -412,6 +441,9 @@ const TripSegmentEdit = () => {
                       )
                     }
                   >
+                    <option value="" disabled hidden>
+                      핀을 선택해주세요
+                    </option>
                     {pinOptions.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
@@ -434,6 +466,7 @@ const TripSegmentEdit = () => {
                     id="lastPin"
                     aria-label="마지막 핀"
                     value={pinOptions[lastIncludedIndex]?.value ?? ''}
+                    disabled={!hasIncludedPin || !hasSelectablePin}
                     onChange={(event) =>
                       applyRange(
                         firstIncludedIndex,
@@ -443,6 +476,9 @@ const TripSegmentEdit = () => {
                       )
                     }
                   >
+                    <option value="" disabled hidden>
+                      핀을 선택해주세요
+                    </option>
                     {pinOptions.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}

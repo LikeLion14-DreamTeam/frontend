@@ -72,7 +72,12 @@ const PinSaveComplete = () => {
   const countryName = useRecordDraftStore((draft) => draft.countryName)
   const storedPlaceName = useRecordDraftStore((draft) => draft.placeName)
   const storedTextNote = useRecordDraftStore((draft) => draft.textNote)
+  const storedVoiceMemoFile = useRecordDraftStore((draft) => draft.voiceMemoFile)
+  const storedVoiceDurationSec = useRecordDraftStore(
+    (draft) => draft.voiceDurationSec,
+  )
   const setContext = useRecordDraftStore((draft) => draft.setContext)
+  const setVoiceMemo = useRecordDraftStore((draft) => draft.setVoiceMemo)
   const setLocationDetails = useRecordDraftStore(
     (draft) => draft.setLocationDetails,
   )
@@ -104,7 +109,10 @@ const PinSaveComplete = () => {
     startRecording,
     stopRecording,
     deleteRecording,
-  } = useVoiceRecorder()
+  } = useVoiceRecorder({
+    initialAudioFile: storedVoiceMemoFile,
+    initialDurationSec: storedVoiceDurationSec,
+  })
 
   const {
     index: photoIndex,
@@ -176,6 +184,11 @@ const PinSaveComplete = () => {
     window.addEventListener('keydown', closeOnEscape)
     return () => window.removeEventListener('keydown', closeOnEscape)
   }, [isVoiceSheetOpen, stopRecording, voiceStatus])
+
+  // 재촬영 화면을 거쳐도 음성 메모를 유지할 수 있도록 임시 기록에 함께 둔다.
+  useEffect(() => {
+    setVoiceMemo({ file: voiceFile, durationSec: voiceDurationSec })
+  }, [setVoiceMemo, voiceDurationSec, voiceFile])
 
   const handleOpenVoiceMemo = () => {
     setIsVoiceSheetOpen(true)

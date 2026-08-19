@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import styled from 'styled-components'
+import ConfirmationModal from '../../components/common/ConfirmationModal'
 import PhotoPreviewOverlay from '../../components/common/PhotoPreviewOverlay'
+import PhotoUploadStatus from '../../components/common/PhotoUploadStatus'
 import Tile from '../../components/common/Tile'
 import backIcon from '../../assets/icons/Back.svg'
 import {
@@ -13,6 +15,10 @@ import {
   addNearbyPhotos,
   describeRejected,
 } from '../../features/pins/nearbyPhotos'
+import {
+  PHOTO_UPLOAD_BATCH_SIZE,
+  getRemainingPhotoCapacity,
+} from '../../features/pins/photoUploadQueue'
 
 // 핀 상세를 거치지 않고 들어왔을 때를 위한 기본값.
 const FALLBACK_PIN_ID = 101
@@ -105,6 +111,7 @@ const AllPhotos = () => {
 
   const fileInputRef = useRef(null)
   const [isUploading, setIsUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(null)
   const [addResult, setAddResult] = useState(null)
   const [addError, setAddError] = useState('')
 
@@ -201,9 +208,27 @@ const AllPhotos = () => {
     setIsUploading(true)
     setAddError('')
     setAddResult(null)
+    const uploadableCount = Math.min(
+      files.length,
+      getRemainingPhotoCapacity(photos.length),
+    )
+    setUploadProgress(
+      uploadableCount > 0
+        ? {
+            phase: 'upload',
+            completed: 0,
+            total: uploadableCount,
+            batchIndex: 1,
+            totalBatches: Math.ceil(uploadableCount / PHOTO_UPLOAD_BATCH_SIZE),
+          }
+        : null,
+    )
 
     try {
-      const result = await addNearbyPhotos(pinID, files)
+      const result = await addNearbyPhotos(pinID, files, {
+        currentPhotoCount: photos.length,
+        onProgress: setUploadProgress,
+      })
       setAddResult(result)
 
       const photoList = await getPinPhotos(pinID)
@@ -212,6 +237,7 @@ const AllPhotos = () => {
       setAddError(error.message)
     } finally {
       setIsUploading(false)
+      setUploadProgress(null)
     }
   }
 
@@ -236,9 +262,18 @@ const AllPhotos = () => {
 
         <ToolbarActions>
           {isSelectMode ? (
-            <ToolbarButton type="button" onClick={exitSelectMode}>
-              취소
-            </ToolbarButton>
+            <>
+              <ToolbarButton type="button" onClick={exitSelectMode}>
+                취소
+              </ToolbarButton>
+              <DeleteSelectionButton
+                type="button"
+                onClick={() => setIsConfirmingDelete(true)}
+                disabled={selectedIds.length === 0}
+              >
+                {selectedIds.length}장 삭제
+              </DeleteSelectionButton>
+            </>
           ) : (
             <>
               <ToolbarButton
@@ -272,9 +307,10 @@ const AllPhotos = () => {
 
       {/* 안내가 떠도 아래가 밀리지 않도록 자리를 늘 비워둔다. */}
       <NoticeSlot>
+        {isUploading && <PhotoUploadStatus progress={uploadProgress} />}
         {addError && <Notice role="alert">{addError}</Notice>}
 
-        {!addError && addResult && (
+        {!isUploading && !addError && addResult && (
           <Notice role="status">{describeAddResult(addResult)}</Notice>
         )}
       </NoticeSlot>
@@ -327,36 +363,20 @@ const AllPhotos = () => {
         </PhotoGroups>
       )}
 
-      {isSelectMode && (
-        <SelectionBar>
-          <SelectionCount>{selectedIds.length}장 선택됨</SelectionCount>
-
-          {isConfirmingDelete ? (
-            <>
-              {/* 대표사진이 지워지면 서버가 남은 사진에서 대체 1장을 채운다. */}
-              <ConfirmText>
-                선택한 사진을 삭제할까요? 되돌릴 수 없고, 대표사진이 포함돼
-                있으면 추천이 다시 계산됩니다.
-              </ConfirmText>
-              <DeleteButton
-                type="button"
-                onClick={handleDeleteSelected}
-                disabled={isDeleting}
-              >
-                {isDeleting ? '삭제 중...' : '삭제'}
-              </DeleteButton>
-            </>
-          ) : (
-            <DeleteButton
-              type="button"
-              onClick={() => setIsConfirmingDelete(true)}
-              disabled={selectedIds.length === 0}
-            >
-              삭제
-            </DeleteButton>
-          )}
-        </SelectionBar>
-      )}
+      <ConfirmationModal
+        open={isConfirmingDelete}
+        title={`선택한 사진 ${selectedIds.length}장을 삭제할까요?`}
+        confirmLabel={isDeleting ? '삭제 중...' : `${selectedIds.length}장 삭제하기`}
+        confirmDisabled={isDeleting}
+        cancelDisabled={isDeleting}
+        onConfirm={handleDeleteSelected}
+        onCancel={() => setIsConfirmingDelete(false)}
+      >
+        {/* 대표사진이 지워지면 서버가 남은 사진에서 대체 1장을 채운다. */}
+        <DeleteConfirmText>
+          되돌릴 수 없고, 대표사진이 포함돼 있으면 추천이 다시 계산됩니다.
+        </DeleteConfirmText>
+      </ConfirmationModal>
 
       {/* 선택 모드에서는 고르는 게 우선이라 크게 보기를 띄우지 않는다. */}
       {!isSelectMode && previewIndex >= 0 && (
@@ -457,6 +477,10 @@ const AddNearbyButton = styled.button`
     color: var(--State-Disabled-Text);
     cursor: not-allowed;
   }
+`
+
+const DeleteSelectionButton = styled(ToolbarButton)`
+  color: var(--Primary-Cognac);
 `
 
 const Heading = styled.div`
@@ -592,45 +616,10 @@ const Notice = styled.p`
   text-overflow: ellipsis;
 `
 
-const SelectionBar = styled.div`
-  position: sticky;
-  bottom: 0;
-  width: 354px;
-  margin-top: 30px;
-  border: 1px solid var(--Primary-Cognac);
-  border-radius: 12px;
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  background: rgb(181 118 59 / 9%);
-`
-
-const SelectionCount = styled.p`
-  color: var(--Text-Primary);
-  font: var(--text-ui-label);
-`
-
-const ConfirmText = styled.p`
+const DeleteConfirmText = styled.p`
   color: var(--Text-Secondary);
-  font: var(--text-ui-caption);
   word-break: keep-all;
-`
-
-const DeleteButton = styled.button`
-  min-height: 44px;
-  border: 0;
-  border-radius: 22px;
-  background: var(--Primary-Cognac);
-  color: var(--Text-Inverse);
-  font: var(--text-ui-button);
-  cursor: pointer;
-
-  &:disabled {
-    background: var(--State-Disabled-Fill);
-    color: var(--State-Disabled-Text);
-    cursor: not-allowed;
-  }
+  font: var(--text-ui-body-m);
 `
 
 const StateMessage = styled.p`

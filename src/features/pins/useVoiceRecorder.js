@@ -17,7 +17,9 @@ const getAudioExtension = (mimeType) =>
   mimeType.includes('mp4') ? 'm4a' : 'webm'
 
 /** 브라우저 MediaRecorder를 이용한 핀 음성 메모 녹음 상태를 관리한다. */
-const useVoiceRecorder = () => {
+const useVoiceRecorder = (
+  { initialAudioFile = null, initialDurationSec = 0 } = {},
+) => {
   const recorderRef = useRef(null)
   const streamRef = useRef(null)
   const chunksRef = useRef([])
@@ -29,10 +31,16 @@ const useVoiceRecorder = () => {
   const cancelRequestedRef = useRef(false)
   const isStartingRef = useRef(false)
 
-  const [status, setStatus] = useState('idle')
-  const [durationSec, setDurationSec] = useState(0)
-  const [audioFile, setAudioFile] = useState(null)
-  const [audioUrl, setAudioUrl] = useState('')
+  const [status, setStatus] = useState(
+    initialAudioFile ? 'recorded' : 'idle',
+  )
+  const [durationSec, setDurationSec] = useState(initialDurationSec)
+  const [audioFile, setAudioFile] = useState(initialAudioFile)
+  const [audioUrl, setAudioUrl] = useState(() => {
+    const url = initialAudioFile ? URL.createObjectURL(initialAudioFile) : ''
+    audioUrlRef.current = url
+    return url
+  })
   const [errorMessage, setErrorMessage] = useState('')
 
   const stopTimer = useCallback(() => {
