@@ -1171,6 +1171,8 @@ export const getDemoPinPhotos = (pinId) => {
 export const getMcmDemoPinPhotos = (pinId) =>
   isMcmDemoPinId(pinId) ? getDemoPinPhotos(pinId) : null
 
+const MAX_PIN_PHOTOS = 50
+
 export const addDemoPinPhotos = (pinId, photos, resolveFilePath) => {
   if (!isDemoPinId(pinId)) return null
 
@@ -1182,6 +1184,14 @@ export const addDemoPinPhotos = (pinId, photos, resolveFilePath) => {
   const rejected = []
 
   photos.forEach((photo) => {
+    if (stored.length >= MAX_PIN_PHOTOS) {
+      rejected.push({
+        file_id: photo.file_id,
+        reason: 'PIN_PHOTO_LIMIT_EXCEEDED',
+      })
+      return
+    }
+
     const filePath = resolveFilePath?.(photo.file_id) ?? photo.file_id
 
     if (!filePath) {

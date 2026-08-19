@@ -4,6 +4,7 @@ import styled from 'styled-components'
 import { uploadAudio } from '../../api/uploads'
 import Button from '../../components/common/Button'
 import ConfirmationModal from '../../components/common/ConfirmationModal'
+import PhotoUploadStatus from '../../components/common/PhotoUploadStatus'
 import { createPin, deletePin } from '../../features/pins/pinApi'
 import PhotoPreviewOverlay, {
   PreviewDeleteButton,
@@ -14,6 +15,10 @@ import {
   uploadCapturedPhotos,
 } from '../../features/pins/recordPhotos'
 import { reverseGeocode } from '../../features/pins/reverseGeocode'
+import {
+  MAX_PIN_PHOTOS,
+  getRemainingPhotoCapacity,
+} from '../../features/pins/photoUploadQueue'
 import useVoiceRecorder, {
   formatVoiceDuration,
 } from '../../features/pins/useVoiceRecorder'
@@ -71,6 +76,9 @@ const ManualPinDetails = () => {
   const [saveError, setSaveError] = useState('')
   /** 일부만 올라갔을 때 물어보려고 들고 있는 `{ total, uploaded }`. */
   const [partialUpload, setPartialUpload] = useState(null)
+  const [registrationResult, setRegistrationResult] = useState(null)
+  const [photoMessage, setPhotoMessage] = useState('')
+  const [uploadProgress, setUploadProgress] = useState(null)
   const [resolvedPlace, setResolvedPlace] = useState(null)
   const locationRequestRef = useRef(null)
   const photoInputRef = useRef(null)
@@ -142,8 +150,13 @@ const ManualPinDetails = () => {
   }, [isVoiceSheetOpen, stopRecording, voiceStatus])
 
   const handlePhotoSelection = (event) => {
-    const selectedPhotos = Array.from(event.target.files ?? [])
-      .filter((file) => file.type.startsWith('image/'))
+    const imageFiles = Array.from(event.target.files ?? []).filter((file) =>
+      file.type.startsWith('image/'),
+    )
+    const remainingCapacity = getRemainingPhotoCapacity(photos.length)
+    const acceptedFiles = imageFiles.slice(0, remainingCapacity)
+    const overflowCount = imageFiles.length - acceptedFiles.length
+    const selectedPhotos = acceptedFiles
       .map((file) => ({
         id: `${file.name}-${file.lastModified}-${
           crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`
@@ -159,6 +172,12 @@ const ManualPinDetails = () => {
       hasAllowedPartialSaveRef.current = false
     }
 
+    setPhotoMessage(
+      overflowCount > 0
+        ? `최대 ${MAX_PIN_PHOTOS}장까지 추가할 수 있어 ${acceptedFiles.length}장만 추가했어요.`
+        : '',
+    )
+
     event.target.value = ''
   }
 
@@ -172,6 +191,8 @@ const ManualPinDetails = () => {
     const remaining = photos.filter((photo) => photo.id !== removed.id)
 
     setPhotos(remaining)
+    hasAllowedPartialSaveRef.current = false
+    setPhotoMessage('')
     setPreviewIndex(previewIndex < remaining.length ? previewIndex : -1)
   }
 
@@ -206,6 +227,7 @@ const ManualPinDetails = () => {
 
     setIsSaving(true)
     setSaveError('')
+    setUploadProgress(null)
 
     try {
       if (
@@ -224,7 +246,7 @@ const ManualPinDetails = () => {
       if (photos.length > 0 && !hasAllowedPartialSaveRef.current) {
         uploadedPhotosRef.current = await uploadCapturedPhotos(
           photos,
-          { latitude, longitude },
+          { latitude, longitude, onProgress: setUploadProgress },
           uploadedPhotosRef.current,
         )
       }
@@ -278,10 +300,19 @@ const ManualPinDetails = () => {
           const photoResult = await attachUploadedPhotos(
             createdPinIdRef.current,
             uploadedPhotos,
+            { onProgress: setUploadProgress },
           )
 
           if ((photoResult.added?.length ?? 0) === 0) {
             throw new Error('사진을 핀에 등록하지 못했습니다.')
+          }
+
+          if (photoResult.added.length < uploadedPhotos.length) {
+            setRegistrationResult({
+              total: photos.length,
+              added: photoResult.added.length,
+            })
+            return
           }
         } catch (error) {
           // 지우는 것까지 실패해도 알릴 것은 원래 오류다.
@@ -298,6 +329,7 @@ const ManualPinDetails = () => {
       )
     } finally {
       setIsSaving(false)
+      setUploadProgress(null)
     }
   }
 
@@ -312,6 +344,12 @@ const ManualPinDetails = () => {
   const handleRetryMissingPhotos = () => {
     setPartialUpload(null)
     void handleSave()
+  }
+
+  const handleViewPartiallySavedPin = () => {
+    const pinId = createdPinIdRef.current
+    setRegistrationResult(null)
+    navigate(pinId ? `/map/pin/${pinId}` : '/map', { replace: true })
   }
 
   return (
@@ -379,7 +417,13 @@ const ManualPinDetails = () => {
         </DateFields>
 
         <PhotoSection>
-          <FieldLabel>사진</FieldLabel>
+          <PhotoLabelRow>
+            <FieldLabel>사진</FieldLabel>
+            <PhotoCapacity>
+              {photos.length}/{MAX_PIN_PHOTOS} ·{' '}
+              {getRemainingPhotoCapacity(photos.length)}장 더 추가할 수 있어요
+            </PhotoCapacity>
+          </PhotoLabelRow>
           <HiddenPhotoInput
             ref={photoInputRef}
             type="file"
@@ -406,6 +450,7 @@ const ManualPinDetails = () => {
                 <AddMorePhotoButton
                   type="button"
                   onClick={() => photoInputRef.current?.click()}
+                  disabled={photos.length >= MAX_PIN_PHOTOS || isSaving}
                 >
                   <AddPhotoIcon src={photoAddIcon} alt="" aria-hidden="true" />
                   더 추가
@@ -416,11 +461,14 @@ const ManualPinDetails = () => {
             <AddPhotoButton
               type="button"
               onClick={() => photoInputRef.current?.click()}
+              disabled={isSaving}
             >
               <AddPhotoIcon src={photoAddIcon} alt="" aria-hidden="true" />
               <span>사진 추가</span>
             </AddPhotoButton>
           )}
+          {photoMessage && <PhotoMessage role="status">{photoMessage}</PhotoMessage>}
+          {isSaving && <PhotoUploadStatus progress={uploadProgress} />}
         </PhotoSection>
 
         <NoteField>
@@ -469,6 +517,26 @@ const ManualPinDetails = () => {
             `${partialUpload.total}장 중 ${partialUpload.uploaded}장이 올라갔어요. 이대로 저장하면 나머지 ${
               partialUpload.total - partialUpload.uploaded
             }장은 핀에 들어가지 않습니다.`}
+        </PartialUploadNotice>
+      </ConfirmationModal>
+
+      <ConfirmationModal
+        open={Boolean(registrationResult)}
+        title="일부 사진만 저장됐어요"
+        confirmLabel="지도로 이동"
+        cancelLabel="핀에서 확인"
+        closeOnBackdrop={false}
+        onConfirm={() => {
+          setRegistrationResult(null)
+          navigate('/map', { replace: true })
+        }}
+        onCancel={handleViewPartiallySavedPin}
+      >
+        <PartialUploadNotice>
+          {registrationResult &&
+            `${registrationResult.total}장 중 ${registrationResult.added}장이 핀에 저장됐어요. 나머지 ${
+              registrationResult.total - registrationResult.added
+            }장은 저장하지 못했습니다.`}
         </PartialUploadNotice>
       </ConfirmationModal>
 
@@ -784,6 +852,24 @@ const PhotoSection = styled.section`
   display: flex;
   flex-direction: column;
   gap: 7px;
+`
+
+const PhotoLabelRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+`
+
+const PhotoCapacity = styled.span`
+  color: var(--Text-Secondary);
+  font: var(--text-ui-caption);
+`
+
+const PhotoMessage = styled.p`
+  margin: 0;
+  color: var(--Text-Secondary);
+  font: var(--text-ui-caption);
 `
 
 const AddPhotoButton = styled.button`

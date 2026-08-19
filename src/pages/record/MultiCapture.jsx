@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import styled, { createGlobalStyle } from 'styled-components'
 import ConfirmationModal from '../../components/common/ConfirmationModal'
+import { MAX_PIN_PHOTOS } from '../../features/pins/photoUploadQueue'
 import PhotoPreviewOverlay, {
   PreviewDeleteButton,
 } from '../../components/common/PhotoPreviewOverlay'
@@ -315,7 +316,7 @@ const MultiCapture = () => {
 
   const handleShutter = () => {
     const video = videoRef.current
-    if (!video || status !== 'ready') return
+    if (!video || status !== 'ready' || shots.length >= MAX_PIN_PHOTOS) return
 
     // 원본 프레임에서 3:4 영역만 가운데 기준으로 잘라낸다.
     // 뷰파인더가 object-fit: cover 라 화면에 보이던 영역과 동일하다.
@@ -349,18 +350,22 @@ const MultiCapture = () => {
       (blob) => {
         if (!blob) return
 
-        setShots((prev) => [
-          ...prev,
-          {
-            id: crypto.randomUUID?.() ?? `${Date.now()}-${blob.size}`,
-            url: URL.createObjectURL(blob),
-            file: new File([blob], `orte-${Date.now()}.jpg`, {
-              type: blob.type,
-              lastModified: Date.now(),
-            }),
-            capturedAt: new Date().toISOString(),
-          },
-        ])
+        setShots((prev) => {
+          if (prev.length >= MAX_PIN_PHOTOS) return prev
+
+          return [
+            ...prev,
+            {
+              id: crypto.randomUUID?.() ?? `${Date.now()}-${blob.size}`,
+              url: URL.createObjectURL(blob),
+              file: new File([blob], `orte-${Date.now()}.jpg`, {
+                type: blob.type,
+                lastModified: Date.now(),
+              }),
+              capturedAt: new Date().toISOString(),
+            },
+          ]
+        })
       },
       'image/jpeg',
       JPEG_QUALITY,
@@ -489,6 +494,12 @@ const MultiCapture = () => {
       </ViewfinderArea>
 
       <BottomPanel>
+        <PhotoLimitStatus role="status">
+          사진 {shots.length}/{MAX_PIN_PHOTOS}장
+          {shots.length < MAX_PIN_PHOTOS
+            ? ` · ${MAX_PIN_PHOTOS - shots.length}장 더 촬영할 수 있어요`
+            : ' · 최대 사진 수에 도달했어요'}
+        </PhotoLimitStatus>
         <ThumbnailStrip aria-label="촬영한 사진">
           {shots.map((shot, index) => (
             <ThumbnailButton
@@ -511,7 +522,7 @@ const MultiCapture = () => {
             type="button"
             aria-label="촬영"
             onClick={handleShutter}
-            disabled={status !== 'ready'}
+            disabled={status !== 'ready' || shots.length >= MAX_PIN_PHOTOS}
           />
 
           <TextButton
@@ -736,6 +747,13 @@ const BottomPanel = styled.section`
   padding: 0 24px calc(20px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
+`
+
+const PhotoLimitStatus = styled.p`
+  margin: 0;
+  color: var(--Surface-Base);
+  font: var(--text-ui-caption);
+  text-align: center;
 `
 
 /* 첫 장은 본문 여백(24)에 맞춰 시작하지만, 넘기면 화면 끝까지 흘러가며 잘린다.

@@ -19,6 +19,10 @@ import {
 } from '../demo/demoJourneyData'
 import { getMockPinLocation } from '../trips/tripMock'
 import { mockPinStore } from './pinMock'
+import {
+  MAX_PIN_PHOTOS,
+  PHOTO_UPLOAD_BATCH_SIZE,
+} from './photoUploadQueue'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK_API === 'true'
 const REPRESENTATIVE_PHOTO_CACHE_KEY = 'orte:representative-photos:v1'
@@ -426,6 +430,14 @@ const PHOTO_RADIUS_METERS = 1000
  * file_id 는 `api/uploads` 의 2단계 업로드로 먼저 받아둔다.
  */
 export const addPinPhotos = async (pinId, photos) => {
+  if (photos.length > PHOTO_UPLOAD_BATCH_SIZE) {
+    throw new ApiError({
+      status: 400,
+      code: 'BATCH_SIZE_EXCEEDED',
+      message: `사진은 한 번에 최대 ${PHOTO_UPLOAD_BATCH_SIZE}장까지 등록할 수 있습니다.`,
+    })
+  }
+
   if (isDemoPinId(pinId)) {
     const result = addDemoPinPhotos(
       pinId,
@@ -446,6 +458,14 @@ export const addPinPhotos = async (pinId, photos) => {
     const stored = mockPinStore.photos[pinId] ?? []
 
     photos.forEach((photo) => {
+      if (stored.length >= MAX_PIN_PHOTOS) {
+        rejected.push({
+          file_id: photo.file_id,
+          reason: 'PIN_PHOTO_LIMIT_EXCEEDED',
+        })
+        return
+      }
+
       const isLocationlessCapture =
         pin.latitude == null &&
         pin.longitude == null &&
