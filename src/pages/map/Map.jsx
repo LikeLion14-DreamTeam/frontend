@@ -18,7 +18,6 @@ import activePinIcon from '../../assets/map/map-pin-active.svg'
 import pinIcon from '../../assets/map/map-pin.svg'
 import myLocationIcon from '../../assets/map/my-location.svg'
 import recordPlusIcon from '../../assets/map/record-plus.png'
-import tripAvatar from '../../assets/map/trip-avatar.svg'
 import tripSelectChevron from '../../assets/icons/trip-select-chevron.svg'
 import {
   getPinsByCountry,
@@ -45,6 +44,21 @@ const CURRENT_POSITION_ZOOM = 17
 /* 진행 중인 여행은 TRAVEL_SEGMENT 가 없어 segment_id 로 못 고른다.
    목록에서 구분하려고 쓰는 프론트 전용 값이다. */
 const ONGOING_TRIP_ID = 'ongoing'
+
+// 종료 여정은 최근에 끝난 순으로 보여 준다. 예시 데이터는 실제 여정 뒤에 둔다.
+const sortEndedTrips = (trips) =>
+  [...trips].sort((left, right) => {
+    if (Boolean(left.is_demo) !== Boolean(right.is_demo)) {
+      return left.is_demo ? 1 : -1
+    }
+
+    const getEndedAt = (trip) => {
+      const timestamp = new Date(trip.end_at ?? trip.start_at ?? 0).getTime()
+      return Number.isNaN(timestamp) ? 0 : timestamp
+    }
+
+    return getEndedAt(right) - getEndedAt(left)
+  })
 
 // 아이콘 파일의 원본 크기. 정중앙을 좌표에 맞추는 데 쓴다.
 const PIN_SIZE = { width: 38, height: 38 }
@@ -439,11 +453,13 @@ const MapPage = () => {
 
         if (ignore) return
 
-        const ended = list.map((trip, index) => ({
-          ...trip,
-          pin_count: summaries[index]?.pin_count,
-          photo_count: summaries[index]?.photo_count,
-        }))
+        const ended = sortEndedTrips(
+          list.map((trip, index) => ({
+            ...trip,
+            pin_count: summaries[index]?.pin_count,
+            photo_count: summaries[index]?.photo_count,
+          })),
+        )
 
         const options =
           ongoing.pins.length > 0
@@ -891,7 +907,7 @@ const MapPage = () => {
         }}
       >
         <TripSelectorInner>
-          <TripAvatar src={tripAvatar} alt="" />
+          <TripAvatar src="/favicon-32x32.png" alt="" />
           <TripName>
             {isCountryFilterMode
               ? countryName || countryCode
@@ -1066,7 +1082,9 @@ const TripSelectorInner = styled.span`
 const TripAvatar = styled.img`
   width: 28px;
   height: 28px;
+  padding: 6px;
   flex: 0 0 auto;
+  object-fit: contain;
 `
 
 const TripName = styled.span`
