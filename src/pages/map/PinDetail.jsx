@@ -644,7 +644,8 @@ const PinDetail = () => {
                       disabled={!audioSrc}
                     />
 
-                    {/* 재생 전에도 길이를 보여줘야 해서 정보만 미리 받는다. */}
+                    {/* 길이를 보내기 전에 만든 핀은 5.1 이 0 을 주므로, 그때만
+                        파일 머리말에서 읽어 채운다. 재생에도 이 요소를 쓴다. */}
                     <audio
                       ref={audioRef}
                       src={audioSrc ?? undefined}

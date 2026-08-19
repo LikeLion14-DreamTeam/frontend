@@ -21,6 +21,8 @@ const INITIAL_PLAYER = {
   pinId: null,
   isPlaying: false,
   progress: 0,
+  /** 지금까지 들은 길이(초). 재생 막대에 `지난 시간 / 전체 길이` 로 나온다. */
+  position: 0,
   duration: 0,
 }
 
@@ -404,6 +406,7 @@ const TripArchive = () => {
               pinId: pin.id,
               isPlaying: true,
               progress: 0.32,
+              position: (pin.voiceMemo?.duration ?? 0) * 0.32,
               duration: pin.voiceMemo?.duration ?? 0,
             },
       )
@@ -435,6 +438,7 @@ const TripArchive = () => {
       pinId: pin.id,
       isPlaying: false,
       progress: 0,
+      position: 0,
       duration: pin.voiceMemo.duration,
     })
 
@@ -455,14 +459,16 @@ const TripArchive = () => {
       const progress = duration > 0 ? audio.currentTime / duration : 0
 
       setPlayer((current) =>
-        current.pinId === pin.id ? { ...current, progress } : current,
+        current.pinId === pin.id
+          ? { ...current, progress, position: audio.currentTime }
+          : current,
       )
     })
 
     audio.addEventListener('ended', () => {
       setPlayer((current) =>
         current.pinId === pin.id
-          ? { ...current, isPlaying: false, progress: 0 }
+          ? { ...current, isPlaying: false, progress: 0, position: 0 }
           : current,
       )
     })
@@ -610,12 +616,20 @@ const TripArchive = () => {
                           voiceMemo={
                             pin.voiceMemo
                               ? {
+                                  /* 6.2 가 준 길이를 그대로 쓴다. 길이를
+                                     보내기 전에 만든 핀은 0 으로 오는데,
+                                     그때만 재생하며 읽은 값으로 채운다. */
                                   duration:
-                                    isCurrentVoice && player.duration > 0
-                                      ? player.duration
-                                      : pin.voiceMemo.duration,
+                                    pin.voiceMemo.duration ||
+                                    (isCurrentVoice ? player.duration : 0),
                                   progress: isCurrentVoice
                                     ? player.progress
+                                    : 0,
+                                  /* 아직 안 들은 핀은 0 부터 보여준다.
+                                     빈칸으로 두면 전체 길이만 나와, 재생을
+                                     누른 순간 표시 모양이 바뀐다. */
+                                  position: isCurrentVoice
+                                    ? player.position
                                     : 0,
                                   isPlaying:
                                     isCurrentVoice && player.isPlaying,
