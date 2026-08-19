@@ -564,7 +564,7 @@ const Page = styled.main`
   /* 시안의 y=58 은 이미 안전영역 아래라 그만큼 뺀다. */
   padding: calc(58px - var(--design-safe-top)) 24px 87px;
   overflow-x: hidden;
-  background: #f5eee4;
+  background: var(--Background-Base);
 `
 
 const Brand = styled.header`
