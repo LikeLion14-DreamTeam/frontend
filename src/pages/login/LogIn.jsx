@@ -116,7 +116,7 @@ export default Login
 const LoginWrapper = styled.main`
   position: relative;
   width: 100%;
-  max-width: 402px;
+  max-width: 450px;
   height: var(--app-viewport-height);
   min-height: 0;
   margin: 0 auto;
@@ -177,8 +177,8 @@ const PhotoBaseImage = styled.img`
   position: absolute;
   top: -55.19%;
   left: 0;
-  width: 99.99%;
-  height: 196.26%;
+  width: 100%;
+  height: auto;
   max-width: none;
 `
 
@@ -195,9 +195,9 @@ const PhotoOverlay = styled.div`
 const PhotoOverlayImage = styled.img`
   position: absolute;
   top: 0;
-  left: 0.08%;
-  width: 99.92%;
-  height: 126.49%;
+  left: 0;
+  width: 100%;
+  height: auto;
   max-width: none;
 `
 
@@ -214,7 +214,7 @@ const LoginArea = styled.section`
 
 const GoogleButton = styled.div`
   position: relative;
-  width: 330px;
+  width: min(330px, calc(100% - 48px));
   height: 56px;
 `
 
@@ -251,7 +251,7 @@ const GoogleButtonArea = styled.div`
 `
 
 const LoginButton = styled.button`
-  width: 330px;
+  width: min(330px, calc(100% - 48px));
   height: 56px;
   border: 0;
   border-radius: 20px;
