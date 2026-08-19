@@ -13,8 +13,9 @@ const ROUTE_COLOR = '#c99a45'
  *
  * 삼각형과 달리 닫지(`Z`) 않는다. 두 획만 남아 선의 일부처럼 읽힌다.
  */
-const ARROW_LENGTH = 5
-const ARROW_WIDTH = 5
+// 일반 구간은 기존 크기를 유지하고, 가까운 핀 사이에서만 아래 scale을 적용한다.
+const ARROW_LENGTH = 6
+const ARROW_WIDTH = 6
 const ARROW_PATH = [
   `M ${-ARROW_WIDTH / 2} ${ARROW_LENGTH / 2}`,
   `L 0 ${-ARROW_LENGTH / 2}`,
@@ -33,7 +34,8 @@ const getLegScreenDistance = ([from, to], view) => {
   const toPoint = view.projection.fromLatLngToPoint(to)
   if (!fromPoint || !toPoint) return Infinity
 
-  const worldSize = 256 * 2 ** view.zoom
+  // 점 좌표 자체가 확대 전 256px 기준이므로, 줌에 따른 배율만 곱한다.
+  const worldSize = 2 ** view.zoom
   // 날짜 변경선 양쪽도 실제로 가까운 거리로 재야 한다.
   const xDistance = Math.min(
     Math.abs(toPoint.x - fromPoint.x),
@@ -118,7 +120,7 @@ const buildDirectionArrow = (leg, scale) => [
          기본값(각진 끝, 뾰족한 이음매)으로 그려진다. */
       strokeColor: ROUTE_COLOR,
       strokeOpacity: 1,
-      strokeWeight: 2.5 * scale,
+      strokeWeight: 3 * scale,
       fillOpacity: 0,
       rotation: getBearing(leg),
       scale,
