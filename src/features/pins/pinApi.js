@@ -215,9 +215,13 @@ export const createPin = async ({
     country_name: countryName,
     place_name: placeName,
     text_note: textNote,
-    audio_file: audioFile ?? null,
-    // 음성이 없으면 길이도 없다.
-    duration_sec: audioFile ? getDurationSec(voiceDurationSec) : null,
+  }
+
+  // 음성 파일이나 재생 길이를 알 수 없을 때는 키 자체를 보내지 않는다.
+  // null 을 명시하면 서버가 유효하지 않은 음성 값으로 해석한다.
+  if (audioFile) {
+    pinPayload.audio_file = audioFile
+    pinPayload.duration_sec = getDurationSec(voiceDurationSec)
   }
 
   if (USE_MOCK) {
