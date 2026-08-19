@@ -615,8 +615,10 @@ const ArrowButton = styled.button`
   &:disabled { opacity: 0.2; cursor: default; }
 `
 
+/* 402 로 묶어 두면 그보다 넓은 기기에서 좌우가 뜬다. 시트는 화면 아래에
+   붙는 것이라 가장자리까지 닿아야 해서 앱 공통 상한(450)까지 늘린다. */
 const TemplateSheet = styled(SnapSheet)`
-  width: min(100%, 402px);
+  width: min(100%, 450px);
   left: 50%;
   z-index: 4;
   padding: 0 0 20px;
