@@ -77,7 +77,7 @@ const DEMO_JOURNEYS = [
     segmentId: MCM_DEMO_SEGMENT_ID,
     photobookId: MCM_DEMO_PHOTOBOOK_ID,
     slug: 'mcm',
-    name: 'MCM 여정',
+    name: 'MCM',
     stampCode: MCM_DEMO_STAMP_CODE,
     stampName: 'MCM',
     stampImageId: 'MCM',
@@ -472,6 +472,17 @@ const applyDkmAllAboutUpdates = (state) => {
   return state
 }
 
+// 이미 저장된 예시 데이터도 새 표시 이름으로 맞춘다. 사용자가 임의로 바꾼 이름은 보존한다.
+const applyDemoJourneyNameUpdates = (state) => {
+  const mcmTrip = state.trips?.[MCM_DEMO_SEGMENT_ID]
+  if (mcmTrip?.name === 'MCM 여정') mcmTrip.name = 'MCM'
+
+  const mcmPhotobook = state.photobooks?.[MCM_DEMO_PHOTOBOOK_ID]
+  if (mcmPhotobook?.name === 'MCM 여정') mcmPhotobook.name = 'MCM'
+
+  return state
+}
+
 const createInitialState = () => {
   const pinGroups = {
     [MCM_DEMO_SEGMENT_ID]: createMcmPins(),
@@ -666,8 +677,10 @@ const loadInitialState = () => {
     const saved = JSON.parse(storage.getItem(DEMO_JOURNEY_STORAGE_KEY))
     if (saved?.state && saved.version === 2) {
       const state = reviveAssetUrls(
-        applyDkmAllAboutUpdates(
-          applySeededDkmPhotobookPins(applySeededDkmCoordinates(saved.state)),
+        applyDemoJourneyNameUpdates(
+          applyDkmAllAboutUpdates(
+            applySeededDkmPhotobookPins(applySeededDkmCoordinates(saved.state)),
+          ),
         ),
       )
       if (seedPersistedRepresentativePhotos(state)) {
@@ -702,7 +715,9 @@ const loadInitialState = () => {
         },
       )
       return reviveAssetUrls(
-        applyDkmAllAboutUpdates(applySeededDkmCoordinates(state)),
+        applyDemoJourneyNameUpdates(
+          applyDkmAllAboutUpdates(applySeededDkmCoordinates(state)),
+        ),
       )
     }
 
