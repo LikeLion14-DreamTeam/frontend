@@ -15,6 +15,7 @@ import {
   updatePhotobookName,
 } from '../../features/photobooks/photobookApi'
 import { getCachedRepresentativePhotos } from '../../features/pins/pinApi'
+import { getTripPins } from '../../features/trips/tripApi'
 
 const INITIAL_PLAYER = {
   pinId: null,
@@ -198,6 +199,8 @@ const TripArchive = () => {
   const audioPinIdRef = useRef(null)
   const nameInputRef = useRef(null)
   const [photobook, setPhotobook] = useState(null)
+  /** 지도용 구간 핀 전체(4.5). 아래 도시별 목록은 그대로 6.2 를 쓴다. */
+  const [segmentPins, setSegmentPins] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
   const [player, setPlayer] = useState(INITIAL_PLAYER)
@@ -257,16 +260,70 @@ const TripArchive = () => {
     [photobook],
   )
 
-  const mapPins = useMemo(
-    () =>
-      (archive?.pins ?? []).filter(hasCoordinates).map((pin) => ({
-        id: pin.id,
-        name: pin.placeName,
-        lat: pin.latitude,
-        lng: pin.longitude,
-      })),
-    [archive],
-  )
+  /*
+   * 지도에 쓸 구간 핀 전체(4.5).
+   *
+   * 6.2 는 도시마다 핀을 일부만 실어 주기 때문에(`city.pin_count` 와
+   * `city.pins.length` 가 다를 수 있다) 그것만으로는 여정 전체를 그릴 수 없다.
+   */
+  useEffect(() => {
+    const segmentId = archive?.segmentId
+
+    if (segmentId === null || segmentId === undefined) {
+      setSegmentPins([])
+      return undefined
+    }
+
+    let ignore = false
+
+    getTripPins(segmentId)
+      .then(({ pins }) => {
+        if (!ignore) setSegmentPins(pins)
+      })
+      // 지도만 덜 그려질 뿐이라 화면 전체를 오류로 덮지 않는다.
+      .catch(() => {
+        if (!ignore) setSegmentPins([])
+      })
+
+    return () => {
+      ignore = true
+    }
+  }, [archive?.segmentId])
+
+  /*
+   * 구간에서 제외한 핀은 지도에 올리지 않는다. 좌표가 없는 핀도 그릴 수 없다.
+   * 방문한 순서대로 정렬해 마커 순번과 동선이 어긋나지 않게 한다.
+   *
+   * 4.5 를 못 받았으면 6.2 가 준 만큼이라도 찍는다. 지도가 통째로 비는 것보다는
+   * 일부라도 보이는 편이 낫다.
+   */
+  const mapPins = useMemo(() => {
+    const segmentMapPins = segmentPins
+      .filter(
+        ({ latitude, longitude, included_in_segment: isIncluded }) =>
+          isIncluded &&
+          getCoordinate(latitude) !== null &&
+          getCoordinate(longitude) !== null,
+      )
+      .sort((left, right) =>
+        String(left.tagged_at ?? '').localeCompare(String(right.tagged_at ?? '')),
+      )
+      .map((pin) => ({
+        id: pin.pin_id,
+        name: pin.place_name?.trim() || '이름 없는 장소',
+        lat: getCoordinate(pin.latitude),
+        lng: getCoordinate(pin.longitude),
+      }))
+
+    if (segmentMapPins.length > 0) return segmentMapPins
+
+    return (archive?.pins ?? []).filter(hasCoordinates).map((pin) => ({
+      id: pin.id,
+      name: pin.placeName,
+      lat: pin.latitude,
+      lng: pin.longitude,
+    }))
+  }, [archive, segmentPins])
 
   const routePath = useMemo(
     () => mapPins.map(({ lat, lng }) => ({ lat, lng })),
