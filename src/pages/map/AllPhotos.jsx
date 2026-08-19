@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import styled from 'styled-components'
+import ConfirmationModal from '../../components/common/ConfirmationModal'
 import PhotoPreviewOverlay from '../../components/common/PhotoPreviewOverlay'
 import Tile from '../../components/common/Tile'
 import backIcon from '../../assets/icons/Back.svg'
@@ -236,9 +237,18 @@ const AllPhotos = () => {
 
         <ToolbarActions>
           {isSelectMode ? (
-            <ToolbarButton type="button" onClick={exitSelectMode}>
-              취소
-            </ToolbarButton>
+            <>
+              <ToolbarButton type="button" onClick={exitSelectMode}>
+                취소
+              </ToolbarButton>
+              <DeleteSelectionButton
+                type="button"
+                onClick={() => setIsConfirmingDelete(true)}
+                disabled={selectedIds.length === 0}
+              >
+                {selectedIds.length}장 삭제
+              </DeleteSelectionButton>
+            </>
           ) : (
             <>
               <ToolbarButton
@@ -327,36 +337,20 @@ const AllPhotos = () => {
         </PhotoGroups>
       )}
 
-      {isSelectMode && (
-        <SelectionBar>
-          <SelectionCount>{selectedIds.length}장 선택됨</SelectionCount>
-
-          {isConfirmingDelete ? (
-            <>
-              {/* 대표사진이 지워지면 서버가 남은 사진에서 대체 1장을 채운다. */}
-              <ConfirmText>
-                선택한 사진을 삭제할까요? 되돌릴 수 없고, 대표사진이 포함돼
-                있으면 추천이 다시 계산됩니다.
-              </ConfirmText>
-              <DeleteButton
-                type="button"
-                onClick={handleDeleteSelected}
-                disabled={isDeleting}
-              >
-                {isDeleting ? '삭제 중...' : '삭제'}
-              </DeleteButton>
-            </>
-          ) : (
-            <DeleteButton
-              type="button"
-              onClick={() => setIsConfirmingDelete(true)}
-              disabled={selectedIds.length === 0}
-            >
-              삭제
-            </DeleteButton>
-          )}
-        </SelectionBar>
-      )}
+      <ConfirmationModal
+        open={isConfirmingDelete}
+        title={`선택한 사진 ${selectedIds.length}장을 삭제할까요?`}
+        confirmLabel={isDeleting ? '삭제 중...' : `${selectedIds.length}장 삭제하기`}
+        confirmDisabled={isDeleting}
+        cancelDisabled={isDeleting}
+        onConfirm={handleDeleteSelected}
+        onCancel={() => setIsConfirmingDelete(false)}
+      >
+        {/* 대표사진이 지워지면 서버가 남은 사진에서 대체 1장을 채운다. */}
+        <DeleteConfirmText>
+          되돌릴 수 없고, 대표사진이 포함돼 있으면 추천이 다시 계산됩니다.
+        </DeleteConfirmText>
+      </ConfirmationModal>
 
       {/* 선택 모드에서는 고르는 게 우선이라 크게 보기를 띄우지 않는다. */}
       {!isSelectMode && previewIndex >= 0 && (
@@ -457,6 +451,10 @@ const AddNearbyButton = styled.button`
     color: var(--State-Disabled-Text);
     cursor: not-allowed;
   }
+`
+
+const DeleteSelectionButton = styled(ToolbarButton)`
+  color: var(--Primary-Cognac);
 `
 
 const Heading = styled.div`
@@ -592,45 +590,10 @@ const Notice = styled.p`
   text-overflow: ellipsis;
 `
 
-const SelectionBar = styled.div`
-  position: sticky;
-  bottom: 0;
-  width: 354px;
-  margin-top: 30px;
-  border: 1px solid var(--Primary-Cognac);
-  border-radius: 12px;
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  background: rgb(181 118 59 / 9%);
-`
-
-const SelectionCount = styled.p`
-  color: var(--Text-Primary);
-  font: var(--text-ui-label);
-`
-
-const ConfirmText = styled.p`
+const DeleteConfirmText = styled.p`
   color: var(--Text-Secondary);
-  font: var(--text-ui-caption);
   word-break: keep-all;
-`
-
-const DeleteButton = styled.button`
-  min-height: 44px;
-  border: 0;
-  border-radius: 22px;
-  background: var(--Primary-Cognac);
-  color: var(--Text-Inverse);
-  font: var(--text-ui-button);
-  cursor: pointer;
-
-  &:disabled {
-    background: var(--State-Disabled-Fill);
-    color: var(--State-Disabled-Text);
-    cursor: not-allowed;
-  }
+  font: var(--text-ui-body-m);
 `
 
 const StateMessage = styled.p`
