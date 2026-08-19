@@ -285,10 +285,15 @@ const SegmentText = styled.div`
   gap: 4px;
 `
 
+/* 이름이 길면 여러 줄로 늘어나 아래 내용을 밀어낸다. 한 줄로 묶고 넘치는
+   만큼만 말줄임표로 접는다. 부모의 min-width: 0 이 있어야 줄어든다. */
 const SegmentTitle = styled.h2`
+  overflow: hidden;
   color: var(--Text-Primary);
   font: var(--text-ui-h2);
   letter-spacing: -0.22px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 `
 
 const SegmentMeta = styled.p`
@@ -311,18 +316,25 @@ const SettingRow = styled.div`
   gap: 10px;
 `
 
+/* 항목 이름은 짧고 고정이라 줄이지 않는다. 줄어들 몫은 값이 진다. */
 const SettingLabel = styled.p`
-  flex: 1;
-  min-width: 0;
+  flex: 0 0 auto;
   color: var(--Text-Primary);
   font: var(--text-ui-label);
 `
 
+/* 여정 이름이 값으로 들어와 카드를 뚫고 나가던 자리다. 남는 자리에서만
+   늘어나고 모자라면 말줄임표로 접는다. 오른쪽 붙임은 자동 여백이 맡는다. */
 const SettingValue = styled.p`
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
   color: var(--Text-Secondary);
   font: var(--text-ui-caption);
   white-space: nowrap;
+  text-align: right;
+  text-overflow: ellipsis;
 `
 
 const Divider = styled.div`
