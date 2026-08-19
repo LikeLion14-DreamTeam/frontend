@@ -47,8 +47,13 @@ const MapOverlay = ({
      */
     overlay.onAdd = () => {
       overlay.getPanes()?.floatPane.appendChild(container)
-      if (interactive && blockMapGestures) {
-        maps.OverlayView.preventMapHitsAndGesturesFrom(container)
+      if (interactive) {
+        if (blockMapGestures) {
+          maps.OverlayView.preventMapHitsAndGesturesFrom(container)
+        } else {
+          // 숫자 핀 클릭은 지도 배경 클릭으로 전파하지 않되, 휠·핀치 제스처는 둔다.
+          maps.OverlayView.preventMapHitsFrom(container)
+        }
       }
     }
     overlay.onRemove = () => container.remove()
