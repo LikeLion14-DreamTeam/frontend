@@ -143,7 +143,7 @@ const buildDirectionArrow = (leg, scale) => [
  * `path` 는 방문한 순서대로 와야 한다. 화살표는 그 순서를 따른다.
  * 점이 둘 미만이면 이을 것이 없어 아무것도 그리지 않는다.
  */
-const RoutePolyline = ({ path }) => {
+const RoutePolyline = ({ path, showArrows = true }) => {
   const view = useMapView()
 
   if (path.length < 2) return null
@@ -158,18 +158,19 @@ const RoutePolyline = ({ path }) => {
       />
 
       {/* 화살표만 얹는 선들이다. 동선은 위에서 이미 그렸으므로 보이지 않게 둔다. */}
-      {getLegs(path).map((leg, index) => {
-        const scale = getShortLegArrowScale(getLegScreenDistance(leg, view))
+      {showArrows &&
+        getLegs(path).map((leg, index) => {
+          const scale = getShortLegArrowScale(getLegScreenDistance(leg, view))
 
-        return (
-          <Polyline
-            key={`${leg[0].lat},${leg[0].lng}-${index}`}
-            path={leg}
-            strokeOpacity={0}
-            icons={buildDirectionArrow(leg, scale)}
-          />
-        )
-      })}
+          return (
+            <Polyline
+              key={`${leg[0].lat},${leg[0].lng}-${index}`}
+              path={leg}
+              strokeOpacity={0}
+              icons={buildDirectionArrow(leg, scale)}
+            />
+          )
+        })}
     </>
   )
 }

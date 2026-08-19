@@ -826,7 +826,7 @@ const MapPage = () => {
               onClick: () => setSelectedPinId(null),
             }}
           >
-            {SHOW_ROUTE_ARROWS && <RoutePolyline path={routePath} />}
+            <RoutePolyline path={routePath} showArrows={SHOW_ROUTE_ARROWS} />
 
             {SHOW_ROUTE_ARROWS
               ? mapPins.map((pin) => {
