@@ -172,10 +172,8 @@ const TripManagement = () => {
             <SettingsCard>
               {settings.map((item, index) => (
                 <React.Fragment key={item.label}>
-                  <SettingRow>
-                    <SettingLabel>{item.label}</SettingLabel>
-                    <SettingValue>{item.value}</SettingValue>
-                  </SettingRow>
+                  <SettingLabel>{item.label}</SettingLabel>
+                  <SettingValue>{item.value}</SettingValue>
                   {index < settings.length - 1 ? <Divider /> : null}
                 </React.Fragment>
               ))}
@@ -285,10 +283,15 @@ const SegmentText = styled.div`
   gap: 4px;
 `
 
+/* 이름이 길면 여러 줄로 늘어나 아래 내용을 밀어낸다. 한 줄로 묶고 넘치는
+   만큼만 말줄임표로 접는다. 부모의 min-width: 0 이 있어야 줄어든다. */
 const SegmentTitle = styled.h2`
+  overflow: hidden;
   color: var(--Text-Primary);
   font: var(--text-ui-h2);
   letter-spacing: -0.22px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 `
 
 const SegmentMeta = styled.p`
@@ -296,36 +299,44 @@ const SegmentMeta = styled.p`
   font: var(--text-ui-caption);
 `
 
+/* 세 줄이 한 격자를 나눠 쓴다. 첫 칸은 가장 긴 항목 이름("포함 핀 범위")에
+   맞춰지므로, 값이 아무리 길어도 그 끝에서 한 칸 띄운 자리까지만 온다.
+   줄마다 따로 재면 이름 길이가 달라 값의 왼쪽 끝이 들쭉날쭉해진다. */
 const SettingsCard = styled(Card)`
   border: 0;
   border-radius: 16px;
   padding: 4px 16px;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: center;
   background: var(--Surface-Base);
 `
 
-const SettingRow = styled.div`
-  width: 100%;
+const SettingLabel = styled.p`
   min-height: 46px;
   display: flex;
   align-items: center;
-  gap: 10px;
-`
-
-const SettingLabel = styled.p`
-  flex: 1;
-  min-width: 0;
   color: var(--Text-Primary);
   font: var(--text-ui-label);
-`
-
-const SettingValue = styled.p`
-  flex: 0 0 auto;
-  color: var(--Text-Secondary);
-  font: var(--text-ui-caption);
   white-space: nowrap;
 `
 
+/* 여정 이름이 값으로 들어와 카드를 뚫고 나가던 자리다. 제 칸 안에서만
+   늘어나고 넘치면 말줄임표로 접는다.
+   말줄임표는 flex 상자에서는 걸리지 않으므로 여기는 블록으로 두고,
+   세로 가운데 맞춤은 격자에 맡긴다. */
+const SettingValue = styled.p`
+  overflow: hidden;
+  color: var(--Text-Secondary);
+  font: var(--text-ui-caption);
+  white-space: nowrap;
+  text-align: right;
+  text-overflow: ellipsis;
+`
+
 const Divider = styled.div`
+  grid-column: 1 / -1;
   width: 100%;
   height: 1px;
   background: var(--Border-Default);
