@@ -816,17 +816,31 @@ const getIncludedTripPins = (segmentId) =>
 // 포토북은 도시별로 최대 세 핀만 싣는다. 여정/지도에 보이는 핀은 제한하지 않는다.
 const getPhotobookTripPins = (segmentId) => {
   const cityPinCounts = new Map()
+  const selectedPinIds = new Set()
+  const includedPins = getIncludedTripPins(segmentId)
 
-  return getIncludedTripPins(segmentId).filter((tripPin) => {
-    if (tripPin.included_in_photobook === false) return false
+  const selectPins = (pins) => {
+    pins.forEach((tripPin) => {
+      const city = demoJourneyState.pins[tripPin.pin_id]?.city ?? ''
+      const count = cityPinCounts.get(city) ?? 0
+      if (count >= 3) return
 
-    const city = demoJourneyState.pins[tripPin.pin_id]?.city ?? ''
-    const count = cityPinCounts.get(city) ?? 0
-    if (count >= 3) return false
+      cityPinCounts.set(city, count + 1)
+      selectedPinIds.add(tripPin.pin_id)
+    })
+  }
 
-    cityPinCounts.set(city, count + 1)
-    return true
-  })
+  // 처음 선정된 핀은 우선 유지한다. 다만 그 핀이 여정에서 제외되어 자리가
+  // 비면, 포토북에 아직 선정되지 않은 포함 핀으로 도시별 정원을 채운다.
+  selectPins(
+    includedPins.filter((tripPin) => tripPin.included_in_photobook !== false),
+  )
+  selectPins(
+    includedPins.filter((tripPin) => tripPin.included_in_photobook === false),
+  )
+
+  // 후보 우선순위와 무관하게 포토북의 표시 순서는 여정의 시간순을 따른다.
+  return includedPins.filter((tripPin) => selectedPinIds.has(tripPin.pin_id))
 }
 
 const getPinPhotoCount = (pinId) => demoJourneyState.photos[pinId]?.length ?? 0
