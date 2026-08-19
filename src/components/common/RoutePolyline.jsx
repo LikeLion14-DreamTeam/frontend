@@ -30,6 +30,16 @@ const toRadian = (degree) => (degree * Math.PI) / 180
 const mercatorY = (lat) => Math.log(Math.tan(Math.PI / 4 + toRadian(lat) / 2))
 
 /**
+ * 두 지점 사이 경도 차이를 짧은 쪽으로 접는다(-180 ~ 180).
+ *
+ * 지도는 두 점을 이을 때 짧은 쪽으로 긋는다. 미국(-122)에서 한국(127)이면
+ * 태평양을 건너 서쪽으로 111 만 가면 되는데, 그냥 빼면 +249 가 나와 지구를
+ * 거의 한 바퀴 도는 동쪽으로 읽힌다. 그러면 선은 왼쪽으로 가는데 화살표만
+ * 오른쪽을 가리킨다. 차이가 180 을 넘는 구간에서만 생기는 일이다.
+ */
+const getLongitudeDelta = (from, to) => ((to - from + 540) % 360) - 180
+
+/**
  * 화면에서 보이는 구간의 기울기(도, 시계 방향).
  *
  * 지도는 메르카토르라 위도가 높을수록 세로가 늘어난다. 위경도 차이를 그대로
@@ -39,7 +49,7 @@ const mercatorY = (lat) => Math.log(Math.tan(Math.PI / 4 + toRadian(lat) / 2))
  */
 const getBearing = ([from, to]) =>
   (Math.atan2(
-    toRadian(to.lng - from.lng),
+    toRadian(getLongitudeDelta(from.lng, to.lng)),
     mercatorY(to.lat) - mercatorY(from.lat),
   ) *
     180) /
