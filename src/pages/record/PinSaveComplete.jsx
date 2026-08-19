@@ -335,6 +335,7 @@ const PinSaveComplete = () => {
           placeName,
           textNote: memo,
           audioFile: uploadedAudioRef.current?.url,
+          voiceDurationSec,
         })
 
         createdPinIdRef.current = createdPin.pin_id

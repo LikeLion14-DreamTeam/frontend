@@ -64,6 +64,15 @@ export const getCachedRepresentativePhotos = (pinId) => {
   return Array.isArray(photos) ? photos : []
 }
 
+/** 음성 길이를 0 이상의 정수 초로 다듬는다. 값이 없으면 0. */
+const getDurationSec = (value) => {
+  const durationSec = Number(value)
+
+  return Number.isFinite(durationSec)
+    ? Math.max(0, Math.round(durationSec))
+    : 0
+}
+
 const mockNotFound = () =>
   new ApiError({
     status: 404,
@@ -145,7 +154,7 @@ const createMockPin = (pinPayload) => {
       voice_memo_id: voiceMemoId,
       audio_file:
         getMockUploadedUrl(pinPayload.audio_file) ?? pinPayload.audio_file,
-      duration_sec: 0,
+      duration_sec: getDurationSec(pinPayload.duration_sec),
       saved_at: taggedAt,
     }
     voiceMemo = { voice_memo_id: voiceMemoId }
@@ -177,6 +186,9 @@ const createMockPin = (pinPayload) => {
  * 여행 구간은 요청에서 지정하지 않으며 서버가 항상 segment_id = null 로 만든다.
  * `audioFile` 은 업로드된 음성 파일의 공개 URL이다. 촬영 사진은 핀 생성 후
  * 5.5 API로 별도 등록한다.
+ *
+ * `voiceDurationSec` 은 녹음한 길이(초)다. 서버는 파일 주소만으로는 길이를 알
+ * 수 없어, 이 값을 안 보내면 이후 조회에서 0 으로 내려온다.
  */
 export const createPin = async ({
   nfcTagId,
@@ -189,6 +201,7 @@ export const createPin = async ({
   placeName = '',
   textNote = '',
   audioFile,
+  voiceDurationSec,
 }) => {
   const pinPayload = {
     nfc_tag_id: nfcTagId ?? null,
@@ -201,6 +214,8 @@ export const createPin = async ({
     place_name: placeName,
     text_note: textNote,
     audio_file: audioFile ?? null,
+    // 음성이 없으면 길이도 없다.
+    duration_sec: audioFile ? getDurationSec(voiceDurationSec) : null,
   }
 
   if (USE_MOCK) {

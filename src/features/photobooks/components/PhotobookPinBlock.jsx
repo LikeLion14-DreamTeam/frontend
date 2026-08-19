@@ -94,6 +94,8 @@ const PhotobookPinBlock = ({
           {voiceMemo ? (
             <VoiceMemoBar
               duration={voiceMemo.duration}
+              /* 주면 `지난 시간 / 전체 길이` 로, 없으면 전체 길이만 나온다. */
+              position={voiceMemo.position ?? null}
               isPlaying={voiceMemo.isPlaying}
               progress={voiceMemo.progress}
               onToggle={voiceMemo.onToggle}
