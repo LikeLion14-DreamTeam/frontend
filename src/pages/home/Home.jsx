@@ -372,7 +372,7 @@ const Home = () => {
                     {/* 보여주기용 고정 값이다. 연동할 API 를 두지 않기로 했다. */}
                     <ProductIdentity>
                       <ProductName>Ottomar 비세토스 위켄더</ProductName>
-                      <ProductTaggedAt>2024.03.15 태깅</ProductTaggedAt>
+                      <ProductTaggedAt>2026.08.25 태깅</ProductTaggedAt>
                     </ProductIdentity>
 
                     <StartJourneyLink to="/record/multi-capture">
