@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import styled from 'styled-components'
 import ConfirmationModal from '../../components/common/ConfirmationModal'
 import PhotoPreviewOverlay from '../../components/common/PhotoPreviewOverlay'
+import PhotoUploadStatus from '../../components/common/PhotoUploadStatus'
 import Tile from '../../components/common/Tile'
 import backIcon from '../../assets/icons/Back.svg'
 import {
@@ -14,6 +15,10 @@ import {
   addNearbyPhotos,
   describeRejected,
 } from '../../features/pins/nearbyPhotos'
+import {
+  PHOTO_UPLOAD_BATCH_SIZE,
+  getRemainingPhotoCapacity,
+} from '../../features/pins/photoUploadQueue'
 
 // 핀 상세를 거치지 않고 들어왔을 때를 위한 기본값.
 const FALLBACK_PIN_ID = 101
@@ -106,6 +111,7 @@ const AllPhotos = () => {
 
   const fileInputRef = useRef(null)
   const [isUploading, setIsUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(null)
   const [addResult, setAddResult] = useState(null)
   const [addError, setAddError] = useState('')
 
@@ -202,9 +208,27 @@ const AllPhotos = () => {
     setIsUploading(true)
     setAddError('')
     setAddResult(null)
+    const uploadableCount = Math.min(
+      files.length,
+      getRemainingPhotoCapacity(photos.length),
+    )
+    setUploadProgress(
+      uploadableCount > 0
+        ? {
+            phase: 'upload',
+            completed: 0,
+            total: uploadableCount,
+            batchIndex: 1,
+            totalBatches: Math.ceil(uploadableCount / PHOTO_UPLOAD_BATCH_SIZE),
+          }
+        : null,
+    )
 
     try {
-      const result = await addNearbyPhotos(pinID, files)
+      const result = await addNearbyPhotos(pinID, files, {
+        currentPhotoCount: photos.length,
+        onProgress: setUploadProgress,
+      })
       setAddResult(result)
 
       const photoList = await getPinPhotos(pinID)
@@ -213,6 +237,7 @@ const AllPhotos = () => {
       setAddError(error.message)
     } finally {
       setIsUploading(false)
+      setUploadProgress(null)
     }
   }
 
@@ -282,9 +307,10 @@ const AllPhotos = () => {
 
       {/* 안내가 떠도 아래가 밀리지 않도록 자리를 늘 비워둔다. */}
       <NoticeSlot>
+        {isUploading && <PhotoUploadStatus progress={uploadProgress} />}
         {addError && <Notice role="alert">{addError}</Notice>}
 
-        {!addError && addResult && (
+        {!isUploading && !addError && addResult && (
           <Notice role="status">{describeAddResult(addResult)}</Notice>
         )}
       </NoticeSlot>

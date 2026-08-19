@@ -30,6 +30,7 @@ import {
 } from '../../features/pins/nearbyPhotos'
 import {
   MAX_PIN_PHOTOS,
+  PHOTO_UPLOAD_BATCH_SIZE,
   getRemainingPhotoCapacity,
 } from '../../features/pins/photoUploadQueue'
 import { getTrip, getTripPins } from '../../features/trips/tripApi'
@@ -377,7 +378,21 @@ const PinDetail = () => {
 
     setIsUploading(true)
     setAddMessage('')
-    setUploadProgress(null)
+    const uploadableCount = Math.min(
+      files.length,
+      getRemainingPhotoCapacity(photos.length),
+    )
+    setUploadProgress(
+      uploadableCount > 0
+        ? {
+            phase: 'upload',
+            completed: 0,
+            total: uploadableCount,
+            batchIndex: 1,
+            totalBatches: Math.ceil(uploadableCount / PHOTO_UPLOAD_BATCH_SIZE),
+          }
+        : null,
+    )
 
     try {
       const { added, rejected } = await addNearbyPhotos(pinID, files, {
