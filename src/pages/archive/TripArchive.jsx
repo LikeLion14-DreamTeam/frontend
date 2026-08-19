@@ -204,8 +204,6 @@ const TripArchive = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
   const [player, setPlayer] = useState(INITIAL_PLAYER)
-  /** 재생에 실패한 핀의 안내 문구. `{ [핀 id]: 문구 }` */
-  const [voiceErrors, setVoiceErrors] = useState({})
   const [isEditingName, setIsEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
   const [isSavingName, setIsSavingName] = useState(false)
@@ -219,7 +217,6 @@ const TripArchive = () => {
       audioRef.current = null
       audioPinIdRef.current = null
       setPlayer(INITIAL_PLAYER)
-      setVoiceErrors({})
       setIsEditingName(false)
       setNameDraft('')
       setIsSavingName(false)
@@ -396,26 +393,22 @@ const TripArchive = () => {
     if (event.key === 'Escape') handleCancelNameEdit()
   }
 
-  const setVoiceError = (pinId, message) => {
-    setVoiceErrors((current) => {
-      if ((current[pinId] ?? '') === message) return current
-
-      return { ...current, [pinId]: message }
-    })
-  }
-
   const handleToggleVoice = (pin) => {
     const audioUrl = pin.voiceMemo?.audioUrl
 
-    /* 주소가 없으면 재생할 방법이 없다. 예전에는 이 자리에서 진행도를 0.32 로
-       세워 재생 중인 척했는데, 소리는 안 나고 파형만 중간에 멈춰 있어 고장으로
-       보였다. 흉내 내지 않고 못 재생한다고 알린다. */
     if (!audioUrl) {
-      setVoiceError(pin.id, '음성 메모 주소가 없어요.')
+      setPlayer((current) =>
+        current.pinId === pin.id
+          ? { ...current, isPlaying: !current.isPlaying }
+          : {
+              pinId: pin.id,
+              isPlaying: true,
+              progress: 0.32,
+              duration: pin.voiceMemo?.duration ?? 0,
+            },
+      )
       return
     }
-
-    setVoiceError(pin.id, '')
 
     const currentAudio = audioRef.current
 
@@ -423,9 +416,8 @@ const TripArchive = () => {
       if (currentAudio.paused) {
         currentAudio.play().then(() => {
           setPlayer((current) => ({ ...current, isPlaying: true }))
-        }).catch((error) => {
+        }).catch(() => {
           setPlayer((current) => ({ ...current, isPlaying: false }))
-          setVoiceError(pin.id, `음성 메모를 열지 못했어요. (${error.name})`)
         })
       } else {
         currentAudio.pause()
@@ -481,15 +473,12 @@ const TripArchive = () => {
           ? { ...current, isPlaying: true }
           : current,
       )
-    }).catch((error) => {
+    }).catch(() => {
       setPlayer((current) =>
         current.pinId === pin.id
           ? { ...current, isPlaying: false }
           : current,
       )
-      /* 주소는 있는데 열리지 않는 경우다. 파일이 없거나, 막혀 있거나, 이
-         브라우저가 못 읽는 형식이다. 어느 쪽인지는 이유를 봐야 갈린다. */
-      setVoiceError(pin.id, `음성 메모를 열지 못했어요. (${error.name})`)
     })
   }
 
@@ -631,7 +620,6 @@ const TripArchive = () => {
                                   isPlaying:
                                     isCurrentVoice && player.isPlaying,
                                   onToggle: () => handleToggleVoice(pin),
-                                  error: voiceErrors[pin.id] || undefined,
                                 }
                               : undefined
                           }
