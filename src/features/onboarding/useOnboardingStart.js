@@ -24,6 +24,7 @@ import { getOnboardingFlowPath, ONBOARDING_STAGE_PATHS } from './onboardingFlow'
  * @param stage 이 화면이 담당하는 2.6 단계 값
  * @param isRelearning 재학습 흐름인지
  * @param initialRound progress 조회 없이 시작할 때 사용할 화면 라운드
+ * @param restorePreviousStage 이미 완료한 이전 단계를 다시 볼 때 사용한다
  * @param normalizeRound 서버 라운드를 화면 라운드로 바꿔야 할 때 사용한다
  * @param onProgressLoaded 진행 상태에 담긴 기존 응답을 화면 state로 복원할 때 사용한다
  * @returns `{ isReady, round, setRound }` — 준비 전에는 화면을 그리지 않는다
@@ -32,6 +33,7 @@ const useOnboardingStart = ({
   stage,
   isRelearning,
   initialRound = 1,
+  restorePreviousStage = false,
   normalizeRound = (roundNo) => roundNo,
   onProgressLoaded,
 }) => {
@@ -46,7 +48,11 @@ const useOnboardingStart = ({
   onProgressLoadedRef.current = onProgressLoaded
 
   useEffect(() => {
-    if (isRelearning) {
+    // 초기 온보딩에서도 다음 단계에서 이전 단계로 돌아올 수 있다. 이때는 서버의
+    // current_stage가 다음 단계이므로, 일반 조회 로직을 타면 즉시 다시 쫓겨난다.
+    // 전달받은 응답과 라운드로 화면을 복원한 뒤 사용자가 다시 다음을 누를 때만
+    // 정상 진행 상태를 조회하도록 한다.
+    if (isRelearning || restorePreviousStage) {
       setRound(initialRound)
       setIsReady(true)
       return undefined
@@ -85,7 +91,14 @@ const useOnboardingStart = ({
     return () => {
       ignore = true
     }
-  }, [initialRound, isRelearning, navigate, stage, user])
+  }, [
+    initialRound,
+    isRelearning,
+    navigate,
+    restorePreviousStage,
+    stage,
+    user,
+  ])
 
   /**
    * 저장한 뒤 서버 진행 상태를 다시 읽어 화면을 맞춘다.

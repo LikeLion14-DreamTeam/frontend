@@ -52,6 +52,7 @@ const BasicQuestion = () => {
   const navigate = useNavigate()
   const isRelearning = isRelearningFlow(location.search)
   const initialRound = location.state?.initialRound ?? 1
+  const restorePreviousStage = location.state?.restorePreviousStage ?? false
   const [answers, setAnswers] = useState(() => {
     const draft = isRelearning ? readRelearningDraft() : {}
 
@@ -65,6 +66,7 @@ const BasicQuestion = () => {
     stage: BASIC_QUESTION_STAGE,
     isRelearning,
     initialRound,
+    restorePreviousStage,
     onProgressLoaded: (progress) => {
       setAnswers((currentAnswers) => {
         const nextAnswers = [...currentAnswers]
@@ -113,6 +115,15 @@ const BasicQuestion = () => {
   const handleNext = async () => {
     if (!selected || isSubmitting) return
 
+    // 다음 단계에서 되돌아온 기본 질문의 마지막 응답은 이미 저장돼 있다.
+    // 현재 서버 단계는 A/B라 다시 저장하면 거절될 수 있으므로 그대로 복귀한다.
+    if (isLastRound && restorePreviousStage && !isRelearning) {
+      navigate(getOnboardingFlowPath('/onboarding/ab-preference', isRelearning), {
+        state: { basicAnswers: answers },
+      })
+      return
+    }
+
     setIsSubmitting(true)
     setErrorMessage('')
 
@@ -133,7 +144,7 @@ const BasicQuestion = () => {
 
       navigate(
         getOnboardingFlowPath('/onboarding/ab-preference', isRelearning),
-        isRelearning ? { state: { basicAnswers: answers } } : undefined,
+        { state: { basicAnswers: answers } },
       )
     } catch (error) {
       setErrorMessage(
