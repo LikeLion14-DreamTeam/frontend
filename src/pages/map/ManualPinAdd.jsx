@@ -14,6 +14,7 @@ import crosshairIcon from '../../assets/map/manual-pin-crosshair.svg'
 import markerIcon from '../../assets/map/manual-pin-marker.svg'
 import searchIcon from '../../assets/map/manual-pin-search.svg'
 import recordPlusIcon from '../../assets/map/record-plus.png'
+import { normalizeMapPosition } from '../../utils/coordinates'
 
 /* 건물 하나를 찾았을 때 이보다 더 파고들지 않는다. 처음 배율과 같은 값이라
    검색 전후로 보이는 정도가 크게 달라지지 않는다. */
@@ -39,7 +40,10 @@ const PanToSearched = ({ result, fitPadding, onSettled }) => {
   useEffect(() => {
     if (!map || !result) return undefined
 
-    const center = { lat: result.latitude, lng: result.longitude }
+    const center = normalizeMapPosition({
+      lat: result.latitude,
+      lng: result.longitude,
+    })
 
     if (!result.viewport) {
       map.panTo(center)
@@ -152,8 +156,9 @@ const ManualPinAdd = () => {
     const startFrom = (center) => {
       if (ignore) return
 
-      setInitialCenter(center)
-      setSelectedCenter(center)
+      const normalizedCenter = normalizeMapPosition(center)
+      setInitialCenter(normalizedCenter)
+      setSelectedCenter(normalizedCenter)
     }
 
     if (!navigator.geolocation) {
@@ -206,7 +211,7 @@ const ManualPinAdd = () => {
     const center = event.detail?.center
     if (!center) return
 
-    setSelectedCenter({ lat: center.lat, lng: center.lng })
+    setSelectedCenter(normalizeMapPosition(center))
   }
 
   /* 입력한 주소를 좌표로 바꿔 지도를 옮긴다. 핀은 늘 지도 중심이라 따라온다. */

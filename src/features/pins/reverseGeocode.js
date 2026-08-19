@@ -10,6 +10,7 @@
  * 주의: Google Cloud 콘솔에서 **Geocoding API** 를 켜야 동작한다.
  * 지금까지 쓰던 Maps JavaScript API 만으로는 요청이 거절된다.
  */
+import { normalizeLongitude } from '../../utils/coordinates'
 
 /** 지오코더는 한 번만 만들어 두고 재사용한다. */
 let geocoderPromise = null
@@ -73,12 +74,14 @@ const toReadableAddress = (formattedAddress = '') =>
 export const reverseGeocode = async ({ latitude, longitude }) => {
   if (latitude == null || longitude == null) return null
 
+  const normalizedLongitude = normalizeLongitude(longitude)
+
   const geocoder = await loadGeocoder()
   if (!geocoder) return null
 
   try {
     const { results } = await geocoder.geocode({
-      location: { lat: latitude, lng: longitude },
+      location: { lat: latitude, lng: normalizedLongitude },
       // 도시·나라 이름을 한국어로 받는다. 나라 코드는 언어와 무관하게 같다.
       language: 'ko',
     })
@@ -136,7 +139,7 @@ export const geocodeAddress = async (query) => {
 
     return {
       latitude: location.lat(),
-      longitude: location.lng(),
+      longitude: normalizeLongitude(location.lng()),
       address: toReadableAddress(best.formatted_address),
       viewport: viewport?.toJSON() ?? null,
     }

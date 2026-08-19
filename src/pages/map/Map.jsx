@@ -31,6 +31,7 @@ import {
   getTripPins,
   getTrips,
 } from '../../features/trips/tripApi'
+import { normalizeLongitude } from '../../utils/coordinates'
 
 // 위치 권한을 받을 수 없을 때만 쓰는 마지막 fallback.
 const FALLBACK_CENTER = { lat: 37.5665, lng: 126.978 }
@@ -592,7 +593,11 @@ const MapPage = () => {
             latitude != null &&
             longitude != null,
         )
-        .sort((a, b) => a.tagged_at.localeCompare(b.tagged_at)),
+        .sort((a, b) => a.tagged_at.localeCompare(b.tagged_at))
+        .map((pin) => ({
+          ...pin,
+          longitude: normalizeLongitude(pin.longitude),
+        })),
     [isCountryFilterMode, tripPins],
   )
 
