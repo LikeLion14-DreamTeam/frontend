@@ -12,6 +12,8 @@ const INITIAL_DRAFT = {
   countryName: '',
   placeName: '',
   textNote: '',
+  voiceMemoFile: null,
+  voiceDurationSec: 0,
 }
 
 /**
@@ -41,6 +43,8 @@ const useRecordDraftStore = create((set, get) => ({
   setLocationDetails: ({ address, city, countryCode, countryName }) =>
     set({ address, city, countryCode, countryName }),
   setContext: ({ placeName, textNote }) => set({ placeName, textNote }),
+  setVoiceMemo: ({ file, durationSec = 0 }) =>
+    set({ voiceMemoFile: file ?? null, voiceDurationSec: durationSec }),
 
   clearDraft: () => {
     if (typeof URL !== 'undefined') {
