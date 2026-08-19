@@ -119,7 +119,7 @@ const composePinThumbnailPhotos = (representativePhotos, photos) => {
   )
 }
 
-const normalizePin = (pin, cityName, index) => {
+const normalizePin = (pin, cityName, countryName, index) => {
   const placeName = pin.place_name?.trim() || '이름 없는 장소'
   const voiceMemo = pin.voice_memo
   const refreshedRepresentativePhotos = getCachedRepresentativePhotos(pin.pin_id)
@@ -133,6 +133,9 @@ const normalizePin = (pin, cityName, index) => {
     id: pin.pin_id,
     order: Number.isFinite(Number(pin.order)) ? Number(pin.order) : index + 1,
     cityName,
+    /* 6.2 는 국가를 도시 묶음에 한 번만 주므로 핀마다 옮겨 담는다.
+       내보내기 템플릿이 핀 하나만 들고 그리기 때문이다. */
+    countryName,
     placeName,
     recordedAt: formatDateTime(pin.tagged_at),
     latitude: getCoordinate(pin.latitude),
@@ -155,8 +158,9 @@ const normalizePhotobook = (photobook) => {
   const cities = (Array.isArray(photobook.cities) ? photobook.cities : []).map(
     (city, cityIndex) => {
       const cityName = city.city?.trim() || '이름 없는 도시'
+      const countryName = city.country_name?.trim() || ''
       const pins = (Array.isArray(city.pins) ? city.pins : []).map(
-        (pin, pinIndex) => normalizePin(pin, cityName, pinIndex),
+        (pin, pinIndex) => normalizePin(pin, cityName, countryName, pinIndex),
       )
 
       return {
