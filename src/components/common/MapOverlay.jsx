@@ -16,6 +16,7 @@ const MapOverlay = ({
   longitude,
   zIndex,
   interactive = true,
+  blockMapGestures = true,
   children,
 }) => {
   const map = useMap()
@@ -46,7 +47,9 @@ const MapOverlay = ({
      */
     overlay.onAdd = () => {
       overlay.getPanes()?.floatPane.appendChild(container)
-      if (interactive) maps.OverlayView.preventMapHitsAndGesturesFrom(container)
+      if (interactive && blockMapGestures) {
+        maps.OverlayView.preventMapHitsAndGesturesFrom(container)
+      }
     }
     overlay.onRemove = () => container.remove()
 
@@ -64,7 +67,7 @@ const MapOverlay = ({
     overlay.setMap(map)
 
     return () => overlay.setMap(null)
-  }, [container, interactive, latitude, longitude, map, maps])
+  }, [blockMapGestures, container, interactive, latitude, longitude, map, maps])
 
   return createPortal(children, container)
 }

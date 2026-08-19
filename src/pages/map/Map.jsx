@@ -855,6 +855,8 @@ const MapPage = () => {
                       key={pin.pin_id}
                       latitude={pin.latitude}
                       longitude={pin.longitude}
+                      // 숫자 핀 위에서도 휠·트랙패드 제스처는 지도에 전달한다.
+                      blockMapGestures={false}
                       // 같은 자리에 겹치면 나중에 방문한 핀이 위에 보인다.
                       zIndex={isSelected ? 1000 : 100 + index}
                     >
