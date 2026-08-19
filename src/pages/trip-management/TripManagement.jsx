@@ -172,10 +172,8 @@ const TripManagement = () => {
             <SettingsCard>
               {settings.map((item, index) => (
                 <React.Fragment key={item.label}>
-                  <SettingRow>
-                    <SettingLabel>{item.label}</SettingLabel>
-                    <SettingValue>{item.value}</SettingValue>
-                  </SettingRow>
+                  <SettingLabel>{item.label}</SettingLabel>
+                  <SettingValue>{item.value}</SettingValue>
                   {index < settings.length - 1 ? <Divider /> : null}
                 </React.Fragment>
               ))}
@@ -301,34 +299,34 @@ const SegmentMeta = styled.p`
   font: var(--text-ui-caption);
 `
 
+/* 세 줄이 한 격자를 나눠 쓴다. 첫 칸은 가장 긴 항목 이름("포함 핀 범위")에
+   맞춰지므로, 값이 아무리 길어도 그 끝에서 한 칸 띄운 자리까지만 온다.
+   줄마다 따로 재면 이름 길이가 달라 값의 왼쪽 끝이 들쭉날쭉해진다. */
 const SettingsCard = styled(Card)`
   border: 0;
   border-radius: 16px;
   padding: 4px 16px;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: center;
   background: var(--Surface-Base);
 `
 
-const SettingRow = styled.div`
-  width: 100%;
+const SettingLabel = styled.p`
   min-height: 46px;
   display: flex;
   align-items: center;
-  gap: 10px;
-`
-
-/* 항목 이름은 짧고 고정이라 줄이지 않는다. 줄어들 몫은 값이 진다. */
-const SettingLabel = styled.p`
-  flex: 0 0 auto;
   color: var(--Text-Primary);
   font: var(--text-ui-label);
+  white-space: nowrap;
 `
 
-/* 여정 이름이 값으로 들어와 카드를 뚫고 나가던 자리다. 남는 자리에서만
-   늘어나고 모자라면 말줄임표로 접는다. 오른쪽 붙임은 자동 여백이 맡는다. */
+/* 여정 이름이 값으로 들어와 카드를 뚫고 나가던 자리다. 제 칸 안에서만
+   늘어나고 넘치면 말줄임표로 접는다.
+   말줄임표는 flex 상자에서는 걸리지 않으므로 여기는 블록으로 두고,
+   세로 가운데 맞춤은 격자에 맡긴다. */
 const SettingValue = styled.p`
-  flex: 0 1 auto;
-  min-width: 0;
-  margin-left: auto;
   overflow: hidden;
   color: var(--Text-Secondary);
   font: var(--text-ui-caption);
@@ -338,6 +336,7 @@ const SettingValue = styled.p`
 `
 
 const Divider = styled.div`
+  grid-column: 1 / -1;
   width: 100%;
   height: 1px;
   background: var(--Border-Default);
