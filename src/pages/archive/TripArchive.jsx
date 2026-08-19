@@ -4,6 +4,7 @@ import styled from 'styled-components'
 import noteEditIcon from '../../assets/map/note-edit.svg'
 import paperTexture from '../../assets/pin-save/manual-pin-form-bg.png'
 import GoogleMap, { FOCUS_ZOOM } from '../../components/common/GoogleMap'
+import { SHOW_ROUTE_ARROWS } from '../../components/common/mapDisplayConfig'
 import RoutePolyline from '../../components/common/RoutePolyline'
 import Header from '../../components/layout/Header'
 import {
@@ -14,7 +15,10 @@ import {
   getPhotobook,
   updatePhotobookName,
 } from '../../features/photobooks/photobookApi'
-import { getCachedRepresentativePhotos } from '../../features/pins/pinApi'
+import {
+  getCachedRepresentativePhotos,
+  getPinVoiceMemos,
+} from '../../features/pins/pinApi'
 import { getTripPins } from '../../features/trips/tripApi'
 
 const INITIAL_PLAYER = {
@@ -122,7 +126,7 @@ const composePinThumbnailPhotos = (representativePhotos, photos) => {
   )
 }
 
-const normalizePin = (pin, cityName, countryName, index) => {
+const normalizePin = (pin, cityName, countryName, index, audioUrls) => {
   const placeName = pin.place_name?.trim() || '이름 없는 장소'
   const voiceMemo = pin.voice_memo
   const refreshedRepresentativePhotos = getCachedRepresentativePhotos(pin.pin_id)
@@ -150,20 +154,25 @@ const normalizePin = (pin, cityName, countryName, index) => {
     ),
     voiceMemo: voiceMemo
       ? {
-          audioUrl: voiceMemo.audio_url ?? voiceMemo.audio_file ?? '',
+          audioUrl:
+            voiceMemo.audio_url ??
+            voiceMemo.audio_file ??
+            audioUrls[pin.pin_id] ??
+            '',
           duration: getCount(voiceMemo.duration_sec),
         }
       : null,
   }
 }
 
-const normalizePhotobook = (photobook) => {
+const normalizePhotobook = (photobook, audioUrls = {}) => {
   const cities = (Array.isArray(photobook.cities) ? photobook.cities : []).map(
     (city, cityIndex) => {
       const cityName = city.city?.trim() || '이름 없는 도시'
       const countryName = city.country_name?.trim() || ''
       const pins = (Array.isArray(city.pins) ? city.pins : []).map(
-        (pin, pinIndex) => normalizePin(pin, cityName, countryName, pinIndex),
+        (pin, pinIndex) =>
+          normalizePin(pin, cityName, countryName, pinIndex, audioUrls),
       )
 
       return {
@@ -201,6 +210,7 @@ const TripArchive = () => {
   const audioPinIdRef = useRef(null)
   const nameInputRef = useRef(null)
   const [photobook, setPhotobook] = useState(null)
+  const [voiceAudioUrls, setVoiceAudioUrls] = useState({})
   /** 지도용 구간 핀 전체(4.5). 아래 도시별 목록은 그대로 6.2 를 쓴다. */
   const [segmentPins, setSegmentPins] = useState([])
   const [isLoading, setIsLoading] = useState(true)
@@ -219,6 +229,7 @@ const TripArchive = () => {
       audioRef.current = null
       audioPinIdRef.current = null
       setPlayer(INITIAL_PLAYER)
+      setVoiceAudioUrls({})
       setIsEditingName(false)
       setNameDraft('')
       setIsSavingName(false)
@@ -258,9 +269,43 @@ const TripArchive = () => {
   )
 
   const archive = useMemo(
-    () => (photobook ? normalizePhotobook(photobook) : null),
-    [photobook],
+    () => (photobook ? normalizePhotobook(photobook, voiceAudioUrls) : null),
+    [photobook, voiceAudioUrls],
   )
+
+  /* 6.2 응답에는 재생 URL이 빠질 수 있다. 음성 메모가 있는 핀만 5.8로
+     보완해 실제 파일을 재생한다. */
+  useEffect(() => {
+    if (!photobook) return undefined
+
+    const pins = (photobook.cities ?? []).flatMap((city) => city.pins ?? [])
+    const pinsNeedingAudioUrl = pins.filter(
+      (pin) =>
+        pin.voice_memo &&
+        !pin.voice_memo.audio_url &&
+        !pin.voice_memo.audio_file,
+    )
+    if (!pinsNeedingAudioUrl.length) return undefined
+
+    let ignore = false
+
+    Promise.all(
+      pinsNeedingAudioUrl.map(async (pin) => {
+        const { voice_memo: voiceMemo } = await getPinVoiceMemos(pin.pin_id)
+        return [pin.pin_id, voiceMemo?.audio_file ?? voiceMemo?.audio_url ?? '']
+      }),
+    )
+      .then((entries) => {
+        if (ignore) return
+        setVoiceAudioUrls(Object.fromEntries(entries.filter(([, url]) => url)))
+      })
+      // 음성 URL을 못 받아도 포토북 본문은 정상적으로 보여 준다.
+      .catch(() => {})
+
+    return () => {
+      ignore = true
+    }
+  }, [photobook])
 
   /*
    * 지도에 쓸 구간 핀 전체(4.5).
@@ -398,20 +443,7 @@ const TripArchive = () => {
   const handleToggleVoice = (pin) => {
     const audioUrl = pin.voiceMemo?.audioUrl
 
-    if (!audioUrl) {
-      setPlayer((current) =>
-        current.pinId === pin.id
-          ? { ...current, isPlaying: !current.isPlaying }
-          : {
-              pinId: pin.id,
-              isPlaying: true,
-              progress: 0.32,
-              position: (pin.voiceMemo?.duration ?? 0) * 0.32,
-              duration: pin.voiceMemo?.duration ?? 0,
-            },
-      )
-      return
-    }
+    if (!audioUrl) return
 
     const currentAudio = audioRef.current
 
@@ -585,8 +617,12 @@ const TripArchive = () => {
                       clickableIcons: false,
                       keyboardShortcuts: false,
                     }}
+                    showSequenceNumbers={!SHOW_ROUTE_ARROWS}
                   >
-                    <RoutePolyline path={routePath} />
+                    <RoutePolyline
+                      path={routePath}
+                      showArrows={SHOW_ROUTE_ARROWS}
+                    />
                   </GoogleMap>
                 ) : (
                   <MapPlaceholder>위치 정보가 없습니다.</MapPlaceholder>
@@ -619,9 +655,11 @@ const TripArchive = () => {
                                   /* 6.2 가 준 길이를 그대로 쓴다. 길이를
                                      보내기 전에 만든 핀은 0 으로 오는데,
                                      그때만 재생하며 읽은 값으로 채운다. */
+                                  // 브라우저가 실제 파일에서 읽은 길이를 우선한다.
                                   duration:
-                                    pin.voiceMemo.duration ||
-                                    (isCurrentVoice ? player.duration : 0),
+                                    isCurrentVoice && player.duration > 0
+                                      ? player.duration
+                                      : pin.voiceMemo.duration,
                                   progress: isCurrentVoice
                                     ? player.progress
                                     : 0,
@@ -634,6 +672,7 @@ const TripArchive = () => {
                                   isPlaying:
                                     isCurrentVoice && player.isPlaying,
                                   onToggle: () => handleToggleVoice(pin),
+                                  disabled: !pin.voiceMemo.audioUrl,
                                 }
                               : undefined
                           }

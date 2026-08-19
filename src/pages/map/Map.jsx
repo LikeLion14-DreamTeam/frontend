@@ -8,6 +8,7 @@ import {
   useMapsLibrary,
 } from '@vis.gl/react-google-maps'
 import GoogleMap, { FOCUS_ZOOM } from '../../components/common/GoogleMap'
+import { SHOW_ROUTE_ARROWS } from '../../components/common/mapDisplayConfig'
 import MapOverlay from '../../components/common/MapOverlay'
 import PinPopover from '../../components/common/PinPopover'
 import RoutePolyline from '../../components/common/RoutePolyline'
@@ -45,10 +46,6 @@ const CURRENT_POSITION_ZOOM = 17
 /* 진행 중인 여행은 TRAVEL_SEGMENT 가 없어 segment_id 로 못 고른다.
    목록에서 구분하려고 쓰는 프론트 전용 값이다. */
 const ONGOING_TRIP_ID = 'ongoing'
-
-/* false면 핀 안에 방문 순서를, true면 핀 사이에 진행 방향 화살표를 표시한다.
-   동선 표기를 다시 화살표로 바꿀 때는 이 값만 true로 바꾸면 된다. */
-const SHOW_ROUTE_ARROWS = false
 
 // 종료 여정은 최근에 끝난 순으로 보여 준다. 예시 데이터는 실제 여정 뒤에 둔다.
 const sortEndedTrips = (trips) =>

@@ -2,6 +2,7 @@ import React, { useEffect } from 'react'
 import styled from 'styled-components'
 import { Map, Marker, useMap, useMapsLibrary } from '@vis.gl/react-google-maps'
 import mapPinIcon from '../../assets/map/map-pin.svg'
+import MapOverlay from './MapOverlay'
 import { MAP_STYLES } from './mapStyles'
 import { normalizeLongitude } from '../../utils/coordinates'
 
@@ -135,6 +136,7 @@ const GoogleMap = ({
   borderRadius = '4px',
   bordered = true,
   mapOptions = {},
+  showSequenceNumbers = false,
   children,
 }) => {
   /*
@@ -211,14 +213,28 @@ const GoogleMap = ({
         {fitBounds && <FitZoomLimit maxZoom={maxFitZoom} />}
 
         {/* AdvancedMarker 는 Map ID 를 요구해 테마와 같이 못 쓴다. */}
-        {normalizedMarkers.map(({ id, name, lat, lng }, index) => (
-          <Marker
-            key={id ?? `${name}-${lat}-${lng}-${index}`}
-            position={{ lat, lng }}
-            icon={getPinIcon(core)}
-            title={name}
-          />
-        ))}
+        {showSequenceNumbers
+          ? normalizedMarkers.map(({ id, name, lat, lng }, index) => (
+              <MapOverlay
+                key={id ?? `${name}-${lat}-${lng}-${index}`}
+                latitude={lat}
+                longitude={lng}
+                interactive={false}
+                zIndex={100 + index}
+              >
+                <SequencePin aria-label={`${index + 1}번 핀: ${name}`}>
+                  {index + 1}
+                </SequencePin>
+              </MapOverlay>
+            ))
+          : normalizedMarkers.map(({ id, name, lat, lng }, index) => (
+              <Marker
+                key={id ?? `${name}-${lat}-${lng}-${index}`}
+                position={{ lat, lng }}
+                icon={getPinIcon(core)}
+                title={name}
+              />
+            ))}
         {children}
       </Map>
     </MapFrame>
@@ -247,4 +263,18 @@ const MapFallback = styled.div`
   background: var(--Map-Base);
   color: var(--Text-Secondary);
   font-size: 12px;
+`
+
+const SequencePin = styled.span`
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--Background-Base);
+  border-radius: 50%;
+  background: var(--Map-Pin-Inactive);
+  box-shadow: var(--Effect-Marker);
+  color: var(--Text-Inverse);
+  font: var(--text-ui-button);
+  transform: translate(-50%, -50%);
 `

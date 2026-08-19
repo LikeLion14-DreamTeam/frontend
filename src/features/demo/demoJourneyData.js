@@ -1432,7 +1432,9 @@ export const getDemoPhotobook = (photobookId) => {
   return clone({
     ...summary,
     total_days: getTotalDays(summary.start_at, summary.end_at),
-    pin_count: getPhotobookTripPins(segmentId).length,
+    // 포토북 본문은 도시별 대표 핀만 싣더라도 여정의 핀 수는 전체 포함 핀으로
+    // 표시한다. 특히 DKM은 5개인데 기존에는 대표 3개만 집계됐다.
+    pin_count: getIncludedTripPins(segmentId).length,
     voice_memo_count: getPhotobookTripPins(segmentId).filter(
       (tripPin) => demoJourneyState.voiceMemos[tripPin.pin_id],
     ).length,
