@@ -223,7 +223,9 @@ const ManualPinDetails = () => {
   }
 
   const handleSave = async () => {
-    if (isSaving) return
+    // 일반 촬영 저장과 마찬가지로 사진이 없으면 핀을 만들지 않는다.
+    // 이후 업로드·등록 단계가 건너뛰어져 빈 핀이 남는 것을 막는다.
+    if (photos.length === 0 || isSaving) return
 
     setIsSaving(true)
     setSaveError('')
@@ -497,7 +499,7 @@ const ManualPinDetails = () => {
       <AddPinButton
         type="button"
         onClick={handleSave}
-        disabled={isSaving}
+        disabled={isSaving || photos.length === 0}
       >
         {isSaving ? '저장 중...' : '핀 추가하기'}
       </AddPinButton>
