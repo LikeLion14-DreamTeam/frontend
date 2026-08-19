@@ -2,12 +2,15 @@ import { useState } from 'react'
 import { GoogleLogin } from '@react-oauth/google'
 import { useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
-import Button from '../../components/common/Button'
-import Header from '../../components/layout/Header'
 import { setSessionToken } from '../../api/session'
 import { loginWithGoogle } from '../../features/auth/authApi'
 import { getPostLoginPath } from '../../features/auth/authRoutes'
 import useAuthStore from '../../features/auth/useAuthStore'
+import googleIcon from '../../assets/login/google-icon.png'
+import loginPhotoBottom from '../../assets/login/login-photo-bottom.png'
+import loginPhotoTop from '../../assets/login/login-photo-top.png'
+import loginTexture from '../../assets/login/login-texture.png'
+import mcmOrteMark from '../../assets/login/mcm-orte-mark.svg'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim()
 
@@ -48,24 +51,32 @@ const Login = () => {
   }
 
   return (
-    <>
-      <Header>로그인 화면</Header>
+    <LoginWrapper>
+      <Texture src={loginTexture} alt="" aria-hidden="true" />
+      <BrandArea>
+        <BrandMark src={mcmOrteMark} alt="Orte" />
+        <Collaboration>MCM X Orte</Collaboration>
+        <Tagline>당신의 시선을 따라, 여정을 남깁니다</Tagline>
+      </BrandArea>
 
-      <LoginWrapper>
+      <PhotoBase aria-hidden="true">
+        <PhotoBaseImage src={loginPhotoTop} alt="" />
+      </PhotoBase>
+      <PhotoOverlay aria-hidden="true">
+        <PhotoOverlayImage src={loginPhotoBottom} alt="" />
+      </PhotoOverlay>
 
-        <TitleArea>
-          <Title>Orte</Title>
-          <SubTitle>당신의 순간을 생생하게 남겨보세요</SubTitle>
-        </TitleArea>
-
-        <PassportArea />
-
-        <BottomArea>
-          {isSubmitting ? (
-            <Button type="button" disabled>
-              로그인 처리 중...
-            </Button>
-          ) : GOOGLE_CLIENT_ID ? (
+      <LoginArea>
+        {isSubmitting ? (
+          <LoginButton type="button" disabled>
+            로그인 처리 중...
+          </LoginButton>
+        ) : GOOGLE_CLIENT_ID ? (
+          <GoogleButton>
+            <GoogleButtonVisual aria-hidden="true">
+              <GoogleIcon src={googleIcon} alt="" />
+              Google 계정으로 계속하기
+            </GoogleButtonVisual>
             <GoogleButtonArea>
               <GoogleLogin
                 onSuccess={handleGoogleLogin}
@@ -79,71 +90,158 @@ const Login = () => {
                 shape="pill"
                 text="continue_with"
                 logo_alignment="center"
-                width="400"
+                width="330"
               />
             </GoogleButtonArea>
-          ) : (
-            <Button type="button" disabled>
-              구글 로그인 설정 필요
-            </Button>
-          )}
+          </GoogleButton>
+        ) : (
+          <LoginButton type="button" disabled>
+            구글 로그인 설정 필요
+          </LoginButton>
+        )}
 
-          {(errorMessage || !GOOGLE_CLIENT_ID) && (
-            <ErrorMessage role="alert">
-              {errorMessage ||
-                '.env에 VITE_GOOGLE_CLIENT_ID를 설정해 주세요.'}
-            </ErrorMessage>
-          )}
-
-          <Notice>
-            구글 계정으로 로그인하면
-            <br />
-            취향 프로파일과 여행 기록을 저장할 수 있습니다
-          </Notice>
-        </BottomArea>
-
-      </LoginWrapper>
-    </>
+        {(errorMessage || !GOOGLE_CLIENT_ID) && (
+          <ErrorMessage role="alert">
+            {errorMessage ||
+              '.env에 VITE_GOOGLE_CLIENT_ID를 설정해 주세요.'}
+          </ErrorMessage>
+        )}
+      </LoginArea>
+    </LoginWrapper>
   )
 }
 
 export default Login
 
 const LoginWrapper = styled.main`
+  position: relative;
   width: 100%;
-  max-width: 450px;
-  min-height: calc(
-    var(--app-viewport-height) - 116px + var(--design-safe-top)
-  );
+  max-width: 402px;
+  height: var(--app-viewport-height);
+  min-height: 0;
   margin: 0 auto;
-  padding: 74px 24px 24px;
-  display: flex;
-  flex-direction: column;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--Background-Base);
 `
 
-const TitleArea = styled.section`
+const Texture = styled.img`
+  position: absolute;
+  z-index: -3;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+`
+
+const BrandArea = styled.section`
+  position: relative;
+  z-index: 1;
+  height: min(429px, 49.08vh);
   display: flex;
   flex-direction: column;
   align-items: center;
+`
+
+const BrandMark = styled.img`
+  width: 136px;
+  height: 49px;
+  margin-top: min(159px, 18.19vh);
+`
+
+const Collaboration = styled.p`
+  margin-top: 33px;
+  color: var(--Accent-Gold);
+  font: 600 20px/24px var(--font-serif);
+  letter-spacing: 5.2px;
+  padding-left: 5.2px;
+`
+
+const Tagline = styled.p`
+  margin-top: 42px;
+  color: var(--Text-Primary);
+  font: 400 15px/22px var(--font-sans);
+`
+
+const PhotoBase = styled.div`
+  position: absolute;
+  z-index: -2;
+  top: min(429px, 49.08vh);
+  left: 0;
+  width: 100%;
+  height: min(445px, 50.92vh);
+  overflow: hidden;
+`
+
+const PhotoBaseImage = styled.img`
+  position: absolute;
+  top: -55.19%;
+  left: 0;
+  width: 99.99%;
+  height: 196.26%;
+  max-width: none;
+`
+
+const PhotoOverlay = styled.div`
+  position: absolute;
+  z-index: -1;
+  top: min(184px, 21.05vh);
+  left: 0;
+  width: 100%;
+  height: min(690px, 78.95vh);
+  overflow: hidden;
+`
+
+const PhotoOverlayImage = styled.img`
+  position: absolute;
+  top: 0;
+  left: 0.08%;
+  width: 99.92%;
+  height: 126.49%;
+  max-width: none;
+`
+
+const LoginArea = styled.section`
+  position: absolute;
+  z-index: 2;
+  top: min(728px, 83.30vh);
+  left: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+`
+
+const GoogleButton = styled.div`
+  position: relative;
+  width: 330px;
+  height: 56px;
+`
+
+const GoogleButtonVisual = styled.div`
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   gap: 12px;
+  border-radius: 20px;
+  background: #241c16;
+  box-shadow: var(--Effect-Card);
+  color: rgb(244 236 225 / 95%);
+  font: 500 14px/20px var(--font-sans);
 `
 
-const PassportArea = styled.div`
-  flex: 1;
-`
-
-const BottomArea = styled.section`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
+const GoogleIcon = styled.img`
+  width: 17px;
+  height: 18px;
+  object-fit: contain;
 `
 
 const GoogleButtonArea = styled.div`
-  width: 100%;
-  min-height: 44px;
-  display: flex;
-  justify-content: center;
+  position: absolute;
+  inset: 8px 0;
+  opacity: 0;
   overflow: hidden;
 
   & > div,
@@ -152,21 +250,16 @@ const GoogleButtonArea = styled.div`
   }
 `
 
-const Title = styled.h2`
-  font-size: 16px;
-  font-weight: 600;
+const LoginButton = styled.button`
+  width: 330px;
+  height: 56px;
+  border: 0;
+  border-radius: 20px;
+  background: #241c16;
+  color: rgb(244 236 225 / 95%);
+  font: 500 14px/20px var(--font-sans);
 `
 
-const SubTitle = styled.p`
-  font-size: 12px;
-`
-
-const Notice = styled.p`
-  margin-top: 8px;
-  font-size: 11px;
-  line-height: 1.9;
-  text-align: center;
-`
 
 const ErrorMessage = styled.p`
   color: #b42318;
