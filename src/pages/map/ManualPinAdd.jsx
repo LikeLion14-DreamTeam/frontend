@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import styled from 'styled-components'
 import { useNavigate } from 'react-router-dom'
 import { useMap } from '@vis.gl/react-google-maps'
@@ -179,6 +179,9 @@ const ManualPinAdd = () => {
     if (!selectedCenter) return undefined
 
     let ignore = false
+    // 이전 좌표의 주소를 계속 보여 주면 핀이 옮겨졌는데도 검색 주소에
+    // 고정된 것처럼 보인다. 새 좌표의 조회가 끝날 때까지는 확인 상태로 둔다.
+    setPlace(null)
     setIsResolvingPlace(true)
 
     const timer = setTimeout(() => {
@@ -237,14 +240,22 @@ const ManualPinAdd = () => {
       state: {
         latitude: selectedCenter.lat,
         longitude: selectedCenter.lng,
-        address: address.trim(),
+        address: place?.address ?? address.trim(),
         // 여기서 이미 받아둔 값을 넘겨 다음 화면이 다시 묻지 않게 한다.
         place,
       },
     })
   }
 
-  const { shift: mapShift, fitPadding } = getMapLayout(isSheetCollapsed)
+  /*
+   * 검색 결과를 지도에 맞추는 효과는 `fitPadding`을 의존성으로 가진다.
+   * 렌더마다 새 레이아웃 객체를 만들면 지도를 드래그할 때마다 효과가 다시
+   * 실행되어 검색한 주소로 되돌아간다. 시트 상태가 바뀔 때만 새 값을 만든다.
+   */
+  const { shift: mapShift, fitPadding } = useMemo(
+    () => getMapLayout(isSheetCollapsed),
+    [isSheetCollapsed],
+  )
 
   return (
     <Page>
@@ -326,7 +337,8 @@ const ManualPinAdd = () => {
       >
         <LocationLabel>선택한 위치</LocationLabel>
         <LocationTitle>
-          {address.trim() || place?.address || '지도에서 선택한 위치'}
+          {place?.address ||
+            (isResolvingPlace ? '주소를 확인하는 중이에요' : '지도에서 선택한 위치')}
         </LocationTitle>
         <LocationMeta>
           {formatPlaceMeta({
