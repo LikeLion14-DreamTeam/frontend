@@ -92,13 +92,18 @@ const PhotobookPinBlock = ({
         <Record $hasBoth={Boolean(note && voiceMemo)}>
           {note ? <Note>{note}</Note> : null}
           {voiceMemo ? (
-            <VoiceMemoBar
-              duration={voiceMemo.duration}
-              isPlaying={voiceMemo.isPlaying}
-              progress={voiceMemo.progress}
-              onToggle={voiceMemo.onToggle}
-              disabled={voiceMemo.disabled}
-            />
+            <VoiceRecord>
+              <VoiceMemoBar
+                duration={voiceMemo.duration}
+                isPlaying={voiceMemo.isPlaying}
+                progress={voiceMemo.progress}
+                onToggle={voiceMemo.onToggle}
+                disabled={voiceMemo.disabled}
+              />
+              {voiceMemo.error ? (
+                <VoiceError role="alert">{voiceMemo.error}</VoiceError>
+              ) : null}
+            </VoiceRecord>
           ) : null}
         </Record>
       ) : null}
@@ -267,5 +272,20 @@ const Note = styled.p`
   color: var(--Text-Primary);
   font: var(--text-ui-body-m);
   white-space: pre-wrap;
+  word-break: keep-all;
+`
+
+/* 오류 문구는 재생 막대 바로 아래 붙는다. 기록 묶음의 간격은 글과 음성
+   사이를 벌리는 값이라 여기까지 쓰면 문구가 막대에서 멀어진다. */
+const VoiceRecord = styled.div`
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+`
+
+const VoiceError = styled.p`
+  color: #b42318;
+  font: var(--text-ui-caption);
   word-break: keep-all;
 `
