@@ -123,7 +123,7 @@ const buildMockPinDetail = (pinId) => {
 const createMockPin = (pinPayload) => {
   const pinId =
     Math.max(0, ...Object.keys(mockPinStore.pins).map(Number)) + 1
-  const taggedAt = new Date().toISOString()
+  const taggedAt = pinPayload.tagged_at ?? new Date().toISOString()
 
   const pin = {
     pin_id: pinId,
@@ -201,6 +201,7 @@ export const createPin = async ({
   countryName,
   placeName = '',
   textNote = '',
+  taggedAt,
   audioFile,
   voiceDurationSec,
 }) => {
@@ -217,6 +218,9 @@ export const createPin = async ({
     text_note: textNote,
   }
 
+  // 수동 추가에서는 사용자가 고른 방문 시각을 저장해 지도 동선·순번에도 반영한다.
+  if (taggedAt) pinPayload.tagged_at = taggedAt
+
   // 음성 파일이나 재생 길이를 알 수 없을 때는 키 자체를 보내지 않는다.
   // null 을 명시하면 서버가 유효하지 않은 음성 값으로 해석한다.
   if (audioFile) {
@@ -224,11 +228,11 @@ export const createPin = async ({
     pinPayload.duration_sec = getDurationSec(voiceDurationSec)
   }
 
-  if (USE_MOCK) {
-    return createMockPin(pinPayload)
-  }
+  const createdPin = USE_MOCK
+    ? createMockPin(pinPayload)
+    : await apiClient.post('/pins', pinPayload)
 
-  return apiClient.post('/pins', pinPayload)
+  return createdPin
 }
 
 /**

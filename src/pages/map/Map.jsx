@@ -594,7 +594,13 @@ const MapPage = () => {
             latitude != null &&
             longitude != null,
         )
-        .sort((a, b) => a.tagged_at.localeCompare(b.tagged_at))
+        .sort((a, b) => {
+          const timeDifference =
+            new Date(a.tagged_at).getTime() - new Date(b.tagged_at).getTime()
+
+          // 같은 분에 생성한 핀도 번호가 흔들리지 않도록 ID로 순서를 고정한다.
+          return timeDifference || Number(a.pin_id) - Number(b.pin_id)
+        })
         .map((pin) => ({
           ...pin,
           longitude: normalizeLongitude(pin.longitude),

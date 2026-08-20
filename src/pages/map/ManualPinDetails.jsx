@@ -38,18 +38,22 @@ const WAVEFORM_HEIGHTS = [
 
 const FALLBACK_LOCATION = { latitude: 37.5796, longitude: 126.9849 }
 
-const formatCurrentDate = () => {
+const getCurrentDateTimeFields = () => {
   const now = new Date()
   const pad = (value) => String(value).padStart(2, '0')
 
   return {
-    date: `${now.getFullYear()}.${pad(now.getMonth() + 1)}.${pad(now.getDate())}`,
-    time: new Intl.DateTimeFormat('ko-KR', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    }).format(now),
+    date: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
+    time: `${pad(now.getHours())}:${pad(now.getMinutes())}`,
   }
+}
+
+/** date/time input 값은 사용자의 현지 시각이다. API에는 시간대가 포함된 ISO 값으로 보낸다. */
+const toTaggedAt = (date, time) => {
+  if (!date || !time) return null
+
+  const value = new Date(`${date}T${time}`)
+  return Number.isNaN(value.getTime()) ? null : value.toISOString()
 }
 
 const ManualPinDetails = () => {
@@ -64,9 +68,11 @@ const ManualPinDetails = () => {
   const address = location.state?.address ?? ''
   /** 위치 선택 화면에서 이미 받아 온 주소·도시·나라. 없으면 여기서 다시 묻는다. */
   const passedPlace = location.state?.place ?? null
-  const savedAt = useRef(formatCurrentDate()).current
+  const initialDateTime = useRef(getCurrentDateTimeFields()).current
 
   const [placeName, setPlaceName] = useState('')
+  const [taggedDate, setTaggedDate] = useState(initialDateTime.date)
+  const [taggedTime, setTaggedTime] = useState(initialDateTime.time)
   const [memo, setMemo] = useState('')
   const [photos, setPhotos] = useState([])
   /** 크게 보고 있는 사진의 자리. 없으면 -1 */
@@ -231,6 +237,13 @@ const ManualPinDetails = () => {
     // 이후 업로드·등록 단계가 건너뛰어져 빈 핀이 남는 것을 막는다.
     if (photos.length === 0 || isSaving) return
 
+    const taggedAt = toTaggedAt(taggedDate, taggedTime)
+
+    if (!taggedAt) {
+      setSaveError('날짜와 시각을 모두 설정해 주세요.')
+      return
+    }
+
     setIsSaving(true)
     setSaveError('')
     setUploadProgress(null)
@@ -293,6 +306,7 @@ const ManualPinDetails = () => {
           countryName: place?.countryName ?? '',
           placeName,
           textNote: memo,
+          taggedAt,
           audioFile: uploadedAudioRef.current?.url,
           voiceDurationSec,
         })
@@ -413,13 +427,25 @@ const ManualPinDetails = () => {
         </AddressField>
 
         <DateFields>
-          <FieldGroup>
+          <FieldGroup as="label">
             <FieldLabel>날짜</FieldLabel>
-            <DateValue>{savedAt.date}</DateValue>
+            <DateInput
+              type="date"
+              value={taggedDate}
+              onChange={(event) => setTaggedDate(event.target.value)}
+              aria-label="핀 날짜"
+              disabled={isSaving}
+            />
           </FieldGroup>
-          <FieldGroup>
+          <FieldGroup as="label">
             <FieldLabel>시각</FieldLabel>
-            <DateValue>{savedAt.time}</DateValue>
+            <DateInput
+              type="time"
+              value={taggedTime}
+              onChange={(event) => setTaggedTime(event.target.value)}
+              aria-label="핀 시각"
+              disabled={isSaving}
+            />
           </FieldGroup>
         </DateFields>
 
@@ -839,18 +865,25 @@ const FieldLabel = styled.p`
   font: var(--text-ui-caption);
 `
 
-const DateValue = styled.div`
+const DateInput = styled.input`
   width: 100%;
   height: 45px;
+  border: 0;
   padding: 12px 14px;
-  display: flex;
-  align-items: center;
   overflow: hidden;
   border-radius: 12px;
   background: var(--Surface-Base);
   color: var(--Text-Primary);
   font: var(--text-ui-label);
   text-align: left;
+
+  &:focus {
+    outline: 1px solid var(--Primary-Cognac);
+  }
+
+  &:disabled {
+    color: var(--Text-Secondary);
+  }
 `
 
 const PhotoSection = styled.section`
