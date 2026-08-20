@@ -452,7 +452,7 @@ const MultiCapture = () => {
           <GridLine style={{ top: '66.666%' }} aria-hidden="true" />
 
           {zoomSteps.length > 1 && (
-            <ZoomBar role="group" aria-label="배율">
+            <ZoomBar $landscape={isLandscape} role="group" aria-label="배율">
               {zoomSteps.map((step) => {
                 /* 지금 배율 이하의 가장 큰 단계가 켜진다. 손짓으로 2.4배가 되면
                    2x 버튼이 켜지고 글자가 그 값으로 바뀐다. */
@@ -685,21 +685,37 @@ const ViewfinderTint = styled.div`
 /* 뷰파인더 왼쪽 아래. 전환 버튼이 오른쪽 아래라 좌우로 나뉜다.
    큰 배율이 위로 오도록 세로로 세운다. */
 /* 뷰파인더 아래쪽 가운데. 오른쪽 아래 전환 버튼과는 겹치지 않는 폭이다. */
-/* 뷰파인더 오른쪽 세로 가운데. 아래에 두면 화면 한복판을 가로질러 피사체를
-   가린다. 오른쪽 아래 전환 버튼과는 세로로 떨어져 있어 겹치지 않는다.
-   위에서 아래로 배율이 커지도록 쌓는다. */
+/*
+ * 세로는 뷰파인더 아래 가운데, 가로는 오른쪽 세로 가운데.
+ *
+ * 가로는 뷰파인더가 낮아 아래에 두면 화면 한복판을 가로질러 피사체를 가린다.
+ * 오른쪽 아래 전환 버튼과는 세로로 떨어져 있어 겹치지 않는다.
+ *
+ * 낮은 배율이 먼저 오는 순서는 두 방향에서 같다. 세로는 왼쪽부터, 가로는
+ * 아래부터다. 가로에서 `column-reverse` 를 쓰는 것이 그래서다.
+ */
 const ZoomBar = styled.div`
   position: absolute;
   z-index: 4;
-  top: 50%;
-  right: 8px;
-  transform: translateY(-50%);
   padding: 4px;
   display: flex;
-  flex-direction: column;
   gap: 4px;
   border-radius: 22px;
   background: rgb(0 0 0 / 40%);
+
+  ${({ $landscape }) =>
+    $landscape
+      ? `
+        top: 50%;
+        right: 8px;
+        flex-direction: column-reverse;
+        transform: translateY(-50%);
+      `
+      : `
+        bottom: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+      `}
 `
 
 /* `2.4x` 까지 들어갈 만한 원으로 크기를 고정한다. 글자에 맞춰 늘리면 소수점이
