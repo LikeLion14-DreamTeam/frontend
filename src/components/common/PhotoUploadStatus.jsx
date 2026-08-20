@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import styled, { keyframes } from 'styled-components'
 import SnapSheet from './SnapSheet'
-import sheetWidth from './sheetWidth'
+import overlayWidth from './overlayWidth'
 
 const PhotoUploadStatus = ({ progress, className }) => {
   const [dotCount, setDotCount] = useState(1)
@@ -69,7 +69,7 @@ const UploadSheet = styled(SnapSheet)`
   z-index: 100;
   right: auto;
   left: 50%;
-  ${sheetWidth}
+  ${overlayWidth}
 `
 
 const spin = keyframes`

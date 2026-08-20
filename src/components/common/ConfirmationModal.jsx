@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import styled from 'styled-components'
 
 import Button from './Button'
-import sheetWidth from './sheetWidth'
+import overlayWidth from './overlayWidth'
 
 const FOCUSABLE_SELECTOR = [
   'button:not(:disabled)',
@@ -173,7 +173,7 @@ const ModalLayer = styled.div`
   position: fixed;
   z-index: 100;
   inset: 0 auto 0 50%;
-  ${sheetWidth}
+  ${overlayWidth}
   transform: translateX(-50%);
 `
 

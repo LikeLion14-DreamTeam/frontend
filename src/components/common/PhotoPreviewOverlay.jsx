@@ -1,6 +1,7 @@
 import styled from 'styled-components'
 import closeIcon from '../../assets/icons/capture-close.svg'
 import trashIcon from '../../assets/icons/capture-trash.svg'
+import overlayWidth from './overlayWidth'
 
 /**
  * 사진을 크게 보는 오버레이. 촬영 화면과 전체 사진 보기가 같은 모습을 쓴다.
@@ -105,18 +106,20 @@ const DeleteButton = styled.button`
 /*
  * 화면 전체를 덮어야 해서 `fixed` 로 둔다. `absolute` 로 두면 기준이 되는
  * 조상이 화면마다 달라, 스크롤되는 화면에서는 사진 아래가 덮이지 않는다.
+ *
+ * 폭은 세로에서 페이지와 같게 가운데 세우고, 가로에서만 화면을 꽉 채운다.
+ * 가로는 폭이 900 안팎이라 상한에 묶어 두면 양옆으로 뒤가 비친다.
  */
-/* 화면을 꽉 채운다. 페이지 폭(450)에 맞춰 두면 그보다 넓은 화면에서 양옆으로
-   뒤가 비친다. 사진을 크게 보려고 띄운 것이라 뒤가 보이면 안 된다.
-   세로로 든 기기는 폭이 450 이하라 지금과 달라지지 않는다. */
 const PreviewLayer = styled.div`
   position: fixed;
   z-index: 20;
-  inset: 0;
+  inset: 0 auto 0 50%;
+  ${overlayWidth}
   display: flex;
   flex-direction: column;
   align-items: center;
   background: var(--Text-Primary);
+  transform: translateX(-50%);
 `
 
 const PreviewClose = styled.button`

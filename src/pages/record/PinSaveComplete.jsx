@@ -4,7 +4,7 @@ import styled from 'styled-components'
 import { uploadAudio } from '../../api/uploads'
 import Button from '../../components/common/Button'
 import ConfirmationModal from '../../components/common/ConfirmationModal'
-import sheetWidth from '../../components/common/sheetWidth'
+import overlayWidth from '../../components/common/overlayWidth'
 import PhotoUploadStatus from '../../components/common/PhotoUploadStatus'
 import { createPin, deletePin } from '../../features/pins/pinApi'
 import {
@@ -980,7 +980,7 @@ const ModalLayer = styled.div`
   position: fixed;
   z-index: 50;
   inset: 0 auto 0 50%;
-  ${sheetWidth}
+  ${overlayWidth}
   transform: translateX(-50%);
 `
 
