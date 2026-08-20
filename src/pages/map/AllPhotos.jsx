@@ -116,7 +116,8 @@ const AllPhotos = () => {
   const [addError, setAddError] = useState('')
 
   /** 크게 보고 있는 사진의 자리. 없으면 -1 */
-  const [previewIndex, setPreviewIndex] = useState(-1)
+  /** 크게 보고 있는 사진. `{ groupIndex, index }` 이고 없으면 null */
+  const [preview, setPreview] = useState(null)
   const [isSelectMode, setIsSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState([])
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
@@ -155,11 +156,16 @@ const AllPhotos = () => {
 
   const groups = useMemo(() => groupByCaptureTime(photos), [photos])
 
-  /* 크게 보기는 묶음을 넘나들며 넘길 수 있어야 해서, 화면에 보이는 순서대로
-     펼친 목록을 따로 둔다. 타일의 자리는 묶음의 `offset` 을 더해 구한다. */
-  const orderedPhotos = useMemo(
-    () => groups.flatMap((group) => group.photos),
-    [groups],
+  /* 크게 보기는 누른 사진이 속한 묶음 안에서만 넘긴다. 묶음은 찍은 때로
+     갈라 놓은 것이라, 넘나들면 몇 시간 떨어진 사진이 이어서 나온다. */
+  const previewGroup = preview ? groups[preview.groupIndex] : null
+  const previewPhotos = useMemo(
+    () =>
+      (previewGroup?.photos ?? []).map((photo) => ({
+        id: photo.photo_id,
+        url: photo.file_path,
+      })),
+    [previewGroup],
   )
 
   const title = pin?.place_name || pin?.address || '이름 없는 장소'
@@ -327,7 +333,7 @@ const AllPhotos = () => {
 
       {!isLoading && !errorMessage && photos.length > 0 && (
         <PhotoGroups>
-          {groups.map((group) => (
+          {groups.map((group, groupIndex) => (
             <PhotoGroup key={group.startedAt ?? group.offset}>
               <GroupHeading>
                 <Time>{formatDateTime(group.startedAt)}</Time>
@@ -348,7 +354,7 @@ const AllPhotos = () => {
                     onClick={
                       isSelectMode
                         ? () => toggleSelected(photo.photo_id)
-                        : () => setPreviewIndex(group.offset + index)
+                        : () => setPreview({ groupIndex, index })
                     }
                     src={photo.file_path}
                     alt={`${index + 1}번째 사진`}
@@ -379,15 +385,15 @@ const AllPhotos = () => {
       </ConfirmationModal>
 
       {/* 선택 모드에서는 고르는 게 우선이라 크게 보기를 띄우지 않는다. */}
-      {!isSelectMode && previewIndex >= 0 && (
+      {!isSelectMode && previewPhotos.length > 0 && (
         <PhotoPreviewOverlay
-          photos={orderedPhotos.map((photo) => ({
-            id: photo.photo_id,
-            url: photo.file_path,
-          }))}
-          index={previewIndex}
-          onIndexChange={setPreviewIndex}
-          onClose={() => setPreviewIndex(-1)}
+          photos={previewPhotos}
+          /* 보고 있는 동안 사진이 늘거나 줄어도 자리를 벗어나지 않게 한다. */
+          index={Math.min(preview.index, previewPhotos.length - 1)}
+          onIndexChange={(index) =>
+            setPreview((current) => ({ ...current, index }))
+          }
+          onClose={() => setPreview(null)}
         />
       )}
     </Page>
