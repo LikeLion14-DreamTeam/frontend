@@ -685,14 +685,18 @@ const ViewfinderTint = styled.div`
 /* 뷰파인더 왼쪽 아래. 전환 버튼이 오른쪽 아래라 좌우로 나뉜다.
    큰 배율이 위로 오도록 세로로 세운다. */
 /* 뷰파인더 아래쪽 가운데. 오른쪽 아래 전환 버튼과는 겹치지 않는 폭이다. */
+/* 뷰파인더 오른쪽 세로 가운데. 아래에 두면 화면 한복판을 가로질러 피사체를
+   가린다. 오른쪽 아래 전환 버튼과는 세로로 떨어져 있어 겹치지 않는다.
+   위에서 아래로 배율이 커지도록 쌓는다. */
 const ZoomBar = styled.div`
   position: absolute;
   z-index: 4;
-  bottom: 8px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
   padding: 4px;
   display: flex;
+  flex-direction: column;
   gap: 4px;
   border-radius: 22px;
   background: rgb(0 0 0 / 40%);
