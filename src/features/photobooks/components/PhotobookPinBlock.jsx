@@ -265,9 +265,11 @@ const Record = styled.div`
 `
 
 const Note = styled.p`
+  min-width: 0;
   width: 100%;
   color: var(--Text-Primary);
   font: var(--text-ui-body-m);
-  white-space: pre-wrap;
-  word-break: keep-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `
