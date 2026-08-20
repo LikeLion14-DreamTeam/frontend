@@ -56,6 +56,16 @@ const toTaggedAt = (date, time) => {
   return Number.isNaN(value.getTime()) ? null : value.toISOString()
 }
 
+/** 모바일 브라우저의 로케일별 time 표기와 무관하게 시안 형식으로 보여 준다. */
+const formatDisplayTime = (time) => {
+  const [hourValue, minute = '00'] = time.split(':')
+  const hour = Number(hourValue)
+
+  if (!Number.isFinite(hour)) return time
+
+  return `${hour < 12 ? '오전' : '오후'} ${hour % 12 || 12}:${minute}`
+}
+
 const ManualPinDetails = () => {
   const navigate = useNavigate()
   const location = useLocation()
@@ -429,23 +439,38 @@ const ManualPinDetails = () => {
         <DateFields>
           <FieldGroup as="label">
             <FieldLabel>날짜</FieldLabel>
-            <DateInput
-              type="date"
-              value={taggedDate}
-              onChange={(event) => setTaggedDate(event.target.value)}
-              aria-label="핀 날짜"
-              disabled={isSaving}
-            />
+            <DateField>
+              <DateInput
+                type="date"
+                value={taggedDate}
+                onChange={(event) => setTaggedDate(event.target.value)}
+                aria-label="핀 날짜"
+                disabled={isSaving}
+              />
+              <DateValue aria-hidden="true">{taggedDate}</DateValue>
+              <PickerIcon viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M7 3v3M17 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z" />
+              </PickerIcon>
+            </DateField>
           </FieldGroup>
           <FieldGroup as="label">
             <FieldLabel>시각</FieldLabel>
-            <DateInput
-              type="time"
-              value={taggedTime}
-              onChange={(event) => setTaggedTime(event.target.value)}
-              aria-label="핀 시각"
-              disabled={isSaving}
-            />
+            <DateField>
+              <DateInput
+                type="time"
+                value={taggedTime}
+                onChange={(event) => setTaggedTime(event.target.value)}
+                aria-label="핀 시각"
+                disabled={isSaving}
+              />
+              <DateValue aria-hidden="true">
+                {formatDisplayTime(taggedTime)}
+              </DateValue>
+              <PickerIcon viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="8.5" />
+                <path d="M12 7.5V12l3 2" />
+              </PickerIcon>
+            </DateField>
           </FieldGroup>
         </DateFields>
 
@@ -865,23 +890,101 @@ const FieldLabel = styled.p`
   font: var(--text-ui-caption);
 `
 
-const DateInput = styled.input`
+const DateField = styled.span`
+  position: relative;
   width: 100%;
+  min-width: 0;
   height: 45px;
-  border: 0;
-  padding: 12px 14px;
+  display: block;
   overflow: hidden;
   border-radius: 12px;
   background: var(--Surface-Base);
-  color: var(--Text-Primary);
+
+  &:focus-within {
+    outline: 1px solid var(--Primary-Cognac);
+  }
+`
+
+const DateInput = styled.input`
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 45px;
+  min-width: 0;
+  min-height: 0;
+  max-height: 45px;
+  border: 0;
+  padding: 0 42px 0 14px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--Surface-Base);
+  color: transparent;
+  -webkit-text-fill-color: transparent;
   font: var(--text-ui-label);
   text-align: left;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
 
   &:focus {
-    outline: 1px solid var(--Primary-Cognac);
+    outline: 0;
+  }
+
+  &::-webkit-date-and-time-value {
+    width: 100%;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    text-align: left;
+  }
+
+  &::-webkit-calendar-picker-indicator {
+    position: absolute;
+    top: 0;
+    right: 8px;
+    width: 28px;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    opacity: 0;
+    cursor: pointer;
   }
 
   &:disabled {
+    cursor: default;
+  }
+`
+
+const DateValue = styled.span`
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  color: var(--Text-Primary);
+  font: var(--text-ui-label);
+  line-height: 18px;
+  white-space: nowrap;
+  transform: translateY(-50%);
+  pointer-events: none;
+
+  ${DateInput}:disabled + & {
+    color: var(--Text-Secondary);
+  }
+`
+
+const PickerIcon = styled.svg`
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transform: translateY(-50%);
+  pointer-events: none;
+
+  ${DateInput}:disabled ~ & {
     color: var(--Text-Secondary);
   }
 `
