@@ -214,6 +214,13 @@ const ManualPinAdd = () => {
     setSelectedCenter(normalizeMapPosition(center))
   }
 
+  // 검색한 위치에서 직접 지도를 옮기면, 입력칸도 새 위치를 찾는 상태로 비운다.
+  const handleMapDragStart = () => {
+    setSearchedResult(null)
+    setAddress('')
+    setSearchError('')
+  }
+
   /* 입력한 주소를 좌표로 바꿔 지도를 옮긴다. 핀은 늘 지도 중심이라 따라온다. */
   const handleSearch = async (event) => {
     event.preventDefault()
@@ -281,6 +288,7 @@ const ManualPinAdd = () => {
               gestureHandling: 'greedy',
               keyboardShortcuts: false,
               onCenterChanged: handleCenterChanged,
+              onDragstart: handleMapDragStart,
             }}
           >
             <PanToSearched
