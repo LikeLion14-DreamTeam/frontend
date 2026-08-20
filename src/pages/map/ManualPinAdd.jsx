@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { useNavigate } from 'react-router-dom'
 import { useMap } from '@vis.gl/react-google-maps'
@@ -36,6 +36,10 @@ const SEARCH_MAX_ZOOM = 18
  */
 const PanToSearched = ({ result, fitPadding, onSettled }) => {
   const map = useMap()
+  const fitPaddingRef = useRef(fitPadding)
+
+  // 시트를 접고 펼 때에도 마지막 검색 결과를 다시 적용하지 않는다.
+  fitPaddingRef.current = fitPadding
 
   useEffect(() => {
     if (!map || !result) return undefined
@@ -51,7 +55,7 @@ const PanToSearched = ({ result, fitPadding, onSettled }) => {
       return undefined
     }
 
-    map.fitBounds(result.viewport, fitPadding)
+    map.fitBounds(result.viewport, fitPaddingRef.current)
 
     /* `fitBounds` 에는 상한이 없다. 자리를 잡은 뒤 한 번만 눌러 준다. */
     const listener = map.addListener('idle', () => {
@@ -64,7 +68,7 @@ const PanToSearched = ({ result, fitPadding, onSettled }) => {
     })
 
     return () => listener.remove()
-  }, [fitPadding, map, onSettled, result])
+  }, [map, onSettled, result])
 
   return null
 }
