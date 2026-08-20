@@ -360,7 +360,10 @@ const PinDetail = () => {
     const audio = audioRef.current
     if (!audio) return
 
-    if (isPlaying) {
+    // 버튼에 그리는 상태는 브라우저 이벤트로 갱신된다. 클릭 순간에는 그 값이
+    // 실제 미디어 상태보다 늦을 수 있으므로, 재생/정지는 audio 자체를 기준으로
+    // 판단한다. 그래야 첫 클릭도 곧바로 재생 요청으로 이어진다.
+    if (!audio.paused) {
       audio.pause()
       return
     }
@@ -368,7 +371,9 @@ const PinDetail = () => {
     try {
       setVoiceError('')
       await audio.play()
+      setIsPlaying(true)
     } catch {
+      setIsPlaying(false)
       setVoiceError('음성을 재생할 수 없어요.')
     }
   }
