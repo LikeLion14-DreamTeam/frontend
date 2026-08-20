@@ -7,6 +7,7 @@ import PhotoPreviewOverlay, {
   PreviewDeleteButton,
 } from '../../components/common/PhotoPreviewOverlay'
 import cameraFlipIcon from '../../assets/icons/camera-flip.svg'
+import useIsLandscape from '../../hooks/useIsLandscape'
 import { linkProduct } from '../../features/products/productApi'
 import useRecordDraftStore from '../../features/pins/useRecordDraftStore'
 import {
@@ -51,31 +52,6 @@ const formatZoom = (value) => `${Number(value.toFixed(1))}x`
    기기를 돌리면 긴 쪽이 바뀌므로 비율도 함께 뒤집는다. */
 const PORTRAIT_RATIO = 3 / 4
 const LANDSCAPE_RATIO = 4 / 3
-
-/**
- * 지금 화면이 가로인지.
- *
- * 돌리는 즉시 뷰파인더 비율과 배치가 따라가야 해서 상태로 들고 있는다.
- * 창 크기가 아니라 방향을 직접 물어야 키보드가 올라와 높이만 줄어든 경우에
- * 가로로 잘못 보지 않는다.
- */
-const useIsLandscape = () => {
-  const [isLandscape, setIsLandscape] = useState(
-    () => window.matchMedia('(orientation: landscape)').matches,
-  )
-
-  useEffect(() => {
-    const query = window.matchMedia('(orientation: landscape)')
-    const syncOrientation = (event) => setIsLandscape(event.matches)
-
-    setIsLandscape(query.matches)
-    query.addEventListener('change', syncOrientation)
-
-    return () => query.removeEventListener('change', syncOrientation)
-  }, [])
-
-  return isLandscape
-}
 
 // 개발 모드의 StrictMode 재마운트에서도 같은 NFC 연결 요청을 중복 호출하지 않는다.
 const requestedTagLinks = new Set()

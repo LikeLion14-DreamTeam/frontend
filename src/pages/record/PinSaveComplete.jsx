@@ -17,6 +17,7 @@ import {
   MAX_PIN_PHOTOS,
   getRemainingPhotoCapacity,
 } from '../../features/pins/photoUploadQueue'
+import PortraitOnlyNotice from '../../components/common/PortraitOnlyNotice'
 import useSwipeNavigation from '../../hooks/useSwipeNavigation'
 import useVoiceRecorder, {
   formatVoiceDuration,
@@ -412,6 +413,9 @@ const PinSaveComplete = () => {
 
   return (
     <PageShell>
+      {/* 촬영 화면은 가로를 지원하지만 여기부터는 세로 기준으로 짜여 있다.
+          가로로 들고 넘어오면 무너진 화면 대신 안내를 덮는다. */}
+      <PortraitOnlyNotice />
       <PageContent>
         <SuccessHeader>
           <StampIcon src={stampCheckIcon} alt="" aria-hidden="true" />
