@@ -112,8 +112,13 @@ const getOffsetCenter = (map, core, position, zoom) => {
  * 고른 핀으로 지도를 옮긴다.
  *
  * `useMap` 은 `<Map>` 안에서만 쓸 수 있어 자식 컴포넌트로 둔다. 그리는 건 없다.
+ *
+ * `keepZoom` 이 false 면 지금 배율을 보지 않고 `SELECTED_PIN_ZOOM` 으로 간다.
+ * 핀 상세를 보다 뒤로 온 경우가 그렇다. 그때는 지도가 아직 자리를 잡는 중이라
+ * 지금 배율이 중간값이고, 영역 맞춤 상한과 어느 쪽이 먼저냐에 따라 결과가
+ * 매번 달라진다. 목표를 못박으면 순서와 무관하게 늘 같은 배율로 끝난다.
  */
-const FocusSelectedPin = ({ latitude, longitude }) => {
+const FocusSelectedPin = ({ latitude, longitude, keepZoom = true }) => {
   const map = useMap()
   const core = useMapsLibrary('core')
 
@@ -145,7 +150,9 @@ const FocusSelectedPin = ({ latitude, longitude }) => {
     if (!startCenter || startZoom == null) return undefined
 
     // 이미 더 당겨 봤다면 뒤로 물러나지 않는다.
-    const targetZoom = Math.max(startZoom, SELECTED_PIN_ZOOM)
+    const targetZoom = keepZoom
+      ? Math.max(startZoom, SELECTED_PIN_ZOOM)
+      : SELECTED_PIN_ZOOM
     const targetCenter = getOffsetCenter(
       map,
       core,
@@ -201,7 +208,7 @@ const FocusSelectedPin = ({ latitude, longitude }) => {
 
     // 다른 핀을 고르면 진행 중이던 이동을 멈추고 새로 시작한다.
     return () => cancelAnimationFrame(frame)
-  }, [core, isProjectionReady, latitude, longitude, map])
+  }, [core, isProjectionReady, keepZoom, latitude, longitude, map])
 
   return null
 }
@@ -315,6 +322,8 @@ const MapPage = () => {
     }
   }
   const [selectedPinId, setSelectedPinId] = useState(null)
+  /** 핀 상세를 보다 뒤로 와서 되살린 핀. 그 핀으로 갈 때만 배율을 못박는다. */
+  const [restoredPinId, setRestoredPinId] = useState(null)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [mapCenter, setMapCenter] = useState(null)
   /** 영역(mapBounds)을 못 잡을 때 쓰는 배율 */
@@ -653,8 +662,19 @@ const MapPage = () => {
       ({ pin_id }) => String(pin_id) === initialParams.pin,
     )
 
-    if (target) setSelectedPinId(target.pin_id)
+    if (target) {
+      setRestoredPinId(target.pin_id)
+      setSelectedPinId(target.pin_id)
+    }
   }, [initialParams.pin, mapPins])
+
+  /* 되살린 핀에서 손을 떼면 그 표시도 지운다. 이후 같은 핀을 다시 눌렀을 때는
+     사용자가 고른 것이므로 보고 있던 배율을 지켜야 한다. */
+  useEffect(() => {
+    if (restoredPinId !== null && selectedPinId !== restoredPinId) {
+      setRestoredPinId(null)
+    }
+  }, [restoredPinId, selectedPinId])
 
   /*
    * 보고 있는 여정과 고른 핀을 주소에 남긴다. 핀 상세로 갔다가 뒤로 오면
@@ -906,6 +926,7 @@ const MapPage = () => {
                 <FocusSelectedPin
                   latitude={selectedPin.latitude}
                   longitude={selectedPin.longitude}
+                  keepZoom={selectedPinId !== restoredPinId}
                 />
 
                 <MapOverlay
