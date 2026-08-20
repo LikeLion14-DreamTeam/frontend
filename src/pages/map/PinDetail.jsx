@@ -858,7 +858,7 @@ const PinDetail = () => {
             </SuggestedDescription>
             {photos.length < 4 && !refreshError && (
               <RefreshHint>
-                대표사진 새로고침은 사진이 4장 이상일 때만 가능합니다.
+                추천사진 새로고침은 사진이 4장 이상일 때만 가능합니다.
               </RefreshHint>
             )}
             {refreshError && <RefreshError role="alert">{refreshError}</RefreshError>}
