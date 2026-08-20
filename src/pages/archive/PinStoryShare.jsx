@@ -7,6 +7,7 @@ import downloadIcon from '../../assets/story-share/download.svg'
 import shareIcon from '../../assets/story-share/share.svg'
 import { getPhotobook } from '../../features/photobooks/photobookApi'
 import SnapSheet from '../../components/common/SnapSheet'
+import sheetWidth from '../../components/common/sheetWidth'
 
 const STORY_WIDTH = 1080
 const STORY_HEIGHT = 1920
@@ -617,10 +618,8 @@ const ArrowButton = styled.button`
   &:disabled { opacity: 0.2; cursor: default; }
 `
 
-/* 402 로 묶어 두면 그보다 넓은 기기에서 좌우가 뜬다. 시트는 화면 아래에
-   붙는 것이라 가장자리까지 닿아야 해서 앱 공통 상한(450)까지 늘린다. */
 const TemplateSheet = styled(SnapSheet)`
-  width: min(100%, 450px);
+  ${sheetWidth}
   left: 50%;
   z-index: 4;
   padding: 0 0 20px;
