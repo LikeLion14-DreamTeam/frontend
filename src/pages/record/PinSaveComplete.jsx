@@ -121,6 +121,10 @@ const PinSaveComplete = () => {
 
   const hasLocation = latitude != null && longitude != null
 
+  /** 녹음 중이거나 권한을 묻는 중. 이때는 멈추는 것 말고 할 수 있는 게 없다. */
+  const isVoiceBusy =
+    voiceStatus === 'requesting' || voiceStatus === 'recording'
+
   const record = {
     location:
       address ||
@@ -609,15 +613,13 @@ const PinSaveComplete = () => {
               <VoicePlayback controls src={voiceUrl} aria-label="녹음 미리 듣기" />
             )}
             {voiceError && <VoiceError role="alert">{voiceError}</VoiceError>}
-            <RecordAgainButton
-              type="button"
-              onClick={handleRecordAgain}
-              disabled={
-                voiceStatus === 'requesting' || voiceStatus === 'recording'
-              }
-            >
-              다시녹음
-            </RecordAgainButton>
+            {/* 녹음 중이거나 권한을 묻는 중에는 다시 녹음할 수 없다. 눌리지
+                않는 버튼을 그대로 두면 눌러 보고 고장으로 여기게 된다. */}
+            {!isVoiceBusy && (
+              <RecordAgainButton type="button" onClick={handleRecordAgain}>
+                다시녹음
+              </RecordAgainButton>
+            )}
             {voiceStatus === 'recording' ? (
               <StopButton
                 type="button"
