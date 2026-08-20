@@ -107,6 +107,19 @@ const getPhotoIdentity = (photo) => {
   return url ? `url:${url}` : null
 }
 
+/** 현재 핀에 남아 있는 사진만 대표사진 후보로 사용한다. */
+const filterAvailablePhotos = (candidatePhotos, photos) => {
+  const availablePhotoIds = new Set(
+    (Array.isArray(photos) ? photos : [])
+      .map(getPhotoIdentity)
+      .filter(Boolean),
+  )
+
+  return (Array.isArray(candidatePhotos) ? candidatePhotos : []).filter(
+    (photo) => availablePhotoIds.has(getPhotoIdentity(photo)),
+  )
+}
+
 const composePinThumbnailPhotos = (representativePhotos, photos) => {
   if (!representativePhotos.length) return photos
 
@@ -129,7 +142,10 @@ const composePinThumbnailPhotos = (representativePhotos, photos) => {
 const normalizePin = (pin, cityName, countryName, index, audioUrls) => {
   const placeName = pin.place_name?.trim() || '이름 없는 장소'
   const voiceMemo = pin.voice_memo
-  const refreshedRepresentativePhotos = getCachedRepresentativePhotos(pin.pin_id)
+  const refreshedRepresentativePhotos = filterAvailablePhotos(
+    getCachedRepresentativePhotos(pin.pin_id),
+    pin.photos,
+  )
   const representativePhotos = refreshedRepresentativePhotos.length
     ? refreshedRepresentativePhotos
     : Array.isArray(pin.representative_photos)

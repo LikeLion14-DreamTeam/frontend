@@ -65,6 +65,25 @@ export const getCachedRepresentativePhotos = (pinId) => {
   return Array.isArray(photos) ? photos : []
 }
 
+/** 삭제된 사진이 들어 있던 대표사진 캐시는 서버의 재추천 결과와 달라질 수 있다. */
+const invalidateRepresentativePhotoCache = (photoId) => {
+  const targetId = String(photoId)
+  const cache = getRepresentativePhotoCache()
+  let changed = false
+
+  Object.entries(cache).forEach(([pinId, photos]) => {
+    if (
+      Array.isArray(photos) &&
+      photos.some((photo) => String(photo?.photo_id ?? photo?.id) === targetId)
+    ) {
+      delete cache[pinId]
+      changed = true
+    }
+  })
+
+  if (changed) saveRepresentativePhotoCache(cache)
+}
+
 /** 음성 길이를 0 이상의 정수 초로 다듬는다. 값이 없으면 0. */
 const getDurationSec = (value) => {
   const durationSec = Number(value)
@@ -574,7 +593,10 @@ export const getPinVoiceMemos = async (pinId) => {
  * 항상 최대 3장을 유지한다. 204 No Content 라 반환값이 없다.
  */
 export const deletePhoto = async (photoId) => {
-  if (deleteDemoPhoto(photoId)) return null
+  if (deleteDemoPhoto(photoId)) {
+    invalidateRepresentativePhotoCache(photoId)
+    return null
+  }
 
   if (USE_MOCK) {
     const targetId = Number(photoId)
@@ -601,11 +623,14 @@ export const deletePhoto = async (photoId) => {
     }
 
     mockPinStore.photos[pinId] = remaining
+    invalidateRepresentativePhotoCache(photoId)
 
     return null
   }
 
-  return apiClient.delete(`/photos/${photoId}`)
+  const result = await apiClient.delete(`/photos/${photoId}`)
+  invalidateRepresentativePhotoCache(photoId)
+  return result
 }
 
 /**
