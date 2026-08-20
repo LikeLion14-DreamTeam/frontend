@@ -21,11 +21,13 @@ import myLocationIcon from '../../assets/map/my-location.svg'
 import recordPlusIcon from '../../assets/map/record-plus.png'
 import tripSelectChevron from '../../assets/icons/trip-select-chevron.svg'
 import {
+  getCachedRepresentativePhotos,
   getPinsByCountry,
   getOngoingPins,
   getPin,
   getPinPhotos,
 } from '../../features/pins/pinApi'
+import { composeRepresentativePhotos } from '../../features/pins/representativePhotos'
 import {
   getCountryStamps,
   getTrip,
@@ -685,6 +687,16 @@ const MapPage = () => {
   const [pinPhotos, setPinPhotos] = useState([])
   const [popoverError, setPopoverError] = useState('')
 
+  const popoverRepresentativePhotos = useMemo(() => {
+    if (!pinDetail) return []
+
+    const cachedPhotos = getCachedRepresentativePhotos(selectedPinId)
+    return composeRepresentativePhotos(
+      cachedPhotos.length ? cachedPhotos : pinDetail.representative_photos,
+      pinPhotos,
+    )
+  }, [pinDetail, pinPhotos, selectedPinId])
+
   /** 핀을 고르면 말풍선에 채울 값을 5.1 · 5.4 로 받는다. */
   useEffect(() => {
     if (!selectedPinId) {
@@ -911,7 +923,7 @@ const MapPage = () => {
                       taggedAt={formatTaggedAt(pinDetail?.tagged_at)}
                       photoCount={pinPhotos.length}
                       hasVoiceMemo={Boolean(pinDetail?.voice_memo)}
-                      photos={pinDetail?.representative_photos ?? []}
+                      photos={popoverRepresentativePhotos}
                       message={
                         popoverError || (pinDetail ? '' : '불러오는 중...')
                       }
