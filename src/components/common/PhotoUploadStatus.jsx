@@ -63,12 +63,14 @@ const PhotoUploadStatus = ({ progress, className }) => {
 
 export default PhotoUploadStatus
 
+/* 화면 아래에 붙는 시트라 가장자리까지 닿아야 한다. 402 로 묶으면 그보다
+   넓은 기기에서 좌우가 뜬다. 앱 공통 상한을 쓴다. */
 const UploadSheet = styled(SnapSheet)`
   position: fixed;
   z-index: 100;
   right: auto;
   left: 50%;
-  width: min(100%, 402px);
+  width: min(100%, 450px);
 `
 
 const spin = keyframes`

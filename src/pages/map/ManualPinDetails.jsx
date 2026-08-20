@@ -1042,11 +1042,13 @@ const PartialUploadNotice = styled.p`
   word-break: keep-all;
 `
 
+/* 시트는 화면 아래에 붙는 것이라 가장자리까지 닿아야 한다. 본문과 같은
+   402 로 묶으면 그보다 넓은 기기에서 좌우가 뜬다. 앱 공통 상한을 쓴다. */
 const ModalLayer = styled.div`
   position: fixed;
   z-index: 50;
   inset: 0 auto 0 50%;
-  width: min(100%, 402px);
+  width: min(100%, 450px);
   transform: translateX(-50%);
 `
 
