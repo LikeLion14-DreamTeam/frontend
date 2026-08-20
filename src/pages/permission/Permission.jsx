@@ -242,6 +242,12 @@ const Permission = () => {
         </Body>
 
         <Footer>
+          {/* 컴퓨터로 열었을 때 화면이 좁게 서는 이유를 미리 알린다.
+              시작 버튼 바로 위라 누르기 전에 눈에 들어온다. */}
+          <DeviceNotice>
+            해당 서비스는 모바일 환경에 최적화되어 있습니다
+          </DeviceNotice>
+
           <GuideButton
             type="button"
             disabled={isSubmitting}
@@ -327,6 +333,13 @@ const Footer = styled.section`
   flex-direction: column;
   align-items: center;
   gap: 20px;
+`
+
+const DeviceNotice = styled.p`
+  color: var(--Text-Secondary);
+  font: var(--text-ui-caption);
+  text-align: center;
+  word-break: keep-all;
 `
 
 const GuideButton = styled.button`
