@@ -62,17 +62,15 @@ const Permission = () => {
   const setUser = useAuthStore((state) => state.setUser)
   const [mobileOS] = useState(detectMobileOS)
   const [permissionStatuses, setPermissionStatuses] = useState(() => ({
-    nfc: getNfcIntroStatus(mobileOS),
+    /* NFC 는 기기에 물어보는 권한이 아니라 제품을 어떻게 쓰는지 알리는
+       칸이다. 지원 여부를 보지 않고 늘 안내 상태로 둔다. */
+    nfc: DEVICE_PERMISSION_STATUS.GRANTED,
     camera: DEVICE_PERMISSION_STATUS.IDLE,
     location: DEVICE_PERMISSION_STATUS.IDLE,
     microphone: DEVICE_PERMISSION_STATUS.IDLE,
   }))
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
-
-  const visiblePermissionItems = permissionStatusCardItems.filter(
-    ({ key }) => key !== 'nfc' || mobileOS !== 'ios',
-  )
 
   useEffect(() => {
     let ignore = false
@@ -173,14 +171,15 @@ const Permission = () => {
       rememberLocationGranted()
 
       const updatedUser = await completePermissionIntro()
-      const unavailablePermissionKeys = visiblePermissionItems
-        .map(({ key }) => key)
-        .filter(
-          (permissionType) =>
-            nextStatuses[permissionType] === DEVICE_PERMISSION_STATUS.DENIED ||
-            nextStatuses[permissionType] ===
-              DEVICE_PERMISSION_STATUS.UNSUPPORTED,
-        )
+      /* NFC 는 기기에 물어보지 않는 안내 칸이라 진행을 막는 근거가 될 수 없다.
+         Web NFC 를 지원하지 않는 브라우저에서 미지원으로 잡혀 온보딩까지 못
+         가던 문제가 여기서 났다. */
+      const unavailablePermissionKeys = REQUEST_PERMISSION_TYPES.filter(
+        (permissionType) =>
+          nextStatuses[permissionType] === DEVICE_PERMISSION_STATUS.DENIED ||
+          nextStatuses[permissionType] ===
+            DEVICE_PERMISSION_STATUS.UNSUPPORTED,
+      )
 
       const hasUnavailablePermission = unavailablePermissionKeys.length > 0
 
@@ -215,7 +214,7 @@ const Permission = () => {
         <Body>
           <Head>
             <Title>
-              기록을 시작하려면 {visiblePermissionItems.length}가지가 필요해요
+              기록을 시작하려면 {permissionStatusCardItems.length}가지가 필요해요
             </Title>
             <Description>
               여행 기록을 시작하려면 아래 권한이 필요합니다.
@@ -223,7 +222,7 @@ const Permission = () => {
           </Head>
 
           <PermissionList>
-            {visiblePermissionItems.map(({ key, ...item }) => {
+            {permissionStatusCardItems.map(({ key, ...item }) => {
               const status = permissionStatuses[key]
               const disabled =
                 status === DEVICE_PERMISSION_STATUS.DENIED ||
@@ -249,7 +248,7 @@ const Permission = () => {
             onClick={() =>
               navigate('/permission/denied-guide', {
                 state: {
-                  visiblePermissionKeys: visiblePermissionItems.map(
+                  visiblePermissionKeys: permissionStatusCardItems.map(
                     ({ key }) => key,
                   ),
                 },
