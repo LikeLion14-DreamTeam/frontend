@@ -77,7 +77,10 @@ const PermissionStatusCard = ({
       <TextArea>
         <TitleRow>
           <Title $disabled={disabled}>{resolvedTitle}</Title>
-          <Badge $disabled={disabled}>{resolvedBadgeLabel}</Badge>
+          {/* 상태를 붙이지 않는 칸도 있다. 그때는 배지 자리를 아예 비운다. */}
+          {resolvedBadgeLabel && (
+            <Badge $disabled={disabled}>{resolvedBadgeLabel}</Badge>
+          )}
         </TitleRow>
         <Description $disabled={disabled}>{resolvedDescription}</Description>
       </TextArea>
