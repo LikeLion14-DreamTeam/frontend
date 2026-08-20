@@ -39,6 +39,9 @@ import { getTrip, getTripPins } from '../../features/trips/tripApi'
 const FALLBACK_PIN_ID = 101
 const DETAIL_MAP_ZOOM = 15.5
 
+/** `HTMLMediaElement.HAVE_CURRENT_DATA`. 지금 자리의 소리를 낼 수 있는 상태다. */
+const HAVE_CURRENT_DATA = 2
+
 /* 기록 시트가 서는 세 자리. 값은 모두 화면 위에서부터 잰 거리다. */
 const SHEET_TOP_INSET = 44
 const SHEET_DEFAULT_TOP = 317
@@ -142,7 +145,7 @@ const PinDetail = () => {
   const [audioSrc, setAudioSrc] = useState(null)
   const [playedRatio, setPlayedRatio] = useState(0)
   const [playedSec, setPlayedSec] = useState(0)
-  /* 파일 메타데이터가 서버의 계산값보다 정확하므로 화면 표시에 우선한다. */
+  /* 파일에서 읽은 길이. 서버가 길이를 주지 않는 예전 핀을 위한 대비다. */
   const [audioDuration, setAudioDuration] = useState(0)
   const [voiceError, setVoiceError] = useState('')
   const [pin, setPin] = useState(null)
@@ -370,6 +373,15 @@ const PinDetail = () => {
 
     try {
       setVoiceError('')
+
+      /* 파일을 아직 못 받았거나 길이를 못 읽은 상태면 다시 불러온다.
+         그대로 재생하면 소리 없이 시계만 도는데, 요소를 계속 쓰기 때문에
+         한번 그 상태에 빠지면 다시 불러오기 전까지 계속 그렇다.
+         `load()` 는 클릭 안에서 부르므로 iOS 의 재생 허용이 유지된다. */
+      if (audio.readyState < HAVE_CURRENT_DATA || !Number.isFinite(audio.duration)) {
+        audio.load()
+      }
+
       await audio.play()
       setIsPlaying(true)
     } catch {
@@ -476,6 +488,9 @@ const PinDetail = () => {
     ? { lat: latitude, lng: longitude }
     : null
   const title = pin.place_name || pin.address || '이름 없는 장소'
+  /* 서버가 준 길이를 먼저 쓴다. 길이를 함께 보내기 전에 만든 핀은 0 으로
+     오는데, 그때만 파일에서 읽은 값으로 받친다. */
+  const voiceDuration = pin.voice_memo?.duration_sec || audioDuration
   const apiRepresentativePhotos = (pin.representative_photos ?? [])
     .filter((photo) => photo?.url)
     .slice(0, 3)
@@ -645,11 +660,7 @@ const PinDetail = () => {
                 {pin.voice_memo && (
                   <>
                     <VoiceMemoBar
-                      duration={
-                        audioDuration > 0
-                          ? audioDuration
-                          : pin.voice_memo.duration_sec
-                      }
+                      duration={voiceDuration}
                       position={playedSec}
                       isPlaying={isPlaying}
                       progress={playedRatio}
@@ -657,11 +668,13 @@ const PinDetail = () => {
                       disabled={!audioSrc}
                     />
 
-                    {/* 파일 메타데이터를 읽어 서버 계산값과 실제 재생 길이를 맞춘다. */}
+                    {/* 파일 메타데이터를 읽어 서버 계산값과 실제 재생 길이를 맞춘다.
+                        머리말만 받아 두면 첫 재생에서 데이터가 모자라 소리 없이
+                        시계만 돈다. 음성 메모는 짧아 통째로 미리 받는다. */}
                     <audio
                       ref={audioRef}
                       src={audioSrc ?? undefined}
-                      preload="metadata"
+                      preload="auto"
                       onLoadedMetadata={(event) => {
                         const { duration } = event.currentTarget
                         if (Number.isFinite(duration)) setAudioDuration(duration)
@@ -670,10 +683,18 @@ const PinDetail = () => {
                       onPause={() => setIsPlaying(false)}
                       onTimeUpdate={(event) => {
                         const { currentTime, duration } = event.currentTarget
-                        setPlayedSec(currentTime)
-                        setPlayedRatio(
-                          duration ? currentTime / duration : 0,
-                        )
+                        /* iOS 는 파일 길이를 못 읽으면 duration 을 Infinity 로
+                           준다. 그대로 나누면 비율이 0 에 붙어 진행바가 멈추고
+                           지난 시간만 끝없이 늘어난다. 서버가 준 길이로 받친다. */
+                        const total = Number.isFinite(duration) && duration > 0
+                          ? duration
+                          : voiceDuration
+                        const played = total > 0
+                          ? Math.min(currentTime, total)
+                          : currentTime
+
+                        setPlayedSec(played)
+                        setPlayedRatio(total > 0 ? played / total : 0)
                       }}
                       onEnded={() => {
                         setIsPlaying(false)
