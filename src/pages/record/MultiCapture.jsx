@@ -7,6 +7,7 @@ import PhotoPreviewOverlay, {
   PreviewDeleteButton,
 } from '../../components/common/PhotoPreviewOverlay'
 import cameraFlipIcon from '../../assets/icons/camera-flip.svg'
+import useIsLandscape from '../../hooks/useIsLandscape'
 import { linkProduct } from '../../features/products/productApi'
 import useRecordDraftStore from '../../features/pins/useRecordDraftStore'
 import {
@@ -47,8 +48,10 @@ const MAX_ZOOM = 9
 /** `1x`, `2.4x` 처럼 다듬는다. 소수 첫째 자리까지만 본다. */
 const formatZoom = (value) => `${Number(value.toFixed(1))}x`
 
-// 저장 비율 3:4 고정. 뷰파인더도 같은 비율이라 보이는 그대로 찍힌다.
-const CAPTURE_RATIO = 3 / 4
+/* 저장 비율. 뷰파인더도 같은 비율이라 보이는 그대로 찍힌다.
+   기기를 돌리면 긴 쪽이 바뀌므로 비율도 함께 뒤집는다. */
+const PORTRAIT_RATIO = 3 / 4
+const LANDSCAPE_RATIO = 4 / 3
 
 // 개발 모드의 StrictMode 재마운트에서도 같은 NFC 연결 요청을 중복 호출하지 않는다.
 const requestedTagLinks = new Set()
@@ -85,6 +88,8 @@ const MultiCapture = () => {
     searchParams.get('tag_id') ??
     ''
   ).trim()
+
+  const isLandscape = useIsLandscape()
 
   const [shots, setShots] = useState(() => storedPhotos)
   const [previewId, setPreviewId] = useState(null)
@@ -318,14 +323,15 @@ const MultiCapture = () => {
     const video = videoRef.current
     if (!video || status !== 'ready' || shots.length >= MAX_PIN_PHOTOS) return
 
-    // 원본 프레임에서 3:4 영역만 가운데 기준으로 잘라낸다.
-    // 뷰파인더가 object-fit: cover 라 화면에 보이던 영역과 동일하다.
+    /* 원본 프레임에서 화면 방향에 맞는 영역만 가운데 기준으로 잘라낸다.
+       뷰파인더가 object-fit: cover 라 화면에 보이던 영역과 동일하다. */
+    const captureRatio = isLandscape ? LANDSCAPE_RATIO : PORTRAIT_RATIO
     const sourceWidth = video.videoWidth
     const sourceHeight = video.videoHeight
-    const isSourceWider = sourceWidth / sourceHeight > CAPTURE_RATIO
+    const isSourceWider = sourceWidth / sourceHeight > captureRatio
 
-    const cropWidth = isSourceWider ? sourceHeight * CAPTURE_RATIO : sourceWidth
-    const cropHeight = isSourceWider ? sourceHeight : sourceWidth / CAPTURE_RATIO
+    const cropWidth = isSourceWider ? sourceHeight * captureRatio : sourceWidth
+    const cropHeight = isSourceWider ? sourceHeight : sourceWidth / captureRatio
     const cropX = (sourceWidth - cropWidth) / 2
     const cropY = (sourceHeight - cropHeight) / 2
 
@@ -419,13 +425,14 @@ const MultiCapture = () => {
   }
 
   return (
-    <CaptureShell>
+    <CaptureShell $landscape={isLandscape}>
       <DarkSafeArea />
 
       <ViewfinderArea>
         <ViewfinderSpacer aria-hidden="true" />
 
         <Viewfinder
+          $landscape={isLandscape}
           onTouchStart={handlePinchStart}
           onTouchMove={handlePinchMove}
           onTouchEnd={handlePinchEnd}
@@ -504,8 +511,8 @@ const MultiCapture = () => {
         )}
       </ViewfinderArea>
 
-      <BottomPanel>
-        <ThumbnailStrip aria-label="촬영한 사진">
+      <BottomPanel $landscape={isLandscape}>
+        <ThumbnailStrip $landscape={isLandscape} aria-label="촬영한 사진">
           {shots.map((shot, index) => (
             <ThumbnailButton
               key={shot.id}
@@ -518,8 +525,12 @@ const MultiCapture = () => {
           ))}
         </ThumbnailStrip>
 
-        <ControlRow>
-          <TextButton type="button" onClick={handleClose}>
+        <ControlRow $landscape={isLandscape}>
+          <TextButton
+            type="button"
+            $landscape={isLandscape}
+            onClick={handleClose}
+          >
             닫기
           </TextButton>
 
@@ -533,6 +544,7 @@ const MultiCapture = () => {
           <TextButton
             type="button"
             $accent
+            $landscape={isLandscape}
             onClick={handleDone}
             disabled={shots.length === 0}
           >
@@ -578,14 +590,16 @@ const BOTTOM_PANEL_HEIGHT = '173px'
    장수 문구가 이 사이 공간의 한가운데에 놓인다. 시안은 39. */
 const VIEWFINDER_GAP = '15px'
 
+/* 가로에서는 폭 상한을 풀고 방향을 눕힌다. 조작부가 아래가 아니라 오른쪽에
+   붙어야 뷰파인더가 세로 공간을 온전히 쓴다. */
 const CaptureShell = styled.main`
   width: 100%;
-  max-width: 450px;
+  max-width: ${({ $landscape }) => ($landscape ? 'none' : '450px')};
   /* 스크롤 없이 한 화면에 들어가도록 높이를 고정한다. */
   height: var(--app-viewport-height);
   margin: 0 auto;
   display: flex;
-  flex-direction: column;
+  flex-direction: ${({ $landscape }) => ($landscape ? 'row' : 'column')};
   overflow: hidden;
   background: var(--Text-Primary);
 `
@@ -616,19 +630,32 @@ const PhotoLimitSlot = styled.div`
   justify-content: center;
 `
 
-/* 3:4 고정. 폭이 넘칠 때를 대비해 남은 세로 공간에서 역산한 값과 100% 중 작은 쪽을 쓴다. */
+/* 세로는 3:4, 가로는 4:3. 폭이 넘칠 때를 대비해 남은 세로 공간에서 역산한
+   값과 100% 중 작은 쪽을 쓴다.
+   가로에서는 조작부가 옆으로 빠져 세로를 먹지 않으므로 패널 높이를 빼지 않는다. */
 const Viewfinder = styled.div`
   position: relative;
-  width: min(
-    100%,
-    calc(
-      (
-          var(--app-viewport-height) - ${BOTTOM_PANEL_HEIGHT} -
-            ${VIEWFINDER_GAP} - env(safe-area-inset-bottom)
-        ) * 3 / 4
-    )
-  );
-  aspect-ratio: 3 / 4;
+  width: ${({ $landscape }) =>
+    $landscape
+      ? `min(
+          100%,
+          calc(
+            (
+                var(--app-viewport-height) - ${VIEWFINDER_GAP} -
+                  env(safe-area-inset-bottom)
+              ) * 4 / 3
+          )
+        )`
+      : `min(
+          100%,
+          calc(
+            (
+                var(--app-viewport-height) - ${BOTTOM_PANEL_HEIGHT} -
+                  ${VIEWFINDER_GAP} - env(safe-area-inset-bottom)
+              ) * 3 / 4
+          )
+        )`};
+  aspect-ratio: ${({ $landscape }) => ($landscape ? '4 / 3' : '3 / 4')};
   overflow: hidden;
   /* 두 손가락 손짓을 브라우저에 넘기지 않는다. 넘기면 화면 자체가 확대된다. */
   touch-action: none;
@@ -762,12 +789,23 @@ const RetryButton = styled.button`
   cursor: pointer;
 `
 
+/* 세로에서는 아래에 눕고, 가로에서는 오른쪽에 선다. 두께는 같은 값을 쓴다. */
 const BottomPanel = styled.section`
   flex: 0 0 auto;
-  height: calc(${BOTTOM_PANEL_HEIGHT} + env(safe-area-inset-bottom));
-  padding: 0 24px calc(20px + env(safe-area-inset-bottom));
   display: flex;
-  flex-direction: column;
+
+  ${({ $landscape }) =>
+    $landscape
+      ? `
+        width: calc(${BOTTOM_PANEL_HEIGHT} + env(safe-area-inset-right));
+        padding: 24px calc(20px + env(safe-area-inset-right)) 24px 0;
+        flex-direction: row;
+      `
+      : `
+        height: calc(${BOTTOM_PANEL_HEIGHT} + env(safe-area-inset-bottom));
+        padding: 0 24px calc(20px + env(safe-area-inset-bottom));
+        flex-direction: column;
+      `}
 `
 
 const PhotoLimitStatus = styled.p`
@@ -781,15 +819,27 @@ const PhotoLimitStatus = styled.p`
    패널의 좌우 여백을 음수 마진으로 상쇄하고 같은 값을 스크롤 영역 안쪽에 준다. */
 const ThumbnailStrip = styled.div`
   flex: 0 0 66px;
-  height: 66px;
-  margin: 0 -24px;
-  padding: 0 24px;
   display: flex;
   align-items: center;
   gap: 9px;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
+  overscroll-behavior: contain;
   scrollbar-width: none;
+
+  ${({ $landscape }) =>
+    $landscape
+      ? `
+        width: 66px;
+        margin: -24px 0;
+        padding: 24px 0;
+        flex-direction: column;
+        overflow-y: auto;
+      `
+      : `
+        height: 66px;
+        margin: 0 -24px;
+        padding: 0 24px;
+        overflow-x: auto;
+      `}
 
   &::-webkit-scrollbar {
     display: none;
@@ -820,17 +870,32 @@ const ThumbnailImage = styled.img`
 
 const ControlRow = styled.div`
   flex: 0 0 72px;
-  height: 72px;
-  margin-top: 15px;
-  /* 패널 좌우 여백 24 + 30 = 시안의 54px */
-  padding: 0 30px;
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
+
+  ${({ $landscape }) =>
+    $landscape
+      ? `
+        width: 72px;
+        margin-left: 15px;
+        padding: 30px 0;
+        grid-template-rows: 1fr auto 1fr;
+        justify-items: center;
+      `
+      : `
+        height: 72px;
+        margin-top: 15px;
+        /* 패널 좌우 여백 24 + 30 = 시안의 54px */
+        padding: 0 30px;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: center;
+      `}
 `
 
 const TextButton = styled.button`
-  justify-self: ${({ $accent }) => ($accent ? 'end' : 'start')};
+  ${({ $landscape, $accent }) =>
+    $landscape
+      ? `align-self: ${$accent ? 'end' : 'start'};`
+      : `justify-self: ${$accent ? 'end' : 'start'};`}
   padding: 8px 0;
   border: 0;
   background: none;
