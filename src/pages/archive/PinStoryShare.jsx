@@ -7,7 +7,7 @@ import downloadIcon from '../../assets/story-share/download.svg'
 import shareIcon from '../../assets/story-share/share.svg'
 import { getPhotobook } from '../../features/photobooks/photobookApi'
 import SnapSheet from '../../components/common/SnapSheet'
-import sheetWidth from '../../components/common/sheetWidth'
+import overlayWidth from '../../components/common/overlayWidth'
 
 const STORY_WIDTH = 1080
 const STORY_HEIGHT = 1920
@@ -619,7 +619,7 @@ const ArrowButton = styled.button`
 `
 
 const TemplateSheet = styled(SnapSheet)`
-  ${sheetWidth}
+  ${overlayWidth}
   left: 50%;
   z-index: 4;
   padding: 0 0 20px;
