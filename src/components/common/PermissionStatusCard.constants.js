@@ -2,8 +2,10 @@ import cameraOffIcon from '../../assets/icons/permission-camera-off.png'
 import cameraOnIcon from '../../assets/icons/permission-camera-on.png'
 import locationOffIcon from '../../assets/icons/permission-location-off.png'
 import locationOnIcon from '../../assets/icons/permission-location-on.png'
+import microphoneOffIcon from '../../assets/icons/permission-microphone-off.svg'
 import nfcOffIcon from '../../assets/icons/permission-nfc-off.png'
 import nfcOnIcon from '../../assets/icons/permission-nfc-on.png'
+import microphoneIcon from '../../assets/pin-save/microphone.svg'
 
 /**
  * Figma 권한 카드 3종 기본값입니다.
@@ -43,6 +45,18 @@ export const permissionStatusCardPresets = {
     disabledIcon: locationOffIcon,
     iconSize: 26,
   },
+  microphone: {
+    title: '마이크',
+    description: '태깅한 순간의 소리를 기록해요',
+    disabledDescription: '태깅 중 음성 기록이 안 돼요',
+    enabledBadgeLabel: '필수',
+    icon: microphoneIcon,
+    disabledIcon: microphoneOffIcon,
+    iconSize: {
+      width: 16,
+      height: 20,
+    },
+  },
 }
 
 export const permissionStatusCardItems = [
@@ -57,5 +71,9 @@ export const permissionStatusCardItems = [
   {
     key: 'location',
     ...permissionStatusCardPresets.location,
+  },
+  {
+    key: 'microphone',
+    ...permissionStatusCardPresets.microphone,
   },
 ]

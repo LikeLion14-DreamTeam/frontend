@@ -17,9 +17,8 @@ import {
   requestDevicePermission,
 } from '../../features/permissions/devicePermissions'
 import { recordPermissionEvent } from '../../features/permissions/permissionApi'
-import privacyLockIcon from '../../assets/icons/privacy-lock.svg'
 
-const REQUEST_PERMISSION_TYPES = ['camera', 'location']
+const REQUEST_PERMISSION_TYPES = ['camera', 'location', 'microphone']
 
 /**
  * 위치는 없으면 서비스가 성립하지 않는다. 핀·지도·여정이 모두 좌표 위에 선다.
@@ -66,6 +65,7 @@ const Permission = () => {
     nfc: getNfcIntroStatus(mobileOS),
     camera: DEVICE_PERMISSION_STATUS.IDLE,
     location: DEVICE_PERMISSION_STATUS.IDLE,
+    microphone: DEVICE_PERMISSION_STATUS.IDLE,
   }))
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
@@ -240,12 +240,6 @@ const Permission = () => {
             })}
           </PermissionList>
 
-          <PrivacyCard>
-            <PrivacyIcon src={privacyLockIcon} alt="" aria-hidden="true" />
-            <PrivacyText>
-              태깅하지 않은 사진과 위치는 어디에도 저장되지 않아요
-            </PrivacyText>
-          </PrivacyCard>
         </Body>
 
         <Footer>
@@ -327,31 +321,6 @@ const PermissionList = styled.div`
   display: flex;
   flex-direction: column;
   gap: 12px;
-`
-
-const PrivacyCard = styled.aside`
-  min-height: 42px;
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  padding: 12px 20px;
-  border-radius: 12px;
-  background: rgb(181 118 59 / 9%);
-`
-
-const PrivacyIcon = styled.img`
-  width: 13.5px;
-  height: 18.5px;
-  flex: 0 0 auto;
-  display: block;
-`
-
-const PrivacyText = styled.p`
-  min-width: 0;
-  flex: 1;
-  color: var(--Primary-Cognac);
-  font: var(--text-ui-caption);
-  word-break: keep-all;
 `
 
 const Footer = styled.section`
