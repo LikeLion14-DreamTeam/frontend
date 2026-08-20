@@ -1,5 +1,241 @@
+@font-face {
+  font-family: "Noto Sans KR";
+  src: url("./assets/fonts/NotoSansKR-VariableFont_wght.woff2")
+    format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Cormorant Garamond";
+  src: url("./assets/fonts/CormorantGaramond-VariableFont_wght.woff2")
+    format("woff2");
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Cormorant Garamond";
+  src: url("./assets/fonts/CormorantGaramond-Italic-VariableFont_wght.woff2")
+    format("woff2");
+  font-weight: 300 700;
+  font-style: italic;
+  font-display: swap;
+}
+
 * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  /* Use the visible viewport on mobile while keeping a fallback for older browsers. */
+  --app-viewport-height: 100vh;
+  /* The mobile browser/webview already starts below the designed 58px top safe area. */
+  --design-safe-top: 58px;
+
+  /* Color */
+  --Background-Base: #f7f1e8;
+  --Background-Paper: #f4ece1;
+  --Background-Passport: #efe7da;
+  --Surface-Base: #fffdf9;
+  --Primary-Cognac: #b5763b;
+  --Primary-Pressed: #945a2c;
+  --Accent-Gold: #c5a15b;
+  --Secondary-Taupe: #b5a18c;
+  --Text-Primary: #30251d;
+  --Text-Secondary: #817468;
+  --Text-Inverse: #ffffff;
+  --Border-Default: #ded3c6;
+  --Border-Strong: #c8b8a6;
+  --State-Disabled-Fill: #e8e0d7;
+  --State-Disabled-Text: #b6aca2;
+  --Ink-Film: #332a22;
+  --Ink-Overlay: #2a2522;
+
+  /* Map palette */
+  --Map-Base: #f4eee5;
+  --Map-Land: #eee6db;
+  --Map-Road: #d9d0c5;
+  --Map-Water: #d9e0dc;
+  --Map-Park: #e2e6d7;
+  --Map-Pin-Inactive: #b9aa99;
+
+  /* Typography */
+  --font-sans: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic",
+    system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+
+  --text-editorial-display: 600 40px/44px var(--font-serif);
+  --text-editorial-h1: 600 32px/38px var(--font-serif);
+  --text-editorial-h2: 600 24px/30px var(--font-serif);
+  --text-editorial-brand: 600 24px/30px var(--font-serif);
+  --text-ui-h1: 700 26px/36px var(--font-sans);
+  --text-ui-h2: 700 22px/30px var(--font-sans);
+  --text-ui-h3: 500 18px/26px var(--font-sans);
+  --text-ui-body-l: 400 16px/24px var(--font-sans);
+  --text-ui-body-m: 400 14px/22px var(--font-sans);
+  --text-ui-label: 500 13px/18px var(--font-sans);
+  --text-ui-button: 500 15px/20px var(--font-sans);
+  --text-ui-caption: 400 12px/18px var(--font-sans);
+  --text-ui-nav: 500 11px/16px var(--font-sans);
+
+  /* Elevation */
+  --Effect-Card: 0 4px 14px rgb(48 38 28 / 11%);
+  --Effect-Chip: 0 2px 6px rgb(48 38 28 / 6%);
+  --Effect-Marker: 0 2px 5px rgb(48 38 28 / 18%);
+  --Effect-Marker-Active: 0 4px 10px rgb(48 38 28 / 30%);
+  --Effect-Bottom-Sheet: 0 -5px 22px rgb(48 38 28 / 17%);
+  --Effect-CTA: 0 6px 16px rgb(48 38 28 / 30%);
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --app-viewport-height: 100dvh;
+  }
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  background-color: var(--Background-Base, #f7f1e8);
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--Text-Primary, #30251d);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.text-editorial-display {
+  font: var(--text-editorial-display);
+  letter-spacing: 0.8px;
+}
+
+.text-editorial-h1 {
+  font: var(--text-editorial-h1);
+  letter-spacing: 0.32px;
+}
+
+.text-editorial-h2 {
+  font: var(--text-editorial-h2);
+  letter-spacing: 0.24px;
+}
+
+.text-editorial-brand {
+  font: var(--text-editorial-brand);
+  letter-spacing: 1.44px;
+}
+
+.text-ui-h1 {
+  font: var(--text-ui-h1);
+  letter-spacing: -0.26px;
+}
+
+.text-ui-h2 {
+  font: var(--text-ui-h2);
+  letter-spacing: -0.22px;
+}
+
+.text-ui-h3 {
+  font: var(--text-ui-h3);
+}
+
+.text-ui-body-l {
+  font: var(--text-ui-body-l);
+}
+
+.text-ui-body-m {
+  font: var(--text-ui-body-m);
+}
+
+.text-ui-label {
+  font: var(--text-ui-label);
+}
+
+.text-ui-button {
+  font: var(--text-ui-button);
+}
+
+.text-ui-caption {
+  font: var(--text-ui-caption);
+}
+
+.text-ui-nav {
+  font: var(--text-ui-nav);
+}
+
+/*
+ * 지도 화면과 수동 핀 추가 화면 사이의 이어짐.
+ *
+ * 두 화면은 서로 다른 라우트라 원래는 각자 새로 그려진다. 같은
+ * `view-transition-name` 을 붙여 두면 브라우저가 바뀌기 전후 모습을 이어 준다.
+ * 드롭바가 주소 입력칸 폭으로 늘어나는 건 이름만 맞으면 저절로 그려진다.
+ *
+ * 아이콘은 기본 동작(겹쳐서 흐리게 바꾸기)으로는 + 가 X 로 도는 것처럼 보이지
+ * 않아 회전을 직접 준다. 옛 모습을 45도 돌려 내보내고 새 모습을 -45도에서
+ * 받아 오면, 둘이 겹쳐 한 번 도는 것으로 읽힌다. 돌아올 때도 같은 값으로 맞는다.
+ */
+/*
+ * 폭만 늘어나야 한다.
+ *
+ * 기본값은 높이가 `auto` 라 가로세로 비율을 지키며 늘어난다. 폭이 커지면
+ * 높이도 따라 커진 것처럼 보인다. 두 요소의 높이는 이미 같으므로 높이만
+ * 상자에 맞춰 두면 가로로만 자란다.
+ */
+::view-transition-old(map-top-bar),
+::view-transition-new(map-top-bar) {
+  block-size: 100%;
+}
+
+/*
+ * + 가 X 로 도는 모습.
+ *
+ * 두 화면의 아이콘은 같은 그림에 각도만 다르다. 기본 동작대로 옛 그림과 새
+ * 그림을 겹쳐 흐리게 바꾸면 45도 어긋난 같은 그림이 겹쳐 보여 잔상이 남는다.
+ * 옛 그림은 감추고 새 그림 한 장만 돌린다.
+ *
+ * 새 그림은 도착한 모습(X)이라 -45도에서 시작하면 화면에는 + 로 보인다.
+ * 거기서 0도까지 돌면 한 번에 X 가 된다. 돌아올 때도 같은 값으로 맞는다.
+ */
+::view-transition-old(map-top-action-icon) {
+  animation: none;
+  opacity: 0;
+}
+
+::view-transition-new(map-top-action-icon) {
+  animation: map-action-icon-turn 300ms ease;
+  /* 겹치지 않으므로 밝기를 더하는 기본 혼합을 끈다. */
+  mix-blend-mode: normal;
+  opacity: 1;
+}
+
+@keyframes map-action-icon-turn {
+  from {
+    transform: rotate(-45deg);
+  }
+
+  to {
+    transform: rotate(0deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
 }

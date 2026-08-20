@@ -1,0 +1,130 @@
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { getAuthenticatedEntryPath } from '../auth/authRoutes'
+import useAuthStore from '../auth/useAuthStore'
+import {
+  COMPLETED_STAGE,
+  getOnboardingProgress,
+} from './onboardingProgressApi'
+import { getOnboardingFlowPath, ONBOARDING_STAGE_PATHS } from './onboardingFlow'
+
+/**
+ * 온보딩 화면이 서버가 기다리는 자리에서 시작하도록 맞춘다.
+ *
+ * 서버가 사용자별로 다음에 받을 단계·라운드를 들고 있어서, 화면이 늘 1라운드부터
+ * 시작하면 어긋난다(2.1 이 `현재 진행 중인 라운드가 아닙니다` 로 거절한다).
+ * 들어올 때 2.6 을 읽어 시작 라운드를 정하고, 단계가 다르면 그 화면으로 보낸다.
+ *
+ * 재학습은 예외다. 완주한 사용자가 2.1 에 1라운드를 보내는 순간 서버가 기록을
+ * 지우고 처음으로 되돌리므로, 조회 결과가 `COMPLETED` 여도 그대로 1라운드에서 시작한다.
+ *
+ * 라운드 상태를 여기서 들고 있는다. 화면이 따로 `useState` 로 잡으면 첫 렌더의
+ * 값에 고정돼, 나중에 도착한 조회 결과가 반영되지 않는다.
+ *
+ * @param stage 이 화면이 담당하는 2.6 단계 값
+ * @param isRelearning 재학습 흐름인지
+ * @param initialRound progress 조회 없이 시작할 때 사용할 화면 라운드
+ * @param restorePreviousStage 이미 완료한 이전 단계를 다시 볼 때 사용한다
+ * @param normalizeRound 서버 라운드를 화면 라운드로 바꿔야 할 때 사용한다
+ * @param onProgressLoaded 진행 상태에 담긴 기존 응답을 화면 state로 복원할 때 사용한다
+ * @returns `{ isReady, round, setRound }` — 준비 전에는 화면을 그리지 않는다
+ */
+const useOnboardingStart = ({
+  stage,
+  isRelearning,
+  initialRound = 1,
+  restorePreviousStage = false,
+  normalizeRound = (roundNo) => roundNo,
+  onProgressLoaded,
+}) => {
+  const navigate = useNavigate()
+  const user = useAuthStore((state) => state.user)
+  const [isReady, setIsReady] = useState(false)
+  const [round, setRound] = useState(1)
+  const normalizeRoundRef = useRef(normalizeRound)
+  const onProgressLoadedRef = useRef(onProgressLoaded)
+
+  normalizeRoundRef.current = normalizeRound
+  onProgressLoadedRef.current = onProgressLoaded
+
+  useEffect(() => {
+    // 초기 온보딩에서도 다음 단계에서 이전 단계로 돌아올 수 있다. 이때는 서버의
+    // current_stage가 다음 단계이므로, 일반 조회 로직을 타면 즉시 다시 쫓겨난다.
+    // 전달받은 응답과 라운드로 화면을 복원한 뒤 사용자가 다시 다음을 누를 때만
+    // 정상 진행 상태를 조회하도록 한다.
+    if (isRelearning || restorePreviousStage) {
+      setRound(initialRound)
+      setIsReady(true)
+      return undefined
+    }
+
+    let ignore = false
+
+    const load = async () => {
+      try {
+        const progress = await getOnboardingProgress()
+        if (ignore) return
+
+        if (progress.current_stage === COMPLETED_STAGE) {
+          navigate(getAuthenticatedEntryPath(user), { replace: true })
+          return
+        }
+
+        const stagePath = ONBOARDING_STAGE_PATHS[progress.current_stage]
+
+        if (progress.current_stage !== stage && stagePath) {
+          navigate(getOnboardingFlowPath(stagePath, false), { replace: true })
+          return
+        }
+
+        onProgressLoadedRef.current?.(progress)
+        setRound(normalizeRoundRef.current(progress.current_round))
+        setIsReady(true)
+      } catch {
+        // 조회에 실패해도 온보딩을 막지는 않는다. 1라운드부터 시작한다.
+        if (!ignore) setIsReady(true)
+      }
+    }
+
+    load()
+
+    return () => {
+      ignore = true
+    }
+  }, [
+    initialRound,
+    isRelearning,
+    navigate,
+    restorePreviousStage,
+    stage,
+    user,
+  ])
+
+  /**
+   * 저장한 뒤 서버 진행 상태를 다시 읽어 화면을 맞춘다.
+   *
+   * 저장이 성공했다고 화면이 제멋대로 다음 라운드로 넘어가면 안 된다. 서버는
+   * 같은 사진을 다시 받으면 갱신만 하고 라운드를 전진시키지 않는데, 그때 화면만
+   * 앞서가면 이후 요청이 전부 `현재 진행 중인 라운드가 아닙니다` 로 막힌다.
+   *
+   * @returns 아직 이 단계에 머물면 true. 다음 화면으로 넘어가도 되면 false.
+   */
+  const syncAfterSave = async () => {
+    try {
+      const progress = await getOnboardingProgress()
+
+      if (progress.current_stage !== stage) return false
+
+      onProgressLoadedRef.current?.(progress)
+      setRound(normalizeRoundRef.current(progress.current_round))
+      return true
+    } catch {
+      // 조회에 실패하면 기존 흐름대로 진행한다.
+      return false
+    }
+  }
+
+  return { isReady, round, setRound, syncAfterSave }
+}
+
+export default useOnboardingStart

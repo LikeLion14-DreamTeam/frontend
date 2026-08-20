@@ -1,0 +1,16 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="68" height="56" viewBox="0 0 68 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Group 3">
+<path id="Polygon 2" d="M17 28L55.25 3.75129L55.25 52.2487L17 28Z" fill="url(#paint0_linear_0_47)"/>
+<g id="Journey Seal">
+<rect y="11" width="34" height="34" rx="17" fill="#C5A15B" fill-opacity="0.16"/>
+<rect x="0.5" y="11.5" width="33" height="33" rx="16.5" stroke="#C5A15B" stroke-opacity="0.55" stroke-dasharray="2.5 2"/>
+<circle id="Ellipse" cx="17" cy="28" r="5" fill="#B5763B"/>
+</g>
+</g>
+<defs>
+<linearGradient id="paint0_linear_0_47" x1="17.9444" y1="29.0566" x2="57.2963" y2="29.0566" gradientUnits="userSpaceOnUse">
+<stop stop-color="#C5A15B"/>
+<stop offset="1" stop-color="white" stop-opacity="0"/>
+</linearGradient>
+</defs>
+</svg>
