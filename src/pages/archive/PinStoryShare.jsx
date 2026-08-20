@@ -188,8 +188,10 @@ const drawTemplate = (canvas, templateId, images, pin) => {
     drawPolaroid(ctx, images[1], 560, 120)
     drawPolaroid(ctx, images[2], 48, 1132)
     drawPolaroid(ctx, images[3], 560, 824)
-    setText(ctx, { color: '#f7f1e8', font: `600 120px ${SERIF}`, spacing: 2 })
-    if (title) ctx.fillText(title, 48, 166)
+    /* 제목은 왼쪽 폴라로이드 폭(48~518) 안에 들어가야 한다. 120 으로 두면
+       `서울특별시` 다섯 글자가 610 이 되어 오른쪽 사진을 덮는다. */
+    setText(ctx, { color: '#f7f1e8', font: `600 100px ${SERIF}`, spacing: 2 })
+    if (title) ctx.fillText(title, 48, 176)
     setText(ctx, { color: '#f2eee2', font: `600 40px ${SERIF}`, spacing: 8 })
     ctx.fillText(date, 48, 290)
     return
