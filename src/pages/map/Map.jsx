@@ -825,7 +825,7 @@ const MapPage = () => {
           >
             <RoutePolyline path={routePath} showArrows={SHOW_ROUTE_ARROWS} />
 
-            {SHOW_ROUTE_ARROWS
+            {SHOW_ROUTE_ARROWS || isCountryFilterMode
               ? mapPins.map((pin) => {
                   const isSelected = pin.pin_id === selectedPinId
 
