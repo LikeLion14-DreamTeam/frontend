@@ -37,12 +37,16 @@ const getRequiredPermissionMessage = (status) => {
 }
 
 const getBadgeLabel = (permissionType, status) => {
+  /* NFC 는 허용을 받는 칸이 아니라 제품을 어떻게 쓰는지 알리는 칸이라
+     상태를 붙이지 않는다. 붙이면 허용해야 하는 것처럼 읽힌다. */
+  if (permissionType === 'nfc') return null
+
   if (status === DEVICE_PERMISSION_STATUS.CHECKING) {
     return '확인 중'
   }
 
   if (status === DEVICE_PERMISSION_STATUS.GRANTED) {
-    return permissionType === 'nfc' ? '안내됨' : '허용됨'
+    return '허용됨'
   }
 
   if (status === DEVICE_PERMISSION_STATUS.DENIED) {

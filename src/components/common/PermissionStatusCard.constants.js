@@ -18,7 +18,10 @@ export const permissionStatusCardPresets = {
     title: 'NFC',
     description: 'MCM 태그를 읽어 핀을 만들어요',
     disabledDescription: '제품을 태그해도 반응하지 않아요',
-    enabledBadgeLabel: '확인',
+    /* 허용을 받는 칸이 아니라 알리기만 하는 칸이라 배지를 달지 않는다.
+       `null` 을 넘겨야 카드의 기본값(`필수`·`꺼짐`)이 대신 들어오지 않는다. */
+    enabledBadgeLabel: null,
+    disabledBadgeLabel: null,
     icon: nfcOnIcon,
     disabledIcon: nfcOffIcon,
     iconSize: 28,

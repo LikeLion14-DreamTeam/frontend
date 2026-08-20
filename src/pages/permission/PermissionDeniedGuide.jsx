@@ -6,8 +6,11 @@ import Header from '../../components/layout/Header'
 import { DEVICE_PERMISSION_STATUS } from '../../features/permissions/devicePermissions'
 
 const getDeniedGuideBadgeLabel = (permissionType, status) => {
+  // 권한 화면과 같은 이유로 NFC 에는 상태를 붙이지 않는다.
+  if (permissionType === 'nfc') return null
+
   if (status === DEVICE_PERMISSION_STATUS.GRANTED) {
-    return permissionType === 'nfc' ? '안내됨' : '허용됨'
+    return '허용됨'
   }
 
   if (status === DEVICE_PERMISSION_STATUS.UNSUPPORTED) {
