@@ -153,11 +153,11 @@ const SnapSheet = ({
   }, [collapsedOffset, isCollapsed, nextOffset, settleAt])
 
   /*
-   * 시트 몸통(손잡이 아래)을 잡고 위로 쓸어올려도 시트가 따라 올라간다.
+   * 시트 몸통(손잡이 아래)을 잡고 쓸어도 시트가 따라 움직인다.
    *
    * 시트가 끝까지 열리기 전에는 내용의 스크롤을 잠가 두므로, 여기서 나는
    * 손짓은 전부 시트를 옮기는 데 쓴다. 끝까지 열린 뒤에는 잠금이 풀려 내용이
-   * 평소처럼 스크롤된다.
+   * 평소처럼 스크롤되고, 맨 위에서 아래로 쓸어내릴 때만 다시 시트를 옮긴다.
    *
    * 손잡이와 달리 이쪽은 이 요소가 처음부터 끝까지 직접 처리한다. 창에 붙는
    * 리스너에 넘기면 붙는 시점이 한 박자 늦어 첫 손짓을 놓친다.
@@ -168,7 +168,7 @@ const SnapSheet = ({
   const contentDragRef = useRef(null)
 
   const handleContentPointerDown = (event) => {
-    if (!expandOnScroll || offsetRef.current === 0) return
+    if (!expandOnScroll) return
     if (event.pointerType === 'mouse' && event.button !== 0) return
 
     contentDragRef.current = {
@@ -187,6 +187,17 @@ const SnapSheet = ({
 
     if (!drag.active) {
       if (Math.abs(deltaY) <= DRAG_START_DISTANCE) return
+
+      /* 다 열린 상태에서는 내용이 스크롤된다. 그 자리를 뺏지 않도록, 맨 위에서
+         아래로 쓸어내릴 때만 붙잡는다. 위로 쓸어올리거나 중간을 읽는 중이면
+         그대로 스크롤에 맡긴다. */
+      if (
+        drag.startOffset === 0 &&
+        !(deltaY > 0 && event.currentTarget.scrollTop <= 0)
+      ) {
+        contentDragRef.current = null
+        return
+      }
 
       drag.active = true
       event.currentTarget.setPointerCapture(event.pointerId)
