@@ -59,6 +59,13 @@ const DKM_PIN_IDS = {
   5: -9205,
 }
 
+// 예시 음성 파일의 실제 재생 길이(초). 브라우저 저장소에 남은 이전 예시
+// 데이터의 0초 값도 아래 마이그레이션으로 보정한다.
+const DKM_VOICE_MEMO_DURATIONS = {
+  [DKM_PIN_IDS[1]]: 7,
+  [DKM_PIN_IDS[2]]: 2,
+}
+
 const DKM_PIN_COORDINATES = {
   1: { latitude: 37.5036875, longitude: 126.9560625 },
   2: { latitude: 37.5046875, longitude: 126.9581875 },
@@ -273,7 +280,13 @@ const createPhotos = ({ journey, pinNo, taggedAt }) => {
   return photos
 }
 
-const createVoiceMemo = ({ journey, pinNo, taggedAt, voiceMemoId }) => {
+const createVoiceMemo = ({
+  journey,
+  pinNo,
+  taggedAt,
+  voiceMemoId,
+  durationSec = 0,
+}) => {
   const sourceAudioKey = `${journey.slug}/audio/pin-${String(pinNo).padStart(
     2,
     '0',
@@ -283,7 +296,8 @@ const createVoiceMemo = ({ journey, pinNo, taggedAt, voiceMemoId }) => {
     voice_memo_id: voiceMemoId,
     source_audio_key: sourceAudioKey,
     audio_file: audioUrl(sourceAudioKey),
-    duration_sec: 0,
+    // 재생 전에도 음성 메모의 전체 길이를 표시할 수 있도록 파일 길이를 함께 둔다.
+    duration_sec: durationSec,
     saved_at: taggedAt,
   }
 }
@@ -542,12 +556,14 @@ const createInitialState = () => {
     pinNo: 1,
     taggedAt: state.pins[DKM_PIN_IDS[1]].tagged_at,
     voiceMemoId: -9501,
+    durationSec: 7,
   })
   state.voiceMemos[DKM_PIN_IDS[2]] = createVoiceMemo({
     journey: JOURNEY_BY_SEGMENT_ID.get(DKM_DEMO_SEGMENT_ID),
     pinNo: 2,
     taggedAt: state.pins[DKM_PIN_IDS[2]].tagged_at,
     voiceMemoId: -9502,
+    durationSec: 2,
   })
 
   return applyDkmAllAboutUpdates(applySeededDkmPhotobookPins(state))
@@ -669,6 +685,20 @@ const seedPersistedRepresentativePhotos = (state) => {
   return true
 }
 
+const applyPersistedDemoVoiceMemoDurations = (state) => {
+  let didUpdate = false
+
+  Object.entries(DKM_VOICE_MEMO_DURATIONS).forEach(([pinId, durationSec]) => {
+    const voiceMemo = state.voiceMemos?.[pinId]
+    if (!voiceMemo || Number(voiceMemo.duration_sec) > 0) return
+
+    voiceMemo.duration_sec = durationSec
+    didUpdate = true
+  })
+
+  return didUpdate
+}
+
 const loadInitialState = () => {
   const storage = getBrowserStorage()
   if (!storage) return createInitialState()
@@ -683,7 +713,11 @@ const loadInitialState = () => {
           ),
         ),
       )
-      if (seedPersistedRepresentativePhotos(state)) {
+      const didSeedRepresentativePhotos = seedPersistedRepresentativePhotos(state)
+      const didUpdateVoiceMemoDurations =
+        applyPersistedDemoVoiceMemoDurations(state)
+
+      if (didSeedRepresentativePhotos || didUpdateVoiceMemoDurations) {
         storage.setItem(
           DEMO_JOURNEY_STORAGE_KEY,
           JSON.stringify({
